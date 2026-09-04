@@ -1,7 +1,40 @@
 import os
+from pathlib import Path
 from pydantic import BaseModel, Field
 
+# Automatically load from project root .env or backend/.env
+try:
+    from dotenv import load_dotenv
+    root_env = Path(__file__).resolve().parents[3] / ".env"
+    backend_env = Path(__file__).resolve().parents[2] / ".env"
+    if root_env.exists():
+        load_dotenv(dotenv_path=root_env)
+    elif backend_env.exists():
+        load_dotenv(dotenv_path=backend_env)
+    else:
+        load_dotenv()
+except ImportError:
+    pass
+
 class Settings(BaseModel):
+    database_url: str = Field(
+        default=os.getenv(
+            "DATABASE_URL",
+            "postgresql+asyncpg://postgres:postgres@localhost:5432/iwantajob_db",
+        )
+    )
+    freeapi_base_url: str = Field(
+        default=os.getenv(
+            "FREEAPI_BASE_URL",
+            "https://freeapiforme.aryansingh.space/v1",
+        )
+    )
+    freeapi_api_key: str = Field(
+        default=os.getenv("FREEAPI_API_KEY", "")
+    )
+    freeapi_model: str = Field(
+        default=os.getenv("FREEAPI_MODEL", "gemini-3.7-flash-tiered")
+    )
     indeed_api_key: str = Field(
         default=os.getenv(
             "INDEED_API_KEY",

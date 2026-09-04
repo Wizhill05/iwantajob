@@ -5,6 +5,16 @@ from fastapi import FastAPI, Query, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse
+from sqlalchemy import select, and_
+
+from src.core.database import init_db, async_session_maker
+from src.models.db_entities import UnifiedJob
+from src.services.parser_service import ParserService
+from src.services.raw_ingestion import (
+    save_raw_indeed_job,
+    save_raw_linkedin_job,
+    save_raw_wellfound_job,
+)
 
 from src.clients.indeed import (
     IndeedClient,
@@ -216,6 +226,13 @@ async def scrape_indeed(
             examples=["AAIAAQACAAAAAAAAAAAAAAACYxj34QEAAKimjvf6"],
         ),
     ] = None,
+    persist: Annotated[
+        bool,
+        Query(
+            description="When true, saves raw unmodified records into the raw_indeed_jobs table.",
+            examples=[True],
+        ),
+    ] = False,
 ):
     """
     Connects directly to Indeed's unauthenticated iOS mobile GraphQL gateway (`https://apis.indeed.com/graphql`)
@@ -249,7 +266,7 @@ async def scrape_indeed(
         )
 
     try:
-        items, next_cursor = await indeed_client.search_jobs(
+        res = await indeed_client.search_jobs(
             what=clean_what,
             where=clean_where,
             limit=limit,
@@ -257,7 +274,49 @@ async def scrape_indeed(
             radius=radius,
             radius_unit=radius_unit,
             cursor=cursor,
+            return_raw=True,
         )
+        items, next_cursor, raw_data = res
+
+        if persist:
+            raw_results = raw_data.get("data", {}).get("jobSearch", {}).get("results", [])
+            for res_item in raw_results:
+                job_d = res_item.get("job") or {}
+                t_key = res_item.get("trackingKey")
+                jk = job_d.get("key") or t_key
+                if not jk:
+                    continue
+                emp = job_d.get("employer") or {}
+                loc_d = job_d.get("location") or {}
+                loc_short = (loc_d.get("formatted") or {}).get("short") or clean_where
+                city_val = loc_d.get("city")
+                ctry_val = loc_d.get("countryCode")
+                apply_url_val = job_d.get("url") or ""
+                easy_apply = ("indeed.com" in apply_url_val) or not apply_url_val
+                attrs_val = job_d.get("attributes") or []
+                desc_d = job_d.get("description") or {}
+                desc_html_val = desc_d.get("html")
+                from src.models.job import clean_html
+                desc_text_val = clean_html(desc_html_val)
+                await save_raw_indeed_job({
+                    "external_id": jk,
+                    "tracking_key": t_key,
+                    "title": job_d.get("title", ""),
+                    "company_name": emp.get("name", "Unknown"),
+                    "location_raw": loc_short,
+                    "location_city": city_val,
+                    "location_country": ctry_val,
+                    "is_remote": bool(loc_d.get("isRemote")),
+                    "apply_url": apply_url_val,
+                    "easy_apply_available": easy_apply,
+                    "attributes": attrs_val,
+                    "salary_raw": None,
+                    "description_html": desc_html_val,
+                    "description_text": desc_text_val,
+                    "date_published": None,
+                    "raw_payload": res_item,
+                })
+
         return JobSearchResponse(
             query=clean_what,
             location=clean_where,
@@ -369,6 +428,13 @@ async def scrape_wellfound(
             examples=[False],
         ),
     ] = False,
+    persist: Annotated[
+        bool,
+        Query(
+            description="When true, saves raw unmodified records into the raw_wellfound_jobs table.",
+            examples=[True],
+        ),
+    ] = False,
 ):
     """
     Fetches Wellfound's unauthenticated Server-Side Rendered (SSR) directory pages (`/role/l/{role}/{location}`)
@@ -380,15 +446,50 @@ async def scrape_wellfound(
     * **Slug Normalization:** Unrecognized input terms map automatically to canonical slugs.
     """
     try:
-        jobs = await wellfound_client.search_jobs(
-            role=role,
-            location=location,
-            page=page,
-            limit=limit,
-            max_age_days=max_age_days,
-            include_all_company_jobs=include_all_company_jobs,
-        )
-        return jobs
+        if persist:
+            jobs, apollo_state = await wellfound_client.search_jobs(
+                role=role,
+                location=location,
+                page=page,
+                limit=limit,
+                max_age_days=max_age_days,
+                include_all_company_jobs=include_all_company_jobs,
+                return_raw=True,
+            )
+            for j in jobs:
+                await save_raw_wellfound_job({
+                    "external_id": j.external_id,
+                    "job_slug": j.url.split("/")[-1],
+                    "title": j.title,
+                    "company_name": j.company_name,
+                    "company_slug": None,
+                    "company_logo_url": j.company_logo_url,
+                    "company_website": j.company_website,
+                    "location_raw": j.location_raw,
+                    "locations_list": [j.location_raw],
+                    "is_remote": j.is_remote,
+                    "is_international": j.is_international,
+                    "salary_raw": j.salary_raw,
+                    "native_years_min": j.experience_min_years,
+                    "native_years_max": j.experience_max_years,
+                    "live_start_at": None,
+                    "url": j.url,
+                    "description_html": j.description_html,
+                    "description_text": j.description_text,
+                    "posted_at": j.posted_at,
+                    "raw_payload": {"external_id": j.external_id, "title": j.title},
+                })
+            return jobs
+        else:
+            jobs = await wellfound_client.search_jobs(
+                role=role,
+                location=location,
+                page=page,
+                limit=limit,
+                max_age_days=max_age_days,
+                include_all_company_jobs=include_all_company_jobs,
+            )
+            return jobs
     except Exception as exc:
         logger.error(f"Error executing Wellfound scrape: {exc}", exc_info=True)
         return JSONResponse(
@@ -513,6 +614,13 @@ async def scrape_linkedin(
             examples=[True],
         ),
     ] = True,
+    persist: Annotated[
+        bool,
+        Query(
+            description="When true, saves raw unmodified records into the raw_linkedin_jobs table.",
+            examples=[True],
+        ),
+    ] = False,
 ):
     """
     Queries LinkedIn's unauthenticated public guest search endpoint (`https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search`)
@@ -535,6 +643,25 @@ async def scrape_linkedin(
             seniority=seniority,
             fetch_descriptions=fetch_descriptions,
         )
+        if persist:
+            for j in jobs:
+                await save_raw_linkedin_job({
+                    "external_id": j.external_id,
+                    "title": j.title,
+                    "company_name": j.company_name,
+                    "company_logo_url": j.company_logo_url,
+                    "company_website": j.company_website,
+                    "location_raw": j.location_raw,
+                    "city": j.city,
+                    "is_remote": j.is_remote,
+                    "is_international": j.is_international,
+                    "url": j.url,
+                    "salary_raw": j.salary_raw,
+                    "description_html": j.description_html,
+                    "description_text": j.description_text,
+                    "posted_at": j.posted_at,
+                    "raw_payload": {"external_id": j.external_id, "title": j.title, "url": j.url},
+                })
         return jobs
     except Exception as exc:
         logger.error(f"Error executing LinkedIn scrape: {exc}", exc_info=True)
@@ -546,3 +673,120 @@ async def scrape_linkedin(
                 "retry_after": None,
             },
         )
+
+# ==========================================
+# Parsing & Unified Database Endpoints
+# ==========================================
+
+@app.get(
+    "/api/status/parsing",
+    summary="Get Raw vs Parsed Pipeline Status",
+    tags=["System"],
+)
+async def get_parsing_status():
+    """Inspect how many scraped records exist in raw tables vs promoted to unified_jobs."""
+    return await ParserService.get_parsing_status()
+
+@app.post(
+    "/api/parse/indeed",
+    summary="Manually Trigger Parsing for Indeed Raw Jobs",
+    tags=["Indeed"],
+)
+async def parse_indeed(
+    batch_size: Annotated[int, Query(ge=1, le=500, description="Max raw jobs to parse in this run")] = 50,
+    use_llm: Annotated[bool, Query(description="Whether to use LLM fallback for experience/salary")] = False,
+):
+    """Parses unparsed raw Indeed records into clean unified_jobs records."""
+    return await ParserService.parse_indeed_jobs(batch_size=batch_size, use_llm=use_llm)
+
+@app.post(
+    "/api/parse/linkedin",
+    summary="Manually Trigger Parsing for LinkedIn Raw Jobs",
+    tags=["LinkedIn"],
+)
+async def parse_linkedin(
+    batch_size: Annotated[int, Query(ge=1, le=500, description="Max raw jobs to parse in this run")] = 50,
+    use_llm: Annotated[bool, Query(description="Whether to use LLM fallback for experience/salary")] = False,
+):
+    """Parses unparsed raw LinkedIn records into clean unified_jobs records."""
+    return await ParserService.parse_linkedin_jobs(batch_size=batch_size, use_llm=use_llm)
+
+@app.post(
+    "/api/parse/wellfound",
+    summary="Manually Trigger Parsing for Wellfound Raw Jobs",
+    tags=["Wellfound"],
+)
+async def parse_wellfound(
+    batch_size: Annotated[int, Query(ge=1, le=500, description="Max raw jobs to parse in this run")] = 50,
+    use_llm: Annotated[bool, Query(description="Whether to use LLM fallback for experience/salary")] = False,
+):
+    """Parses unparsed raw Wellfound records into clean unified_jobs records."""
+    return await ParserService.parse_wellfound_jobs(batch_size=batch_size, use_llm=use_llm)
+
+@app.get(
+    "/api/jobs/unified",
+    summary="Query Standardized Clean Jobs from Central Database",
+    tags=["System"],
+)
+async def get_unified_jobs(
+    source: Annotated[str | None, Query(description="Filter by source: 'indeed', 'linkedin', 'wellfound'")] = None,
+    city: Annotated[str | None, Query(description="Filter by lowercase city slug")] = None,
+    is_fresher_friendly: Annotated[bool | None, Query(description="Filter strictly for freshers (min_years <= 1)")] = None,
+    easy_apply_available: Annotated[bool | None, Query(description="Filter for direct Indeed/easy apply jobs")] = None,
+    min_salary_inr: Annotated[int | None, Query(description="Minimum annual salary in INR")] = None,
+    limit: Annotated[int, Query(ge=1, le=200)] = 50,
+    offset: Annotated[int, Query(ge=0)] = 0,
+):
+    """
+    Query only clean, successfully parsed job profiles from unified_jobs with structured filters.
+    """
+    async with async_session_maker() as session:
+        conditions = []
+        if source:
+            conditions.append(UnifiedJob.source == source)
+        if city:
+            conditions.append(UnifiedJob.city == city.lower())
+        if is_fresher_friendly is not None:
+            conditions.append(UnifiedJob.is_fresher_friendly == is_fresher_friendly)
+        if easy_apply_available is not None:
+            conditions.append(UnifiedJob.easy_apply_available == easy_apply_available)
+        if min_salary_inr is not None:
+            conditions.append(UnifiedJob.salary_min_inr_year >= min_salary_inr)
+
+        stmt = select(UnifiedJob)
+        if conditions:
+            stmt = stmt.where(and_(*conditions))
+        stmt = stmt.order_by(UnifiedJob.parsed_at.desc()).offset(offset).limit(limit)
+
+        res = await session.execute(stmt)
+        jobs = res.scalars().all()
+
+        return [
+            {
+                "id": str(j.id),
+                "source": j.source,
+                "external_id": j.external_id,
+                "url": j.url,
+                "title": j.title,
+                "company_name": j.company_name,
+                "company_logo_url": j.company_logo_url,
+                "location_raw": j.location_raw,
+                "city": j.city,
+                "is_remote": j.is_remote,
+                "is_international": j.is_international,
+                "easy_apply_available": j.easy_apply_available,
+                "salary_min_inr_year": j.salary_min_inr_year,
+                "salary_max_inr_year": j.salary_max_inr_year,
+                "salary_raw": j.salary_raw,
+                "salary_currency_raw": j.salary_currency_raw,
+                "salary_extraction_method": j.salary_extraction_method,
+                "experience_min_years": j.experience_min_years,
+                "experience_max_years": j.experience_max_years,
+                "is_fresher_friendly": j.is_fresher_friendly,
+                "experience_extraction_method": j.experience_extraction_method,
+                "description_text": j.description_text[:300] + "...",
+                "posted_at": j.posted_at,
+                "parsed_at": j.parsed_at,
+            }
+            for j in jobs
+        ]

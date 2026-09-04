@@ -112,6 +112,11 @@ def build_indeed_graphql_query(
         f'          name\n'
         f'          relativeCompanyPageUrl\n'
         f'        }}\n'
+        f'        url\n'
+        f'        attributes {{\n'
+        f'          key\n'
+        f'          label\n'
+        f'        }}\n'
         f'      }}\n'
         f'    }}\n'
         f'  }}\n'
@@ -286,6 +291,12 @@ def parse_graphql_response(
         posted_at = parse_indeed_date(target_data.get("datePublished"))
         url = f"https://www.indeed.com/viewjob?jk={job_key}" if job_key else ""
 
+        apply_target_url = target_data.get("url") or ""
+        attrs = target_data.get("attributes") or []
+        is_indeed_hosted = ("indeed.com" in apply_target_url) or not apply_target_url
+        is_fresher_attr = any("fresher" in str(a.get("label", "")).lower() for a in attrs if isinstance(a, dict))
+        exp_min = 0 if is_fresher_attr else None
+
         jobs.append(
             JobItem(
                 external_id=job_key,
@@ -304,6 +315,7 @@ def parse_graphql_response(
                 description_text=desc_text,
                 description_html=desc_html,
                 posted_at=posted_at,
+                experience_min_years=exp_min,
             )
         )
 
@@ -352,7 +364,8 @@ class IndeedClient:
         radius: int = 25,
         radius_unit: str = "KILOMETERS",
         cursor: str | None = None,
-    ) -> tuple[list[JobItem], str | None]:
+        return_raw: bool = False,
+    ) -> tuple[list[JobItem], str | None] | tuple[list[JobItem], str | None, dict[str, Any]]:
         query = build_indeed_graphql_query(
             what=what,
             where=where,
@@ -368,7 +381,10 @@ class IndeedClient:
         # Execute inside concurrency semaphore
         async with self._semaphore:
             data = await self._execute_with_retries(payload, headers, what, where)
-            return parse_graphql_response(data, fallback_where=where)
+            items, next_cursor = parse_graphql_response(data, fallback_where=where)
+            if return_raw:
+                return items, next_cursor, data
+            return items, next_cursor
 
     async def _execute_with_retries(
         self,

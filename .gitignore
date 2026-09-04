@@ -9,3 +9,6 @@ tunnel.log
 server.log
 backend/server.log
 .DS_Store
+.env
+.env.*
+!.env.example

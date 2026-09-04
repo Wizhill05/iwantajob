@@ -200,21 +200,21 @@ Incoming Scraped Job Description
    [ Prompt Construction ]  (Strict JSON response schema)
                │
                ▼
-   POST https://freeapiforme.aryansingh.space/v1/chat/completions
-   Header: Authorization: Bearer REDACTED_API_KEY
-   Model: antigravity/gemini-3.7-flash-tiered
-               │
-               ▼
-   Parsed JSON Output:
-   • technical_skills: ["PyTorch", "vLLM", "Docker"]
-   • salary_normalized: { min: 2500000, max: 3500000, currency: "INR" }
-   • fit_score: 88
-   • score_reasoning: "Matches deep learning criteria..."
+    POST https://freeapiforme.aryansingh.space/v1/chat/completions
+    Header: Authorization: Bearer $FREEAPI_API_KEY
+    Model: antigravity/gemini-3.7-flash-tiered
+                │
+                ▼
+    Parsed JSON Output:
+    • technical_skills: ["PyTorch", "vLLM", "Docker"]
+    • salary_normalized: { min: 2500000, max: 3500000, currency: "INR" }
+    • fit_score: 88
+    • score_reasoning: "Matches deep learning criteria..."
 ```
 
 ### Integration Details
 *   **Base URL:** `https://freeapiforme.aryansingh.space/v1`
-*   **API Key:** `REDACTED_API_KEY` (passed as `FREEAPI_API_KEY`)
+*   **API Key:** Configured via `FREEAPI_API_KEY` in `.env`
 *   **Primary Model:** `antigravity/gemini-3.7-flash-tiered`
 *   **Fallback Models:** `claude-sonnet-4-6`, `gemini-2.5-flash`
 *   **Prompt Specification:**

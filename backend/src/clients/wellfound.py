@@ -347,7 +347,8 @@ class WellfoundClient:
         limit: int = 30,
         max_age_days: int | None = None,
         include_all_company_jobs: bool = False,
-    ) -> list[JobItem]:
+        return_raw: bool = False,
+    ) -> list[JobItem] | tuple[list[JobItem], dict[str, Any]]:
         # Guardrail: Enforce pagination ceiling
         clamped_page = max(1, min(page, MAX_WELLFOUND_PAGE))
         if page > MAX_WELLFOUND_PAGE:
@@ -370,7 +371,7 @@ class WellfoundClient:
         apollo_data = extract_wellfound_apollo_data(html_content)
         if not apollo_data:
             logger.warning(f"Could not extract Apollo data from Wellfound URL: {url}")
-            return []
+            return [] if not return_raw else ([], {})
 
         jobs = parse_wellfound_apollo_jobs(
             apollo_data,
@@ -391,7 +392,10 @@ class WellfoundClient:
                         filtered_jobs.append(j)
             jobs = filtered_jobs
 
-        return jobs[:limit]
+        res_jobs = jobs[:limit]
+        if return_raw:
+            return res_jobs, apollo_data
+        return res_jobs
 
     async def fetch_company_jobs(self, company_slug: str, limit: int = 50) -> list[JobItem]:
         """
