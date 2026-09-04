@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LinkedIn Guest Scraper Test Portal</title>
+  <style>
+    :root {
+      --bg: #0d1117;
+      --card-bg: #161b22;
+      --border: #30363d;
+      --text: #c9d1d9;
+      --text-muted: #8b949e;
+      --linkedin-blue: #0a66c2;
+      --linkedin-hover: #004182;
+      --link: #58a6ff;
+      --badge-bg: #21262d;
+      --badge-border: #363b42;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; }
+    body { background-color: var(--bg); color: var(--text); padding: 24px; line-height: 1.5; }
+    .container { max-width: 1080px; margin: 0 auto; }
+    header { margin-bottom: 24px; border-bottom: 1px solid var(--border); padding-bottom: 16px; display: flex; justify-content: space-between; align-items: center; }
+    h1 { font-size: 24px; color: #fff; display: flex; align-items: center; gap: 8px; }
+    .status-dot { width: 10px; height: 10px; background: var(--linkedin-blue); border-radius: 50%; display: inline-block; }
+    .nav-links { display: flex; gap: 14px; align-items: center; }
+    .nav-link { color: var(--link); font-size: 13px; text-decoration: none; }
+    .nav-link:hover { text-decoration: underline; }
+    
+    .panel { background: var(--card-bg); border: 1px solid var(--border); border-radius: 8px; padding: 20px; margin-bottom: 24px; }
+    .grid-row-1 { display: grid; grid-template-columns: 2fr 1.5fr auto; gap: 16px; align-items: flex-end; margin-bottom: 16px; }
+    .grid-row-2 { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr auto; gap: 16px; align-items: flex-end; }
+    @media (max-width: 800px) {
+      .grid-row-1, .grid-row-2 { grid-template-columns: 1fr; }
+    }
+    
+    label { display: block; font-size: 13px; font-weight: 600; color: var(--text-muted); margin-bottom: 6px; }
+    input[type="text"], input[type="number"], select {
+      width: 100%;
+      padding: 10px 12px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: #fff;
+      font-size: 14px;
+      outline: none;
+    }
+    select { cursor: pointer; }
+    input:focus, select:focus { border-color: var(--linkedin-blue); }
+    
+    .checkbox-group { display: flex; align-items: center; gap: 8px; height: 42px; }
+    .checkbox-group input { width: 16px; height: 16px; accent-color: var(--linkedin-blue); cursor: pointer; }
+    .checkbox-group label { margin-bottom: 0; cursor: pointer; user-select: none; }
+
+    button.btn-primary {
+      padding: 10px 24px;
+      background: var(--linkedin-blue);
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      height: 42px;
+    }
+    button.btn-primary:hover { background: var(--linkedin-hover); }
+    button.btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
+    
+    .pill-group { margin-top: 14px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+    .pill-label { font-size: 12px; color: var(--text-muted); font-weight: 600; }
+    .pill {
+      background: var(--badge-bg);
+      border: 1px solid var(--badge-border);
+      color: var(--text);
+      font-size: 12px;
+      padding: 4px 10px;
+      border-radius: 12px;
+      cursor: pointer;
+      user-select: none;
+    }
+    .pill:hover { border-color: var(--link); color: var(--link); }
+    
+    .summary-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; font-size: 14px; color: var(--text-muted); }
+    .jobs-list { display: flex; flex-direction: column; gap: 12px; }
+    
+    .job-card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px 20px;
+      transition: border-color 0.2s;
+    }
+    .job-card:hover { border-color: #0a66c288; }
+    .job-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
+    .job-title { font-size: 18px; font-weight: 600; color: #fff; margin-bottom: 4px; }
+    .job-company { font-size: 14px; color: var(--link); font-weight: 500; display: flex; align-items: center; gap: 8px; }
+    .company-logo { width: 22px; height: 22px; border-radius: 4px; object-fit: cover; background: #30363d; }
+    .badges { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+    .badge {
+      background: var(--badge-bg);
+      border: 1px solid var(--badge-border);
+      font-size: 11px;
+      font-weight: 500;
+      padding: 2px 8px;
+      border-radius: 4px;
+      color: var(--text);
+    }
+    .badge-remote { color: #56d364; border-color: #238636; }
+    .badge-city { color: #e3b341; border-color: #9e6a03; }
+    .badge-intl { color: #f0883e; border-color: #bd561d; }
+    .badge-src { color: #58a6ff; border-color: #1f6feb; }
+    
+    .job-date { font-size: 12px; color: var(--text-muted); }
+    .job-desc-preview {
+      margin-top: 12px;
+      font-size: 13px;
+      color: #8b949e;
+      display: -webkit-box;
+      -webkit-line-clamp: 3;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+      line-height: 1.5;
+    }
+    .view-btn {
+      display: inline-block;
+      margin-top: 12px;
+      color: var(--link);
+      font-size: 13px;
+      text-decoration: none;
+      font-weight: 500;
+    }
+    .view-btn:hover { text-decoration: underline; }
+    
+    .loading-state, .empty-state, .error-state {
+      text-align: center;
+      padding: 48px;
+      background: var(--card-bg);
+      border: 1px dashed var(--border);
+      border-radius: 8px;
+      color: var(--text-muted);
+    }
+    .error-state { color: #f85149; border-color: #da3633; }
+    .spinner {
+      display: inline-block;
+      width: 18px;
+      height: 18px;
+      border: 2px solid rgba(255,255,255,0.3);
+      border-radius: 50%;
+      border-top-color: #fff;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1><span class="status-dot"></span> LinkedIn Guest Search</h1>
+      <div class="nav-links">
+        <a href="/" class="nav-link">Indeed Portal</a>
+        <a href="/wellfound" class="nav-link">Wellfound Portal</a>
+        <a href="/docs" target="_blank" class="nav-link">FastAPI Swagger</a>
+      </div>
+    </header>
+
+    <div class="panel">
+      <div class="grid-row-1">
+        <div>
+          <label for="keywordsInput">Keywords / Role</label>
+          <input type="text" id="keywordsInput" value="software engineer" placeholder="e.g. ai engineer, backend engineer, devops">
+        </div>
+        <div>
+          <label for="locationInput">Location</label>
+          <input type="text" id="locationInput" value="India" placeholder="e.g. India, Bengaluru, Pune, Delhi">
+        </div>
+        <div>
+          <button id="searchBtn" class="btn-primary" onclick="performSearch()">
+            <span>Search</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="grid-row-2">
+        <div>
+          <label for="workTypeSelect">Workplace Type</label>
+          <select id="workTypeSelect">
+            <option value="">Any</option>
+            <option value="1">On-site</option>
+            <option value="2">Remote</option>
+            <option value="3">Hybrid</option>
+          </select>
+        </div>
+        <div>
+          <label for="timeRangeSelect">Time Posted</label>
+          <select id="timeRangeSelect">
+            <option value="">Any time</option>
+            <option value="r86400">Past 24 Hours</option>
+            <option value="r604800">Past Week</option>
+            <option value="r2592000">Past Month</option>
+          </select>
+        </div>
+        <div>
+          <label for="senioritySelect">Seniority</label>
+          <select id="senioritySelect">
+            <option value="">Any</option>
+            <option value="1">Internship</option>
+            <option value="2">Entry Level</option>
+            <option value="3">Associate</option>
+            <option value="4">Mid-Senior</option>
+            <option value="5">Director</option>
+          </select>
+        </div>
+        <div>
+          <label for="limitInput">Limit (1–50)</label>
+          <input type="number" id="limitInput" value="15" min="1" max="50">
+        </div>
+        <div class="checkbox-group">
+          <input type="checkbox" id="fetchDescCheck" checked>
+          <label for="fetchDescCheck">Fetch Details</label>
+        </div>
+      </div>
+
+      <div class="pill-group">
+        <span class="pill-label">Quick Searches:</span>
+        <span class="pill" onclick="setPreset('ai engineer', 'India', 'r604800', '')">AI Engineer (India)</span>
+        <span class="pill" onclick="setPreset('backend engineer', 'Bengaluru', '', '2')">Backend (Bengaluru, Remote)</span>
+        <span class="pill" onclick="setPreset('full stack engineer', 'Pune', 'r604800', '')">Full Stack (Pune)</span>
+        <span class="pill" onclick="setPreset('devops engineer', 'Delhi', '', '3')">DevOps (Delhi, Hybrid)</span>
+        <span class="pill" onclick="setPreset('machine learning engineer', 'India', '', '2')">ML Engineer (Remote)</span>
+      </div>
+    </div>
+
+    <div class="summary-bar">
+      <div id="statusText">Ready to query LinkedIn Guest API</div>
+      <div id="statsText">0 jobs</div>
+    </div>
+
+    <div id="resultsContainer" class="jobs-list">
+      <div class="empty-state">
+        Configure parameters and hit Search to query the live LinkedIn Guest API.
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function setPreset(keyword, loc, time, wt) {
+      document.getElementById('keywordsInput').value = keyword;
+      document.getElementById('locationInput').value = loc;
+      document.getElementById('timeRangeSelect').value = time;
+      document.getElementById('workTypeSelect').value = wt;
+      performSearch();
+    }
+
+    async function performSearch() {
+      const keywords = document.getElementById('keywordsInput').value.trim();
+      const location = document.getElementById('locationInput').value.trim();
+      const workType = document.getElementById('workTypeSelect').value;
+      const timeRange = document.getElementById('timeRangeSelect').value;
+      const seniority = document.getElementById('senioritySelect').value;
+      const limit = parseInt(document.getElementById('limitInput').value, 10) || 15;
+      const fetchDesc = document.getElementById('fetchDescCheck').checked;
+
+      const searchBtn = document.getElementById('searchBtn');
+      const resultsContainer = document.getElementById('resultsContainer');
+      const statusText = document.getElementById('statusText');
+      const statsText = document.getElementById('statsText');
+
+      searchBtn.disabled = true;
+      searchBtn.innerHTML = '<span class="spinner"></span> Searching...';
+      resultsContainer.innerHTML = '<div class="loading-state"><span class="spinner"></span><br><br>Querying LinkedIn guest search and extracting job cards...</div>';
+      statusText.innerText = 'Querying LinkedIn Guest API...';
+
+      const startTime = performance.now();
+
+      const params = new URLSearchParams({
+        keywords: keywords,
+        location: location,
+        limit: limit,
+        fetch_descriptions: fetchDesc,
+      });
+      if (workType) params.append('work_type', workType);
+      if (timeRange) params.append('time_range', timeRange);
+      if (seniority) params.append('seniority', seniority);
+
+      try {
+        const response = await fetch(`/api/scrape/linkedin?${params.toString()}`);
+        const elapsed = ((performance.now() - startTime) / 1000).toFixed(2);
+
+        if (!response.ok) {
+          const errData = await response.json().catch(() => ({ detail: response.statusText }));
+          throw new Error(errData.detail || `Server returned HTTP ${response.status}`);
+        }
+
+        const jobs = await response.json();
+        statusText.innerText = `Fetched in ${elapsed}s via LinkedIn Guest API`;
+        statsText.innerText = `${jobs.length} jobs returned`;
+
+        if (!jobs || jobs.length === 0) {
+          resultsContainer.innerHTML = '<div class="empty-state">No jobs found for this query. LinkedIn may have returned 0 results or redirected to authwall.</div>';
+          return;
+        }
+
+        renderJobs(jobs);
+      } catch (err) {
+        statusText.innerText = 'Request failed';
+        statsText.innerText = '0 jobs';
+        resultsContainer.innerHTML = `<div class="error-state"><strong>Scrape Error:</strong><br>${escapeHtml(err.message)}</div>`;
+      } finally {
+        searchBtn.disabled = false;
+        searchBtn.innerHTML = '<span>Search</span>';
+      }
+    }
+
+    function renderJobs(jobs) {
+      const resultsContainer = document.getElementById('resultsContainer');
+      resultsContainer.innerHTML = '';
+
+      jobs.forEach(job => {
+        const card = document.createElement('div');
+        card.className = 'job-card';
+
+        let dateStr = 'Recently posted';
+        if (job.posted_at) {
+          try {
+            const dt = new Date(job.posted_at);
+            dateStr = dt.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+          } catch(e) {}
+        }
+
+        const logoHtml = job.company_logo_url
+          ? `<img src="${escapeHtml(job.company_logo_url)}" class="company-logo" alt="${escapeHtml(job.company_name)} logo" onerror="this.style.display='none'">`
+          : '';
+
+        const companyHtml = job.company_website
+          ? `<a href="${escapeHtml(job.company_website)}" target="_blank" style="color: inherit; text-decoration: none;">${escapeHtml(job.company_name)}</a>`
+          : escapeHtml(job.company_name);
+
+        let badges = `<span class="badge badge-src">LinkedIn</span>`;
+        if (job.is_remote) badges += `<span class="badge badge-remote">Remote</span>`;
+        if (job.city) badges += `<span class="badge badge-city">${escapeHtml(job.city)}</span>`;
+        if (job.is_international) badges += `<span class="badge badge-intl">International</span>`;
+
+        const descText = job.description_text || 'Description not fetched (or fast mode enabled)';
+
+        card.innerHTML = `
+          <div class="job-header">
+            <div>
+              <h2 class="job-title">${escapeHtml(job.title)}</h2>
+              <div class="job-company">${logoHtml}${companyHtml} • ${escapeHtml(job.location_raw)}</div>
+              <div class="badges">${badges}</div>
+            </div>
+            <div class="job-date">${dateStr}</div>
+          </div>
+          <div class="job-desc-preview">${escapeHtml(descText)}</div>
+          <a href="${escapeHtml(job.url)}" target="_blank" class="view-btn">View on LinkedIn &rarr;</a>
+        `;
+
+        resultsContainer.appendChild(card);
+      });
+    }
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+  </script>
+</body>
+</html>

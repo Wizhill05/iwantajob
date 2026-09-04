@@ -17,6 +17,7 @@ from src.clients.wellfound import (
     SUPPORTED_WELLFOUND_ROLES,
     SUPPORTED_WELLFOUND_LOCATIONS,
 )
+from src.clients.linkedin import LinkedInClient
 from src.models.job import JobSearchResponse, JobItem, ErrorDetail
 
 logging.basicConfig(level=logging.INFO)
@@ -24,8 +25,8 @@ logger = logging.getLogger("iwantajob")
 
 app = FastAPI(
     title="Autonomous Job Discovery API",
-    description="Production-ready backend ingestion API for job platforms supporting Indeed Mobile GraphQL and Wellfound Apollo SSR.",
-    version="1.0.0",
+    description="Production-ready backend ingestion API for job platforms supporting Indeed Mobile GraphQL, Wellfound Apollo SSR, and LinkedIn Guest API.",
+    version="1.1.0",
     docs_url="/docs",
     redoc_url="/redoc",
 )
@@ -43,6 +44,7 @@ app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
 indeed_client = IndeedClient()
 wellfound_client = WellfoundClient()
+linkedin_client = LinkedInClient()
 
 @app.get("/", include_in_schema=False)
 async def serve_index():
@@ -52,6 +54,11 @@ async def serve_index():
 @app.get("/wellfound", include_in_schema=False)
 async def serve_wellfound():
     page_path = STATIC_DIR / "wellfound.html"
+    return FileResponse(page_path)
+
+@app.get("/linkedin", include_in_schema=False)
+async def serve_linkedin():
+    page_path = STATIC_DIR / "linkedin.html"
     return FileResponse(page_path)
 
 @app.get("/health", tags=["System"])
@@ -95,27 +102,35 @@ async def scrape_indeed(
     sort: Annotated[str, Query(description="Sort order: 'relevance' (Indeed App default) or 'date' (newest first)")] = "relevance",
     radius: Annotated[int, Query(ge=0, le=200, description="Search radius distance")] = 25,
     radius_unit: Annotated[str, Query(description="Radius unit: 'KILOMETERS' or 'MILES'")] = "KILOMETERS",
-    cursor: Annotated[str | None, Query(description="Pagination cursor from previous response's next_cursor")] = None,
+    cursor: Annotated[str | None, Query(description="Pagination cursor token for next page of results")] = None,
 ):
     """
-    Scrape job postings directly from Indeed Mobile GraphQL gateway with concurrency protection,
-    rate-limit backoff, and strict payload sanitation.
+    Query Indeed Mobile GraphQL gateway with concurrency guardrails, rate-limit backoff, and pagination.
     """
     clean_what = what.strip()
     clean_where = where.strip()
+
     if not clean_what:
         return JSONResponse(
             status_code=status.HTTP_400_BAD_REQUEST,
-            content={"error": "INVALID_QUERY", "detail": "The 'what' parameter cannot be empty.", "retry_after": None},
+            content={
+                "error": "INVALID_QUERY",
+                "detail": "The 'what' parameter must not be empty.",
+                "retry_after": None,
+            },
         )
     if not clean_where:
         return JSONResponse(
             status_code=status.HTTP_400_BAD_REQUEST,
-            content={"error": "INVALID_LOCATION", "detail": "The 'where' parameter cannot be empty.", "retry_after": None},
+            content={
+                "error": "INVALID_LOCATION",
+                "detail": "The 'where' parameter must not be empty.",
+                "retry_after": None,
+            },
         )
 
     try:
-        jobs, next_cursor = await indeed_client.search_jobs(
+        items, next_cursor = await indeed_client.search_jobs(
             what=clean_what,
             where=clean_where,
             limit=limit,
@@ -124,56 +139,52 @@ async def scrape_indeed(
             radius_unit=radius_unit,
             cursor=cursor,
         )
-
-        radius_km = radius if radius_unit.upper() in ("KILOMETERS", "KM") else int(radius * 1.60934)
-
         return JobSearchResponse(
             query=clean_what,
             location=clean_where,
-            total_count=len(jobs),
+            total_count=len(items),
             next_cursor=next_cursor,
-            sort=sort.lower(),
-            radius_km=radius_km,
-            items=jobs,
+            sort=sort,
+            radius_km=radius if radius_unit.upper().startswith("K") else int(radius * 1.60934),
+            items=items,
         )
-
-    except UpstreamRateLimitError as rle:
-        logger.warning(f"UpstreamRateLimitError: {rle}")
+    except UpstreamRateLimitError as exc:
+        logger.warning(f"Indeed rate limit triggered: {exc}")
         return JSONResponse(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             content={
                 "error": "UPSTREAM_RATE_LIMITED",
-                "detail": "Indeed mobile API rate limit triggered. Please back off before requesting again.",
-                "retry_after": getattr(rle, "retry_after", 5.0),
+                "detail": str(exc),
+                "retry_after": exc.retry_after,
             },
         )
-    except UpstreamBlockedError as ube:
-        logger.error(f"UpstreamBlockedError: {ube}")
+    except UpstreamBlockedError as exc:
+        logger.error(f"Indeed upstream blocked: {exc}")
         return JSONResponse(
             status_code=status.HTTP_502_BAD_GATEWAY,
             content={
                 "error": "UPSTREAM_BLOCKED",
-                "detail": "Indeed rejected static mobile credentials. Update INDEED_API_KEY or mobile app version.",
+                "detail": str(exc),
                 "retry_after": None,
             },
         )
-    except UpstreamGraphQLError as gqe:
-        logger.error(f"UpstreamGraphQLError: {gqe}")
+    except UpstreamGraphQLError as exc:
+        logger.error(f"Indeed GraphQL syntax error: {exc}")
         return JSONResponse(
             status_code=status.HTTP_400_BAD_REQUEST,
             content={
                 "error": "GRAPHQL_ERROR",
-                "detail": str(gqe),
+                "detail": str(exc),
                 "retry_after": None,
             },
         )
     except Exception as exc:
-        logger.error(f"Unexpected server error in scrape_indeed: {exc}", exc_info=True)
+        logger.error(f"Unexpected error querying Indeed: {exc}", exc_info=True)
         return JSONResponse(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             content={
                 "error": "INTERNAL_SERVER_ERROR",
-                "detail": "An unexpected error occurred while processing the scraping request.",
+                "detail": f"An internal error occurred while scraping Indeed: {str(exc)}",
                 "retry_after": None,
             },
         )
@@ -228,6 +239,43 @@ async def scrape_wellfound_company_jobs(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             content={
                 "error": "WELLFOUND_COMPANY_ERROR",
+                "detail": str(exc),
+                "retry_after": None,
+            },
+        )
+
+@app.get("/api/scrape/linkedin", response_model=list[JobItem], tags=["LinkedIn"])
+async def scrape_linkedin(
+    keywords: Annotated[str, Query(description="Job keywords or profile title")] = "software engineer",
+    location: Annotated[str, Query(description="Location or country")] = "India",
+    start: Annotated[int, Query(ge=0, le=975, description="Pagination start offset (bounded under 1000)")] = 0,
+    limit: Annotated[int, Query(ge=1, le=100, description="Max jobs to return")] = 20,
+    time_range: Annotated[str | None, Query(description="Time filter: r86400 (past 24h), r604800 (past week), r2592000 (past month)")] = None,
+    work_type: Annotated[str | None, Query(description="Workplace type: 1 (on-site), 2 (remote), 3 (hybrid)")] = None,
+    seniority: Annotated[str | None, Query(description="Seniority level: 1 (intern), 2 (entry), 3 (associate), 4 (mid-senior), 5 (director)")] = None,
+    fetch_descriptions: Annotated[bool, Query(description="Whether to fetch full job descriptions from single job API")] = True,
+):
+    """
+    Query LinkedIn Guest API (seeMoreJobPostings) and return standardized job listings.
+    """
+    try:
+        jobs = await linkedin_client.search_jobs(
+            keywords=keywords,
+            location=location,
+            start=start,
+            limit=limit,
+            time_range=time_range,
+            work_type=work_type,
+            seniority=seniority,
+            fetch_descriptions=fetch_descriptions,
+        )
+        return jobs
+    except Exception as exc:
+        logger.error(f"Error executing LinkedIn scrape: {exc}", exc_info=True)
+        return JSONResponse(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            content={
+                "error": "LINKEDIN_SCRAPE_ERROR",
                 "detail": str(exc),
                 "retry_after": None,
             },
