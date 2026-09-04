@@ -23,6 +23,8 @@
     header { margin-bottom: 24px; border-bottom: 1px solid var(--border); padding-bottom: 16px; display: flex; justify-content: space-between; align-items: center; }
     h1 { font-size: 24px; color: #fff; display: flex; align-items: center; gap: 8px; }
     .status-dot { width: 10px; height: 10px; background: #3fb950; border-radius: 50%; display: inline-block; }
+    .docs-badge { font-size: 13px; color: var(--link); text-decoration: none; border: 1px solid var(--border); padding: 4px 10px; border-radius: 6px; }
+    .docs-badge:hover { background: var(--badge-bg); }
     
     .panel { background: var(--card-bg); border: 1px solid var(--border); border-radius: 8px; padding: 20px; margin-bottom: 24px; }
     .grid-row-1 { display: grid; grid-template-columns: 2fr 1.5fr auto; gap: 16px; align-items: flex-end; margin-bottom: 16px; }
@@ -62,6 +64,18 @@
     }
     button.btn-primary:hover { background: var(--accent-hover); }
     button.btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
+
+    button.btn-secondary {
+      padding: 8px 16px;
+      background: var(--badge-bg);
+      border: 1px solid var(--border);
+      color: var(--text);
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    button.btn-secondary:hover { border-color: var(--link); color: var(--link); }
     
     .pill-group { margin-top: 14px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
     .pill-label { font-size: 12px; color: var(--text-muted); font-weight: 600; }
@@ -76,6 +90,7 @@
       user-select: none;
     }
     .pill:hover { border-color: var(--link); color: var(--link); }
+    .pill.active-mode { border-color: #238636; background: #23863633; color: #3fb950; font-weight: 600; }
     
     .summary-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; font-size: 14px; color: var(--text-muted); }
     .jobs-list { display: flex; flex-direction: column; gap: 12px; }
@@ -139,15 +154,16 @@
     @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
     .empty-state { text-align: center; padding: 48px 0; color: var(--text-muted); }
     .error-msg { background: #ffebe9; color: #cf222e; padding: 12px 16px; border-radius: 6px; margin-bottom: 16px; display: none; }
+    .pagination-bar { margin-top: 24px; display: flex; justify-content: center; }
   </style>
 </head>
 <body>
   <div class="container">
     <header>
       <h1><span class="status-dot"></span> Indeed Scraper Portal</h1>
-      <div style="display: flex; gap: 14px; align-items: center;">
-        <a href="/wellfound" style="color: var(--link); font-size: 13px; text-decoration: none;">&rarr; Wellfound Portal</a>
-        <span style="font-size: 12px; color: var(--text-muted);">Mobile GraphQL Ingestion API</span>
+      <div style="display: flex; gap: 12px; align-items: center;">
+        <a href="/docs" target="_blank" class="docs-badge">API Docs (Swagger) &rarr;</a>
+        <span style="font-size: 12px; color: var(--text-muted);">Protected Gateway</span>
       </div>
     </header>
 
@@ -165,7 +181,7 @@
           <input type="text" id="whereInput" value="Bengaluru, Karnataka" placeholder="e.g. Bangalore, Karnataka or Pune">
         </div>
         <div>
-          <button id="searchBtn" class="btn-primary" onclick="triggerSearch()">
+          <button id="searchBtn" class="btn-primary" onclick="triggerSearch(false)">
             <span id="btnSpinner" style="display: none;" class="loader"></span>
             <span id="btnText">Search Jobs</span>
           </button>
@@ -194,8 +210,16 @@
         </div>
         <div>
           <label for="limitInput">Limit (1-100)</label>
-          <input type="number" id="limitInput" value="15" min="1" max="100">
+          <input type="number" id="limitInput" value="20" min="1" max="100">
         </div>
+      </div>
+
+      <!-- Targeting Knobs: Title Match vs Exact Phrase -->
+      <div class="pill-group" style="margin-top: 14px;">
+        <span class="pill-label">Search Targeting:</span>
+        <span class="pill" id="pillStandard" onclick="setQueryTargeting('standard')">Broad Keyword Search</span>
+        <span class="pill" id="pillExact" onclick="setQueryTargeting('exact')">"Exact Phrase"</span>
+        <span class="pill" id="pillTitleOnly" onclick="setQueryTargeting('title')">Job Title Only (title:...)</span>
       </div>
 
       <!-- Quick Role Pills -->
@@ -232,9 +256,15 @@
         Configure your search knobs above and click <b>Search Jobs</b>.
       </div>
     </div>
+
+    <div id="paginationBar" class="pagination-bar" style="display: none;">
+      <button class="btn-secondary" id="loadMoreBtn" onclick="triggerSearch(true)">Load Next Page &darr;</button>
+    </div>
   </div>
 
   <script>
+    let currentNextCursor = null;
+
     function setRole(role) {
       document.getElementById('whatInput').value = role;
     }
@@ -242,13 +272,25 @@
       document.getElementById('whereInput').value = loc;
     }
 
-    async function triggerSearch() {
+    function setQueryTargeting(mode) {
+      const input = document.getElementById('whatInput');
+      let val = input.value.replace(/^title:/, '').replace(/^"|"$/g, '').trim();
+      if (mode === 'title') {
+        input.value = `title:"${val}"`;
+      } else if (mode === 'exact') {
+        input.value = `"${val}"`;
+      } else {
+        input.value = val;
+      }
+    }
+
+    async function triggerSearch(isLoadMore = false) {
       const what = document.getElementById('whatInput').value.trim();
       const where = document.getElementById('whereInput').value.trim();
       const sort = document.getElementById('sortSelect').value;
       const radius = parseInt(document.getElementById('radiusInput').value) || 25;
       const radius_unit = document.getElementById('radiusUnitSelect').value;
-      const limit = parseInt(document.getElementById('limitInput').value) || 15;
+      const limit = parseInt(document.getElementById('limitInput').value) || 20;
 
       const searchBtn = document.getElementById('searchBtn');
       const btnSpinner = document.getElementById('btnSpinner');
@@ -257,13 +299,22 @@
       const jobsContainer = document.getElementById('jobsContainer');
       const resultsCount = document.getElementById('resultsCount');
       const fetchTime = document.getElementById('fetchTime');
+      const paginationBar = document.getElementById('paginationBar');
+      const loadMoreBtn = document.getElementById('loadMoreBtn');
 
       errorAlert.style.display = 'none';
-      searchBtn.disabled = true;
-      btnSpinner.style.display = 'inline-block';
-      btnText.innerText = 'Scraping...';
-      resultsCount.innerText = `Querying Indeed GraphQL (sort=${sort}, radius=${radius} ${radius_unit.toLowerCase()})...`;
-      fetchTime.innerText = '';
+
+      if (isLoadMore) {
+        loadMoreBtn.disabled = true;
+        loadMoreBtn.innerText = 'Loading next page...';
+      } else {
+        currentNextCursor = null;
+        searchBtn.disabled = true;
+        btnSpinner.style.display = 'inline-block';
+        btnText.innerText = 'Scraping...';
+        resultsCount.innerText = `Querying Indeed (sort=${sort}, radius=${radius} ${radius_unit.toLowerCase()})...`;
+        fetchTime.innerText = '';
+      }
 
       const startTime = performance.now();
 
@@ -276,23 +327,37 @@
           radius: radius.toString(),
           radius_unit
         });
-        const res = await fetch(`/api/scrape/indeed?${queryParams.toString()}`);
-        if (!res.ok) {
-          const errData = await res.json().catch(() => ({ detail: res.statusText }));
-          throw new Error(errData.detail || `Server returned HTTP ${res.status}`);
+        if (isLoadMore && currentNextCursor) {
+          queryParams.set('cursor', currentNextCursor);
         }
-        const jobs = await res.json();
-        const duration = ((performance.now() - startTime) / 1000).toFixed(2);
-        
-        resultsCount.innerText = `Found ${jobs.length} jobs for "${what}" in "${where}" (${sort})`;
-        fetchTime.innerText = `Fetched in ${duration}s`;
 
-        if (jobs.length === 0) {
+        const res = await fetch(`/api/scrape/indeed?${queryParams.toString()}`);
+        const data = await res.json();
+
+        if (!res.ok) {
+          const detailMsg = data.detail || data.error || `HTTP ${res.status}`;
+          throw new Error(detailMsg);
+        }
+
+        const duration = ((performance.now() - startTime) / 1000).toFixed(2);
+        const jobs = data.items || [];
+        currentNextCursor = data.next_cursor;
+
+        if (isLoadMore) {
+          resultsCount.innerText = `Loaded +${jobs.length} more jobs (total batch).`;
+        } else {
+          resultsCount.innerText = `Found ${jobs.length} jobs for "${what}" in "${where}" (${sort})`;
+          fetchTime.innerText = `Fetched in ${duration}s`;
+        }
+
+        if (!isLoadMore && jobs.length === 0) {
           jobsContainer.innerHTML = '<div class="empty-state">No jobs found matching your criteria.</div>';
+          paginationBar.style.display = 'none';
           return;
         }
 
-        jobsContainer.innerHTML = jobs.map((job, idx) => {
+        const cardsHtml = jobs.map((job, idx) => {
+          const uniqueIdx = isLoadMore ? `${Date.now()}-${idx}` : idx;
           const dateStr = job.posted_at ? new Date(job.posted_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : 'Recently';
           const salaryBadge = job.salary_raw ? `<span class="badge salary">💰 ${job.salary_raw}</span>` : '';
           const remoteBadge = job.is_remote ? `<span class="badge remote">🌐 Remote</span>` : '';
@@ -312,16 +377,24 @@
                   </div>
                 </div>
               </div>
-              <div class="job-desc" id="desc-${idx}">
+              <div class="job-desc" id="desc-${uniqueIdx}">
                 ${escapeHtml(job.description_text || 'No description preview available.')}
               </div>
-              ${job.description_text && job.description_text.length > 200 ? `<span class="desc-toggle" onclick="toggleDesc(${idx})">Show more</span>` : ''}
+              ${job.description_text && job.description_text.length > 200 ? `<span class="desc-toggle" onclick="toggleDesc('${uniqueIdx}')">Show more</span>` : ''}
               <div class="job-actions">
                 <a href="${job.url}" target="_blank" rel="noopener noreferrer" class="btn-apply">View on Indeed &rarr;</a>
               </div>
             </div>
           `;
         }).join('');
+
+        if (isLoadMore) {
+          jobsContainer.insertAdjacentHTML('beforeend', cardsHtml);
+        } else {
+          jobsContainer.innerHTML = cardsHtml;
+        }
+
+        paginationBar.style.display = currentNextCursor ? 'flex' : 'none';
 
       } catch (err) {
         errorAlert.innerText = `Error: ${err.message}`;
@@ -331,6 +404,8 @@
         searchBtn.disabled = false;
         btnSpinner.style.display = 'none';
         btnText.innerText = 'Search Jobs';
+        loadMoreBtn.disabled = false;
+        loadMoreBtn.innerText = 'Load Next Page ↓';
       }
     }
 
