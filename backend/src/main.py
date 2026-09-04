@@ -7,6 +7,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 
 from src.clients.indeed import IndeedClient
+from src.clients.wellfound import WellfoundClient
 from src.models.job import JobItem
 
 logging.basicConfig(level=logging.INFO)
@@ -14,8 +15,8 @@ logger = logging.getLogger("iwantajob")
 
 app = FastAPI(
     title="Job Discovery & Scraping API",
-    description="Minimal backend scraper API starting with Indeed Mobile GraphQL",
-    version="0.1.0",
+    description="Autonomous job scraper API supporting Indeed Mobile GraphQL and Wellfound Apollo SSR",
+    version="0.2.0",
 )
 
 app.add_middleware(
@@ -30,11 +31,17 @@ STATIC_DIR = Path(__file__).parent / "static"
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
 indeed_client = IndeedClient()
+wellfound_client = WellfoundClient()
 
 @app.get("/")
 async def serve_index():
     index_path = STATIC_DIR / "index.html"
     return FileResponse(index_path)
+
+@app.get("/wellfound")
+async def serve_wellfound():
+    page_path = STATIC_DIR / "wellfound.html"
+    return FileResponse(page_path)
 
 @app.get("/health")
 async def health_check():
@@ -64,4 +71,28 @@ async def scrape_indeed(
         return jobs
     except Exception as exc:
         logger.error(f"Error executing Indeed search: {exc}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(exc))
+
+@app.get("/api/scrape/wellfound", response_model=list[JobItem])
+async def scrape_wellfound(
+    role: Annotated[str, Query(description="Role slug or title, e.g. ai-engineer, backend-engineer")] = "ai-engineer",
+    location: Annotated[str, Query(description="Location slug or city, e.g. india, bengaluru, pune, remote")] = "india",
+    page: Annotated[int, Query(ge=1, le=50, description="Pagination page")] = 1,
+    limit: Annotated[int, Query(ge=1, le=100, description="Max jobs to return")] = 30,
+    max_age_days: Annotated[int | None, Query(ge=1, le=180, description="Optional maximum age in days")] = None,
+):
+    """
+    Query Wellfound SSR Apollo data extraction pipeline and return standardized job listings.
+    """
+    try:
+        jobs = await wellfound_client.search_jobs(
+            role=role,
+            location=location,
+            page=page,
+            limit=limit,
+            max_age_days=max_age_days,
+        )
+        return jobs
+    except Exception as exc:
+        logger.error(f"Error executing Wellfound scrape: {exc}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(exc))

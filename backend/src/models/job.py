@@ -59,3 +59,7 @@ class JobItem(BaseModel):
     description_text: str
     description_html: str | None = None
     posted_at: datetime | None = None
+    experience_min_years: int | None = None
+    experience_max_years: int | None = None
+    company_logo_url: str | None = None
+    company_website: str | None = None

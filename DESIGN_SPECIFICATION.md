@@ -68,10 +68,10 @@ Scraping job aggregator web pages is fragile and triggers Cloudflare or Akamai r
     │ Uses static mobile key + iOS headers. 100 jobs/batch       │
     └─────────────────────────────┬──────────────────────────────┘
                                   │
-    Tier 3 (Public Guest Endpoints)
+    Tier 3 (Public Guest Endpoints & Startup Aggregators)
     ┌─────────────────────────────v──────────────────────────────┐
-    │ LinkedIn Guest API (linkedin.com/jobs-guest/jobs/api/...)  │
-    │ Unauthenticated HTML search segments. Offsets of 25        │
+    │ • LinkedIn Guest API (linkedin.com/jobs-guest/...)         │
+    │ • Wellfound SSR Apollo Extraction (wellfound.com/role/l/..)│
     └────────────────────────────────────────────────────────────┘
 ```
 
@@ -150,7 +150,9 @@ Instead of parsing desktop search cards that trigger Cloudflare Turnstile challe
 
 ---
 
-### Tier 3: LinkedIn Guest Search Ingestion
+### Tier 3: Public Guest Endpoints & Startup Aggregators
+
+#### 1. LinkedIn Guest Search Ingestion
 Targets public endpoints intended for SEO bots and unauthenticated users.
 
 *   **Search Query URL:**
@@ -163,6 +165,24 @@ Targets public endpoints intended for SEO bots and unauthenticated users.
     ```
 *   **Parsing Logic:** Uses BeautifulSoup / Selectors to read `data-entity-urn` (yielding the `job_id`), title inside `.base-search-card__title`, company name, and description markup inside `.show-more-less-html__markup`.
 *   **Pagination Ceiling:** Bounded to offsets under 1,000 to prevent automated redirects to `linkedin.com/authwall`.
+
+#### 2. Wellfound Startup Ecosystem Ingestion (Apollo SSR Extraction)
+Wellfound (formerly AngelList Talent) guards its internal GraphQL API (`wellfound.com/graphql`) and logged-in talent feed behind Cloudflare Turnstile challenges and 403 security gates. However, it serves public, server-side-rendered landing pages for search engines at `/role/l/{role-slug}/{location-slug}` that bypass Turnstile when fetched via TLS ClientHello impersonation.
+
+*   **Ingestion Strategy & Research Findings:**
+    *   **Anti-Bot Circumvention:** Direct POST requests to `https://wellfound.com/graphql` return HTTP 403. In contrast, GET requests to public role/location landing pages return HTTP 200 clean SSR HTML when queried with `curl_cffi` using `chrome120` or `safari16` impersonation.
+    *   **Data Extraction Vector:** The Next.js SSR document embeds the full Apollo Client in-memory state inside `<script id="__NEXT_DATA__">`. No fragile HTML selector scraping is necessary.
+    *   **Search Page Target:** `GET https://wellfound.com/role/l/{role_slug}/{location_slug}?page={page}`
+        *   Examples: `/role/l/ai-engineer/india`, `/role/l/backend-engineer/pune`, `/role/l/software-engineer/bengaluru`, `/role/l/qa-engineer/india`.
+    *   **Extracted Attributes from Apollo State:**
+        *   `ROOT_QUERY.talent.seoLandingPageJobSearchResults`: Total job count, total startup count, pagination pages.
+        *   `StartupResult:{id}`: Startup name, company size, high concept pitch, logo URL, startup slug.
+        *   `JobListingSearchResult:{id}`: Canonical job ID, title, job slug, remote configuration (`remote`, `acceptedRemoteLocationNames`), experience bounds (`yearsExperienceMin`, `yearsExperienceMax`), compensation string (e.g., `₹25L – ₹45L`, `$25k – $50k`), location list, and job type.
+        *   `Job Listing Live Timestamp`: `liveStartAt` (Unix epoch seconds) providing real-time listing freshness and age filtering.
+    *   **Direct Application & Job URLs:**
+        *   Direct Job URL: `https://wellfound.com/jobs/{job_id}-{job_slug}` (e.g. `https://wellfound.com/jobs/4666122-ai-engineer`).
+        *   Single job pages include Schema.org JSON-LD (`application/ld+json`) with structured company details, exact date posted, and direct company websites (`sameAs`).
+    *   **Staleness Analysis:** Ingestion checks `liveStartAt` against current time. Roles under 14 days old are prioritized, while jobs older than 30-60 days can be automatically flagged as stale or filtered out by `max_age_days`.
 
 ---
 
@@ -336,7 +356,7 @@ CREATE EXTENSION IF NOT EXISTS vector;
 -- 1. Scraped Job Listings
 CREATE TABLE jobs (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    source TEXT NOT NULL,                  -- 'greenhouse', 'lever', 'ashby', 'indeed', 'linkedin'
+    source TEXT NOT NULL,                  -- 'greenhouse', 'lever', 'ashby', 'indeed', 'linkedin', 'wellfound'
     external_id TEXT NOT NULL,             -- Unique ID from source platform
     title TEXT NOT NULL,
     company_name TEXT NOT NULL,
@@ -424,6 +444,7 @@ CREATE TABLE scraper_configs (
 ## 7. Backend API Specification (FastAPI)
 
 ```
+# Core Dashboard Endpoints
 GET    /api/jobs                # List jobs with query filters (city, age, score, status, seniority, category, experience_match)
 GET    /api/jobs/{id}           # Fetch single job detail (incl. experience_min/max, seniority_level, job_category, must_have/nice_to_have)
 PATCH  /api/jobs/{id}/status    # Update job state ('bookmarked', 'applied', 'dismissed')
@@ -442,6 +463,11 @@ GET    /api/scheduler/status    # Inspect scheduler state & next execution time
 GET    /api/runs                # List past execution histories
 GET    /api/runs/{id}           # Get detailed run log and error traces
 GET    /api/logs/stream         # Server-Sent Events (SSE) live log stream
+
+# Ad-Hoc Source Scraping & Verification Endpoints
+GET    /api/scrape/indeed       # Live query to Indeed Mobile GraphQL gateway
+GET    /api/scrape/wellfound    # Live query to Wellfound Apollo SSR engine
+GET    /api/scrape/linkedin     # Live query to LinkedIn guest API
 ```
 
 ---
@@ -465,6 +491,7 @@ The project structure keeps frontend and backend concerns isolated within the re
 │   │   │   ├── lever.py            # Lever public REST client
 │   │   │   ├── ashby.py            # Ashby posting API client
 │   │   │   ├── indeed.py           # Indeed mobile GraphQL client (curl_cffi)
+│   │   │   ├── wellfound.py        # Wellfound Apollo SSR client (curl_cffi)
 │   │   │   └── linkedin.py         # LinkedIn guest scraper (curl_cffi)
 │   │   ├── core/
 │   │   │   ├── config.py           # App settings (Pydantic Settings)
@@ -505,7 +532,7 @@ The project structure keeps frontend and backend concerns isolated within the re
    - Verify unauthenticated retrieval of clean job JSON feeds.
 
 2. **Milestone 2: Secondary Crawlers & FreeAPI Enrichment**
-   - Build Indeed mobile GraphQL and LinkedIn guest crawlers using `curl_cffi`.
+   - Build Indeed mobile GraphQL, Wellfound Apollo SSR, and LinkedIn guest crawlers using `curl_cffi`.
    - Wire the OpenAI SDK client to `https://freeapiforme.aryansingh.space/v1` with `gemini-3.7-flash-tiered`.
    - Test JSON output parsing for technical skills, salary normalization, and fit scoring.
 
