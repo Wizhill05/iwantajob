@@ -766,6 +766,7 @@ async def get_unified_jobs(
                 "id": str(j.id),
                 "source": j.source,
                 "external_id": j.external_id,
+                "raw_ref_id": str(j.raw_ref_id) if j.raw_ref_id else None,
                 "url": j.url,
                 "title": j.title,
                 "company_name": j.company_name,
@@ -784,7 +785,7 @@ async def get_unified_jobs(
                 "experience_max_years": j.experience_max_years,
                 "is_fresher_friendly": j.is_fresher_friendly,
                 "experience_extraction_method": j.experience_extraction_method,
-                "description_text": j.description_text[:300] + "...",
+                "description_text": j.description_text,
                 "posted_at": j.posted_at,
                 "parsed_at": j.parsed_at,
             }
