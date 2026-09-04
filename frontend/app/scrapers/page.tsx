@@ -1,0 +1,298 @@
+'use client';
+
+import React, { useState, useEffect, Suspense } from 'react';
+import { useSearchParams, useRouter } from 'next/navigation';
+import {
+  Cpu,
+  Timer,
+  CheckCircle,
+  WarningTriangle,
+  Code,
+  Page,
+  RefreshDouble,
+} from 'iconoir-react';
+import { ScraperTabs, type ScraperTabKey } from '@/components/scrapers/ScraperTabs';
+import { LinkedInTester } from '@/components/scrapers/LinkedInTester';
+import { IndeedTester } from '@/components/scrapers/IndeedTester';
+import { WellfoundTester } from '@/components/scrapers/WellfoundTester';
+import { ScrapedJobCard } from '@/components/scrapers/ScrapedJobCard';
+import { RawJsonViewer } from '@/components/scrapers/RawJsonViewer';
+import type { JobItem } from '@/lib/types';
+import { cn } from '@/lib/utils';
+
+interface ScraperExecutionState {
+  items: JobItem[];
+  rawPayload: any;
+  latencyMs: number | null;
+  provider: string | null;
+  timestamp: string | null;
+}
+
+function ScrapersContent() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
+
+  // Active tab derived from ?tab= or default to linkedin
+  const tabParam = searchParams.get('tab') as ScraperTabKey | null;
+  const initialTab: ScraperTabKey =
+    tabParam === 'indeed' || tabParam === 'wellfound' || tabParam === 'linkedin'
+      ? tabParam
+      : 'linkedin';
+
+  const [activeTab, setActiveTab] = useState<ScraperTabKey>(initialTab);
+
+  // Sync tab with URL parameter changes
+  useEffect(() => {
+    if (tabParam && (tabParam === 'indeed' || tabParam === 'wellfound' || tabParam === 'linkedin')) {
+      setActiveTab(tabParam);
+    }
+  }, [tabParam]);
+
+  const handleTabChange = (tab: ScraperTabKey) => {
+    setActiveTab(tab);
+    router.replace(`/scrapers?tab=${tab}`, { scroll: false });
+  };
+
+  // Execution and results state
+  const [executionState, setExecutionState] = useState<ScraperExecutionState>({
+    items: [],
+    rawPayload: null,
+    latencyMs: null,
+    provider: null,
+    timestamp: null,
+  });
+  const [isLoading, setIsLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<'cards' | 'json'>('cards');
+
+  const handleResults = (
+    provider: string,
+    items: JobItem[],
+    rawPayload: any,
+    latencyMs: number
+  ) => {
+    setExecutionState({
+      items,
+      rawPayload,
+      latencyMs,
+      provider,
+      timestamp: new Date().toLocaleTimeString(),
+    });
+    setErrorMessage(null);
+  };
+
+  const handleError = (message: string) => {
+    setErrorMessage(message);
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Top Page Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <div className="flex items-center gap-2">
+            <h1 className="text-xl sm:text-2xl font-bold font-heading text-white tracking-tight">
+              Scraper Testing Lab
+            </h1>
+            <span className="px-2 py-0.5 text-[10px] font-mono font-medium rounded-full bg-[#3ecf8e]/10 border border-[#3ecf8e]/30 text-[#3ecf8e]">
+              Interactive Benchmarking
+            </span>
+          </div>
+          <p className="text-xs sm:text-sm text-[#9ca3af] mt-1 leading-relaxed">
+            Execute and benchmark raw job extractions across LinkedIn, Indeed, and Wellfound gateways.
+          </p>
+        </div>
+
+        {/* Global indicator pill */}
+        <div className="flex items-center gap-2 text-xs font-mono text-[#9ca3af]">
+          <span className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-[#181818] border border-[#262626]">
+            <Cpu className="w-3.5 h-3.5 text-[#3ecf8e]" />
+            <span>3 Scraping Gateways</span>
+          </span>
+        </div>
+      </div>
+
+      {/* Provider Selector Tabs */}
+      <ScraperTabs activeTab={activeTab} onTabChange={handleTabChange} />
+
+      {/* Active Gateway Parameter Console */}
+      <div>
+        {activeTab === 'linkedin' && (
+          <LinkedInTester
+            onResults={(items, rawPayload, latencyMs) =>
+              handleResults('LinkedIn Guest API', items, rawPayload, latencyMs)
+            }
+            onError={handleError}
+            onLoadingChange={setIsLoading}
+          />
+        )}
+
+        {activeTab === 'indeed' && (
+          <IndeedTester
+            onResults={(items, rawPayload, latencyMs) =>
+              handleResults('Indeed Mobile GQL', items, rawPayload, latencyMs)
+            }
+            onError={handleError}
+            onLoadingChange={setIsLoading}
+          />
+        )}
+
+        {activeTab === 'wellfound' && (
+          <WellfoundTester
+            onResults={(items, rawPayload, latencyMs) =>
+              handleResults('Wellfound Apollo SSR', items, rawPayload, latencyMs)
+            }
+            onError={handleError}
+            onLoadingChange={setIsLoading}
+          />
+        )}
+      </div>
+
+      {/* Results Section */}
+      <div className="space-y-4 pt-2">
+        {/* Results Header Bar */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-xl bg-[#181818] border border-[#262626]">
+          <div className="flex items-center gap-3">
+            <h2 className="text-sm font-semibold font-heading text-white">
+              Extraction Output
+            </h2>
+
+            {executionState.provider && (
+              <span className="px-2 py-0.5 text-[10px] font-mono rounded bg-[#202020] border border-[#262626] text-[#9ca3af]">
+                {executionState.provider}
+              </span>
+            )}
+
+            {executionState.latencyMs !== null && (
+              <span className="flex items-center gap-1 text-[11px] font-mono text-[#3ecf8e]">
+                <Timer className="w-3.5 h-3.5" />
+                <span>{executionState.latencyMs}ms</span>
+              </span>
+            )}
+
+            {executionState.timestamp && (
+              <span className="text-[10px] font-mono text-[#6b7280]">
+                {executionState.timestamp}
+              </span>
+            )}
+          </div>
+
+          {/* View Mode Switcher */}
+          <div className="flex items-center gap-1.5 p-1 rounded-lg bg-[#131313] border border-[#262626]">
+            <button
+              type="button"
+              onClick={() => setViewMode('cards')}
+              className={cn(
+                'flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-mono transition-all',
+                viewMode === 'cards'
+                  ? 'bg-[#202020] text-white border border-[#262626] shadow-sm'
+                  : 'text-[#9ca3af] hover:text-white'
+              )}
+            >
+              <Page className="w-3.5 h-3.5" />
+              <span>Job Cards</span>
+              <span className="text-[10px] font-mono text-[#3ecf8e]">
+                ({executionState.items.length})
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setViewMode('json')}
+              className={cn(
+                'flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-mono transition-all',
+                viewMode === 'json'
+                  ? 'bg-[#202020] text-white border border-[#262626] shadow-sm'
+                  : 'text-[#9ca3af] hover:text-white'
+              )}
+            >
+              <Code className="w-3.5 h-3.5" />
+              <span>Raw JSON</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Error Notification */}
+        {errorMessage && (
+          <div className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/30 text-xs font-mono text-rose-300 flex items-start gap-3">
+            <WarningTriangle className="w-4 h-4 text-rose-400 flex-shrink-0 mt-0.5" />
+            <div>
+              <div className="font-semibold text-rose-200">Scrape Error Occurred</div>
+              <div className="mt-0.5 text-rose-300/90">{errorMessage}</div>
+            </div>
+          </div>
+        )}
+
+        {/* Loading Skeletons */}
+        {isLoading && (
+          <div className="space-y-3">
+            <div className="p-4 rounded-xl bg-[#181818] border border-[#262626] text-center font-mono text-xs text-[#9ca3af] flex items-center justify-center gap-2">
+              <RefreshDouble className="w-4 h-4 text-[#3ecf8e] animate-spin" />
+              <span>Querying upstream gateway and processing responses...</span>
+            </div>
+            {[1, 2, 3].map((n) => (
+              <div
+                key={n}
+                className="rounded-xl bg-[#181818] border border-[#262626] p-5 animate-pulse space-y-3"
+              >
+                <div className="flex items-center justify-between">
+                  <div className="h-4 w-48 bg-[#262626] rounded" />
+                  <div className="h-4 w-16 bg-[#262626] rounded" />
+                </div>
+                <div className="h-3 w-32 bg-[#262626] rounded" />
+                <div className="h-3 w-full bg-[#262626] rounded" />
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Empty State */}
+        {!isLoading && executionState.items.length === 0 && !errorMessage && (
+          <div className="p-10 rounded-xl bg-[#181818] border border-[#262626] text-center space-y-3">
+            <div className="w-12 h-12 rounded-xl bg-[#202020] border border-[#262626] flex items-center justify-center mx-auto text-[#3ecf8e]">
+              <Cpu className="w-6 h-6" />
+            </div>
+            <h3 className="text-sm font-semibold font-heading text-white">
+              No Scraper Run Yet
+            </h3>
+            <p className="text-xs text-[#9ca3af] max-w-md mx-auto leading-relaxed">
+              Configure parameters in the console above and click &quot;Run Scraper&quot; to test real-time extraction, benchmark upstream latency, and preview parsed job cards.
+            </p>
+          </div>
+        )}
+
+        {/* Successful Output View */}
+        {!isLoading && executionState.items.length > 0 && (
+          <div>
+            {viewMode === 'cards' ? (
+              <div className="space-y-3">
+                {executionState.items.map((job, idx) => (
+                  <ScrapedJobCard key={`${job.external_id}-${idx}`} job={job} index={idx} />
+                ))}
+              </div>
+            ) : (
+              <RawJsonViewer
+                data={executionState.rawPayload}
+                title={`${executionState.provider || 'Scraper'} Raw JSON Response`}
+              />
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+export default function ScrapersPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="p-8 rounded-xl bg-[#181818] border border-[#262626] text-center font-mono text-xs text-[#9ca3af]">
+          Loading Scraper Testing Lab...
+        </div>
+      }
+    >
+      <ScrapersContent />
+    </Suspense>
+  );
+}
