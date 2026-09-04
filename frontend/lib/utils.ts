@@ -16,7 +16,7 @@ export function formatSalaryLPA(
   minInr?: number | null,
   maxInr?: number | null
 ): string {
-  if (!minInr && !maxInr) {
+  if ((minInr == null && maxInr == null) || (!minInr && !maxInr)) {
     return 'Not disclosed';
   }
 

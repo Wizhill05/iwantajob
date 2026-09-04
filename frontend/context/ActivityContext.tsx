@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useCallback, useRef, ReactNode } from 'react';
 import type { ActiveProcess, LogEntry, LogLevel } from '@/lib/types';
 
 interface ActivityContextType {
@@ -34,6 +34,8 @@ const MAX_LOGS = 100;
 export function ActivityProvider({ children }: { children: ReactNode }) {
   const [activeProcesses, setActiveProcesses] = useState<ActiveProcess[]>([]);
   const [logs, setLogs] = useState<LogEntry[]>([]);
+  const activeProcessesRef = useRef<ActiveProcess[]>([]);
+  activeProcessesRef.current = activeProcesses;
 
   const addLog = useCallback(
     (
@@ -98,22 +100,21 @@ export function ActivityProvider({ children }: { children: ReactNode }) {
 
   const finishProcess = useCallback(
     (id: string, status: 'completed' | 'failed', message?: string) => {
-      setActiveProcesses((prev) => {
-        const proc = prev.find((p) => p.id === id);
-        if (proc) {
-          const duration = Date.now() - proc.startTime;
-          const level: LogLevel = status === 'completed' ? 'INFO' : 'ERROR';
-          addLog(
-            level,
-            proc.provider,
-            `${proc.type.toUpperCase()} ${status}: ${message || (status === 'completed' ? 'Finished successfully' : 'Failed')}`,
-            duration
-          );
-        }
-        return prev.map((p) =>
-          p.id === id ? { ...p, status, message } : p
+      const proc = activeProcessesRef.current.find((p) => p.id === id);
+      if (proc) {
+        const duration = Date.now() - proc.startTime;
+        const level: LogLevel = status === 'completed' ? 'INFO' : 'ERROR';
+        addLog(
+          level,
+          proc.provider,
+          `${proc.type.toUpperCase()} ${status}: ${message || (status === 'completed' ? 'Finished successfully' : 'Failed')}`,
+          duration
         );
-      });
+      }
+
+      setActiveProcesses((prev) =>
+        prev.map((p) => (p.id === id ? { ...p, status, message } : p))
+      );
     },
     [addLog]
   );
