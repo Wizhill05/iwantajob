@@ -1,25 +1,54 @@
+import asyncio
 import logging
-import re
+import random
+import time
 from datetime import datetime, timezone
 from typing import Any
 import httpx
 
+from src.core.config import settings
 from src.models.job import JobItem, clean_html, parse_location
 
 logger = logging.getLogger(__name__)
 
 INDEED_GRAPHQL_URL = "https://apis.indeed.com/graphql"
-INDEED_API_KEY = "161092c2017b5bbab13edb12461a62d5a833871e7cad6d9d475304573de67ac8"
 
-INDEED_MOBILE_HEADERS: dict[str, str] = {
-    "Host": "apis.indeed.com",
-    "Content-Type": "application/json",
-    "indeed-api-key": INDEED_API_KEY,
-    "indeed-locale": "en-IN",
-    "indeed-co": "IN",
-    "user-agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 16_6_1 like Mac OS X) AppleWebKit/605.1.15 Mobile/15E148 Indeed App 193.1",
-    "indeed-app-info": "appv=193.1; appid=com.indeed.jobsearch; osv=16.6.1; os=ios; dtype=phone",
-}
+
+class UpstreamBlockedError(Exception):
+    """Raised when Indeed returns 401 or 403, indicating API key/header rejection."""
+    pass
+
+
+class UpstreamRateLimitError(Exception):
+    """Raised when Indeed returns 429 Too Many Requests."""
+    def __init__(self, message: str, retry_after: float = 5.0):
+        super().__init__(message)
+        self.retry_after = retry_after
+
+
+class UpstreamGraphQLError(Exception):
+    """Raised when Indeed returns GraphQL-level syntax/validation errors."""
+    pass
+
+
+def get_mobile_headers() -> dict[str, str]:
+    """Dynamically construct headers using current configuration."""
+    return {
+        "Host": "apis.indeed.com",
+        "Content-Type": "application/json",
+        "indeed-api-key": settings.indeed_api_key,
+        "indeed-locale": settings.indeed_locale,
+        "indeed-co": settings.indeed_co,
+        "user-agent": (
+            f"Mozilla/5.0 (iPhone; CPU iPhone OS {settings.indeed_ios_version.replace('.', '_')} like Mac OS X) "
+            f"AppleWebKit/605.1.15 Mobile/15E148 Indeed App {settings.indeed_app_version}"
+        ),
+        "indeed-app-info": (
+            f"appv={settings.indeed_app_version}; appid=com.indeed.jobsearch; "
+            f"osv={settings.indeed_ios_version}; os=ios; dtype=phone"
+        ),
+    }
+
 
 def build_indeed_graphql_query(
     what: str,
@@ -28,17 +57,24 @@ def build_indeed_graphql_query(
     sort: str = "DATE",
     radius: int = 25,
     radius_unit: str = "KILOMETERS",
+    cursor: str | None = None,
 ) -> str:
     """
     Construct the GraphQL query payload matching Indeed Mobile specifications.
+    Sanitizes string inputs to prevent GraphQL injection syntax errors.
     """
     escaped_what = what.replace("\\", "\\\\").replace('"', '\\"')
     escaped_where = where.replace("\\", "\\\\").replace('"', '\\"')
     sort_str = f', sort: {sort.upper()}' if sort and sort.upper() in ("DATE", "RELEVANCE") else ""
     unit_str = "KILOMETERS" if radius_unit.upper() in ("KILOMETERS", "KM") else "MILES"
+    cursor_str = f', cursor: "{cursor.replace("\\", "\\\\").replace("\"", "\\\"")}"' if cursor else ""
+    
+    # Enforce API bounds: max 100 per Indeed GraphQL specification
+    clamped_limit = max(1, min(limit, 100))
+
     return (
         f'query GetJobData {{\n'
-        f'  jobSearch(what: "{escaped_what}", location: {{where: "{escaped_where}", radius: {radius}, radiusUnit: {unit_str}}}, limit: {limit}{sort_str}) {{\n'
+        f'  jobSearch(what: "{escaped_what}", location: {{where: "{escaped_where}", radius: {radius}, radiusUnit: {unit_str}}}, limit: {clamped_limit}{sort_str}{cursor_str}) {{\n'
         f'    pageInfo {{\n'
         f'      nextCursor\n'
         f'    }}\n'
@@ -82,10 +118,8 @@ def build_indeed_graphql_query(
         f'}}'
     )
 
+
 def parse_indeed_date(date_val: Any) -> datetime | None:
-    """
-    Parse date published from Indeed timestamp (ms or s) or ISO format.
-    """
     if not date_val:
         return None
     if isinstance(date_val, (int, float)):
@@ -114,17 +148,16 @@ def parse_indeed_date(date_val: Any) -> datetime | None:
             return None
     return None
 
+
 def _format_salary_number(num: float) -> str:
     if num.is_integer():
         return str(int(num))
     return f"{num:.2f}".rstrip("0").rstrip(".")
 
+
 def parse_indeed_compensation(
     comp_data: dict[str, Any] | None,
 ) -> tuple[float | None, float | None, str | None]:
-    """
-    Extract min salary, max salary, and human-readable string from compensation node.
-    """
     if not isinstance(comp_data, dict):
         return (None, None, None)
 
@@ -151,26 +184,33 @@ def parse_indeed_compensation(
 
     return (salary_min, salary_max, salary_raw)
 
+
 def parse_graphql_response(
     data: dict[str, Any], fallback_where: str = "India"
-) -> list[JobItem]:
+) -> tuple[list[JobItem], str | None]:
     """
-    Extract standardized JobItem objects from Indeed Mobile GraphQL response payload.
+    Extract standardized JobItem objects and nextCursor from GraphQL response payload.
     """
     if not isinstance(data, dict):
-        return []
+        return [], None
 
     if "errors" in data and not data.get("data"):
-        logger.warning(f"Indeed GraphQL returned errors: {data.get('errors')}")
-        return []
+        err_msg = str(data.get("errors"))
+        logger.warning(f"Indeed GraphQL returned errors: {err_msg}")
+        raise UpstreamGraphQLError(f"Indeed GraphQL rejected query: {err_msg}")
 
     job_search = data.get("data", {}).get("jobSearch", {})
     if not isinstance(job_search, dict):
-        return []
+        return [], None
+
+    next_cursor = None
+    page_info = job_search.get("pageInfo")
+    if isinstance(page_info, dict):
+        next_cursor = page_info.get("nextCursor")
 
     results = job_search.get("results", [])
     if not isinstance(results, list):
-        return []
+        return [], next_cursor
 
     jobs: list[JobItem] = []
     for item in results:
@@ -243,14 +283,8 @@ def parse_graphql_response(
 
         desc_text = clean_html(desc_html_raw)
         desc_html = desc_html_raw if desc_html_raw else None
-
         posted_at = parse_indeed_date(target_data.get("datePublished"))
-
-        url = (
-            f"https://www.indeed.com/viewjob?jk={job_key}"
-            if job_key
-            else ""
-        )
+        url = f"https://www.indeed.com/viewjob?jk={job_key}" if job_key else ""
 
         jobs.append(
             JobItem(
@@ -273,25 +307,41 @@ def parse_graphql_response(
             )
         )
 
-    return jobs
+    return jobs, next_cursor
+
 
 class IndeedClient:
     """
-    Client for Indeed Mobile GraphQL Ingestion.
+    Robust Client for Indeed Mobile GraphQL Ingestion with concurrency guardrails,
+    rate limit throttling, retries, and error differentiation.
     """
 
     GRAPHQL_URL = INDEED_GRAPHQL_URL
-    HEADERS = INDEED_MOBILE_HEADERS
 
     def __init__(
         self,
         client: httpx.AsyncClient | Any = None,
-        timeout: float = 30.0,
+        timeout: float | None = None,
         impersonate: str = "safari17_2_ios",
     ):
         self.client = client
-        self.timeout = timeout
+        self.timeout = timeout or settings.timeout_seconds
         self.impersonate = impersonate
+        # Guardrail 1: Mutex Semaphore to prevent concurrent bursts against Indeed API from single IP
+        self._semaphore = asyncio.Semaphore(1)
+        # Guardrail 2: Rate limiter timestamp tracker
+        self._last_request_time: float = 0.0
+
+    async def _rate_limit_throttle(self) -> None:
+        """Enforces jittered inter-request delay to prevent burst HTTP 429s."""
+        min_interval = settings.min_request_interval_seconds
+        elapsed = time.monotonic() - self._last_request_time
+        if elapsed < min_interval:
+            jitter = random.uniform(0.1, 0.4)
+            wait_time = (min_interval - elapsed) + jitter
+            logger.debug(f"Rate limiter sleeping for {wait_time:.2f}s...")
+            await asyncio.sleep(wait_time)
+        self._last_request_time = time.monotonic()
 
     async def search_jobs(
         self,
@@ -301,7 +351,8 @@ class IndeedClient:
         sort: str = "RELEVANCE",
         radius: int = 25,
         radius_unit: str = "KILOMETERS",
-    ) -> list[JobItem]:
+        cursor: str | None = None,
+    ) -> tuple[list[JobItem], str | None]:
         query = build_indeed_graphql_query(
             what=what,
             where=where,
@@ -309,31 +360,63 @@ class IndeedClient:
             sort=sort,
             radius=radius,
             radius_unit=radius_unit,
+            cursor=cursor,
         )
         payload = {"query": query}
-        headers = dict(self.HEADERS)
+        headers = get_mobile_headers()
 
-        try:
-            if self.client is not None:
-                resp = await self.client.post(
-                    self.GRAPHQL_URL,
-                    headers=headers,
-                    json=payload,
-                    timeout=self.timeout,
-                )
-                if resp.status_code in (401, 403, 429) or resp.status_code != 200:
-                    logger.warning(f"Indeed API returned HTTP {resp.status_code}")
-                    return []
-                data = resp.json()
-            else:
-                data = await self._fetch_with_curl_or_httpx(payload, headers, what, where)
-                if data is None:
-                    return []
-
+        # Execute inside concurrency semaphore
+        async with self._semaphore:
+            data = await self._execute_with_retries(payload, headers, what, where)
             return parse_graphql_response(data, fallback_where=where)
-        except Exception as exc:
-            logger.warning(f"Error fetching Indeed jobs: {exc}")
-            return []
+
+    async def _execute_with_retries(
+        self,
+        payload: dict[str, Any],
+        headers: dict[str, str],
+        what: str,
+        where: str,
+    ) -> dict[str, Any]:
+        """Handles retries with exponential backoff for transient network issues or rate limits."""
+        max_retries = settings.max_retries
+        for attempt in range(max_retries + 1):
+            await self._rate_limit_throttle()
+            try:
+                if self.client is not None:
+                    resp = await self.client.post(
+                        self.GRAPHQL_URL,
+                        headers=headers,
+                        json=payload,
+                        timeout=self.timeout,
+                    )
+                    self._check_status_code(resp.status_code, what, where)
+                    return resp.json()
+                else:
+                    return await self._fetch_with_curl_or_httpx(payload, headers, what, where)
+            except UpstreamRateLimitError as rle:
+                if attempt < max_retries:
+                    backoff = rle.retry_after * (attempt + 1) + random.uniform(0.5, 1.5)
+                    logger.warning(f"Rate limited by Indeed. Backing off for {backoff:.2f}s (attempt {attempt + 1}/{max_retries})")
+                    await asyncio.sleep(backoff)
+                    continue
+                raise
+            except (httpx.RequestError, ConnectionError) as net_err:
+                if attempt < max_retries:
+                    backoff = 2.0 * (attempt + 1)
+                    logger.warning(f"Network error: {net_err}. Retrying in {backoff}s...")
+                    await asyncio.sleep(backoff)
+                    continue
+                raise
+
+        raise RuntimeError(f"Exhausted {max_retries} retries querying Indeed.")
+
+    def _check_status_code(self, status_code: int, what: str, where: str) -> None:
+        if status_code == 429:
+            raise UpstreamRateLimitError(f"Indeed rate limit (HTTP 429) hit for '{what}' in '{where}'")
+        if status_code in (401, 403):
+            raise UpstreamBlockedError(f"Indeed rejected API key or TLS signature (HTTP {status_code})")
+        if status_code != 200:
+            raise RuntimeError(f"Indeed returned unexpected HTTP status {status_code}")
 
     async def _fetch_with_curl_or_httpx(
         self,
@@ -341,34 +424,38 @@ class IndeedClient:
         headers: dict[str, str],
         what: str,
         where: str,
-    ) -> dict[str, Any] | None:
+    ) -> dict[str, Any]:
+        """Executes using curl_cffi with TLS fingerprint impersonation, falling back to httpx."""
         try:
             from curl_cffi.requests import AsyncSession
 
-            async with AsyncSession(impersonate=self.impersonate) as session:
+            proxy = settings.http_proxy
+            proxies = {"http": proxy, "https": proxy} if proxy else None
+
+            async with AsyncSession(impersonate=self.impersonate, proxies=proxies) as session:
                 resp = await session.post(
                     self.GRAPHQL_URL,
                     headers=headers,
                     json=payload,
                     timeout=self.timeout,
                 )
-                if resp.status_code != 200:
-                    logger.warning(f"Indeed curl_cffi status {resp.status_code}")
-                    return None
+                self._check_status_code(resp.status_code, what, where)
                 return resp.json()
+        except (UpstreamRateLimitError, UpstreamBlockedError):
+            raise
         except Exception as curl_err:
-            logger.warning(f"curl_cffi request failed ({curl_err}), trying httpx fallback...")
+            logger.warning(f"curl_cffi failed ({curl_err}), attempting httpx fallback...")
             try:
-                async with httpx.AsyncClient(timeout=self.timeout) as http_client:
+                async with httpx.AsyncClient(timeout=self.timeout, proxy=settings.http_proxy) as http_client:
                     resp = await http_client.post(
                         self.GRAPHQL_URL,
                         headers=headers,
                         json=payload,
                     )
-                    if resp.status_code != 200:
-                        logger.warning(f"Indeed httpx status {resp.status_code}")
-                        return None
+                    self._check_status_code(resp.status_code, what, where)
                     return resp.json()
+            except (UpstreamRateLimitError, UpstreamBlockedError):
+                raise
             except Exception as http_err:
-                logger.warning(f"httpx fallback failed: {http_err}")
-                return None
+                logger.error(f"httpx fallback also failed: {http_err}")
+                raise RuntimeError(f"All HTTP transport methods failed for Indeed query: {http_err}") from http_err

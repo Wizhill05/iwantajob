@@ -43,23 +43,37 @@ def parse_location(location_str: str | None) -> tuple[str | None, bool, bool]:
     return city, is_remote, is_international
 
 class JobItem(BaseModel):
-    external_id: str
-    title: str
-    company_name: str
-    source: str = "indeed"
-    location_raw: str
-    city: str | None = None
-    is_remote: bool = False
-    is_international: bool = False
-    salary_raw: str | None = None
-    salary_min: float | None = None
-    salary_max: float | None = None
-    currency: str = "INR"
-    url: str
-    description_text: str
-    description_html: str | None = None
-    posted_at: datetime | None = None
-    experience_min_years: int | None = None
-    experience_max_years: int | None = None
-    company_logo_url: str | None = None
-    company_website: str | None = None
+    external_id: str = Field(description="Unique job key identifier from Indeed")
+    title: str = Field(description="Role title")
+    company_name: str = Field(description="Employer name")
+    source: str = Field(default="indeed", description="Source aggregator/board")
+    location_raw: str = Field(description="Raw location string from source")
+    city: str | None = Field(default=None, description="Normalized city (e.g. pune, bengaluru)")
+    is_remote: bool = Field(default=False, description="Whether the job is remote/WFH")
+    is_international: bool = Field(default=False, description="Whether the role is located outside India")
+    salary_raw: str | None = Field(default=None, description="Formatted human-readable salary string")
+    salary_min: float | None = Field(default=None, description="Minimum numeric salary")
+    salary_max: float | None = Field(default=None, description="Maximum numeric salary")
+    currency: str = Field(default="INR", description="Currency code (e.g. INR, USD, EUR)")
+    url: str = Field(description="Direct URL to the job posting")
+    description_text: str = Field(description="Sanitized plain text description snippet/body")
+    description_html: str | None = Field(default=None, description="Raw HTML description if available")
+    posted_at: datetime | None = Field(default=None, description="ISO datetime of when the role was posted")
+    experience_min_years: int | None = Field(default=None, description="Minimum experience required in years")
+    experience_max_years: int | None = Field(default=None, description="Maximum experience required in years")
+    company_logo_url: str | None = Field(default=None, description="Company logo image URL")
+    company_website: str | None = Field(default=None, description="Company website or profile URL")
+
+class JobSearchResponse(BaseModel):
+    query: str = Field(description="The role / query executed")
+    location: str = Field(description="The location queried")
+    total_count: int = Field(description="Number of jobs returned in this batch")
+    next_cursor: str | None = Field(default=None, description="Cursor token for fetching the next page of results")
+    sort: str = Field(description="Sort order used ('relevance' or 'date')")
+    radius_km: int = Field(description="Search radius in kilometers")
+    items: list[JobItem] = Field(description="List of scraped job items")
+
+class ErrorDetail(BaseModel):
+    error: str = Field(description="Machine-readable error code")
+    detail: str = Field(description="Human-readable explanation of failure")
+    retry_after: float | None = Field(default=None, description="Suggested backoff duration in seconds if rate limited")

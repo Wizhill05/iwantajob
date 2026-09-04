@@ -1,7 +1,12 @@
 import pytest
 from httpx import AsyncClient, ASGITransport
 from src.main import app
-from src.clients.indeed import parse_graphql_response, build_indeed_graphql_query
+from src.clients.indeed import (
+    parse_graphql_response,
+    build_indeed_graphql_query,
+    UpstreamRateLimitError,
+    UpstreamBlockedError,
+)
 
 def test_build_indeed_graphql_query():
     q = build_indeed_graphql_query(
@@ -19,7 +24,7 @@ def test_build_indeed_graphql_query():
     assert 'radiusUnit: KILOMETERS' in q
     assert 'sort: RELEVANCE' in q
 
-def test_build_indeed_graphql_query_date_sort():
+def test_build_indeed_graphql_query_with_cursor():
     q = build_indeed_graphql_query(
         "sdet",
         "Pune",
@@ -27,15 +32,20 @@ def test_build_indeed_graphql_query_date_sort():
         sort="date",
         radius=50,
         radius_unit="MILES",
+        cursor="cursor_token_xyz",
     )
     assert 'sort: DATE' in q
     assert 'radius: 50' in q
     assert 'radiusUnit: MILES' in q
+    assert 'cursor: "cursor_token_xyz"' in q
 
 def test_parse_graphql_response():
     mock_payload = {
         "data": {
             "jobSearch": {
+                "pageInfo": {
+                    "nextCursor": "token_abc_next"
+                },
                 "results": [
                     {
                         "trackingKey": "tk_123",
@@ -72,7 +82,8 @@ def test_parse_graphql_response():
         }
     }
 
-    jobs = parse_graphql_response(mock_payload, fallback_where="India")
+    jobs, cursor = parse_graphql_response(mock_payload, fallback_where="India")
+    assert cursor == "token_abc_next"
     assert len(jobs) == 1
     job = jobs[0]
     assert job.external_id == "job_abc"
@@ -90,7 +101,7 @@ async def test_api_health():
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
         resp = await ac.get("/health")
         assert resp.status_code == 200
-        assert resp.json() == {"status": "ok"}
+        assert resp.json() == {"status": "ok", "version": "1.0.0"}
 
 @pytest.mark.asyncio
 async def test_portal_html_served():
@@ -101,6 +112,16 @@ async def test_portal_html_served():
         assert "Indeed Scraper Portal" in resp.text
         assert "sortSelect" in resp.text
         assert "radiusInput" in resp.text
+        assert "loadMoreBtn" in resp.text
+
+@pytest.mark.asyncio
+async def test_api_scrape_indeed_empty_validation():
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as ac:
+        resp = await ac.get("/api/scrape/indeed?what=&where=India")
+        assert resp.status_code == 400
+        data = resp.json()
+        assert data["error"] == "INVALID_QUERY"
 
 @pytest.mark.asyncio
 async def test_api_scrape_indeed_endpoint():
@@ -109,8 +130,9 @@ async def test_api_scrape_indeed_endpoint():
         resp = await ac.get("/api/scrape/indeed?what=ai+engineer&where=India&limit=2&sort=relevance&radius=25")
         assert resp.status_code == 200
         data = resp.json()
-        assert isinstance(data, list)
-        assert len(data) > 0
-        assert "title" in data[0]
-        assert "url" in data[0]
-        assert data[0]["source"] == "indeed"
+        assert "query" in data
+        assert "total_count" in data
+        assert "items" in data
+        assert isinstance(data["items"], list)
+        assert len(data["items"]) > 0
+        assert data["items"][0]["source"] == "indeed"
