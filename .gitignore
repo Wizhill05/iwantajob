@@ -1,0 +1,9 @@
+backend/.venv/
+backend/__pycache__/
+backend/**/__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+tunnel.log
+.DS_Store
