@@ -31,7 +31,7 @@ export default function SystemLogsPage() {
   return (
     <div className="relative pb-24 lg:pb-12 max-w-7xl mx-auto">
       {/* Centered Dynamic Hero */}
-      <PageHero />
+      <PageHero title="Logs" />
 
       {/* Main Content Pane Starting After Half Viewport */}
       <div className="relative z-10 -mt-8 pt-4 space-y-6 bg-[#131313] min-h-[60vh]">

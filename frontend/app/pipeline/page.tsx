@@ -105,7 +105,7 @@ function PipelineContent() {
   return (
     <div className="relative max-w-7xl mx-auto pb-16">
       {/* Centered Dynamic Hero */}
-      <PageHero />
+      <PageHero title="Pipeline" />
 
       {/* Main Content Starting After Half Viewport */}
       <div className="relative z-10 -mt-8 pt-4 space-y-6 bg-[#131313] min-h-[60vh]">

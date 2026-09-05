@@ -250,7 +250,7 @@ function JobsExplorerContent() {
   return (
     <div className="relative max-w-7xl mx-auto pb-16">
       {/* Centered Dynamic Hero */}
-      <PageHero />
+      <PageHero title="Jobs" />
 
       {/* Main Content Starting After Half Viewport with Pull-Up Overlay */}
       <div className="relative z-10 -mt-8 pt-4 space-y-4 bg-[#131313] min-h-[60vh]">
