@@ -29,12 +29,14 @@ export default function SystemLogsPage() {
   }, []);
 
   return (
-    <div className="space-y-6 pb-24 lg:pb-12 max-w-7xl mx-auto">
+    <div className="relative pb-24 lg:pb-12 max-w-7xl mx-auto">
       {/* Centered Dynamic Hero */}
       <PageHero />
 
-      {/* Action Controls: Auto-Poll & Refresh */}
-      <div className="flex items-center justify-between gap-3 flex-wrap pb-2 border-b border-[#262626]">
+      {/* Main Content Pane Starting After Half Viewport */}
+      <div className="relative z-10 -mt-8 pt-4 space-y-6 bg-[#131313] min-h-[60vh]">
+        {/* Action Controls: Auto-Poll & Refresh */}
+        <div className="flex items-center justify-between gap-3 flex-wrap pb-2 border-b border-[#262626]">
         <div className="flex items-center p-0.5 rounded-lg bg-[#181818] border border-[#262626] text-xs font-sans">
           <span className="px-2 text-[#6b7280] hidden sm:inline">Poll:</span>
           {[
@@ -117,6 +119,7 @@ export default function SystemLogsPage() {
         </div>
         <LogsTerminalView />
       </section>
+      </div>
     </div>
   );
 }

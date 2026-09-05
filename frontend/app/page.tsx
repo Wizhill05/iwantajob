@@ -74,22 +74,24 @@ export default function OverviewPage() {
   }, [fetchStatus]);
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-300">
-      {/* Centered Dynamic Hero */}
+    <div className="relative animate-in fade-in duration-300">
+      {/* Scroll-Reactive Centered Dynamic Hero */}
       <PageHero />
 
-      {/* KPI Grid */}
-      <section aria-labelledby="kpi-section-title">
-        <h2 id="kpi-section-title" className="sr-only">
-          Platform Key Performance Indicators
-        </h2>
-        <KpiGrid
-          status={parsingStatus}
-          isLoading={isLoading}
-          latencyMs={latencyMs}
-          isOnline={isOnline}
-        />
-      </section>
+      {/* Main Content Pane Starting After Half Page with Clean Pull-Up Overlay */}
+      <div className="relative z-10 -mt-8 pt-4 space-y-6 bg-[#131313] min-h-[60vh]">
+        {/* KPI Grid */}
+        <section aria-labelledby="kpi-section-title">
+          <h2 id="kpi-section-title" className="sr-only">
+            Platform Key Performance Indicators
+          </h2>
+          <KpiGrid
+            status={parsingStatus}
+            isLoading={isLoading}
+            latencyMs={latencyMs}
+            isOnline={isOnline}
+          />
+        </section>
 
       {/* Scraper Provider Engine Cards */}
       <section aria-labelledby="providers-section-title">
@@ -168,6 +170,7 @@ export default function OverviewPage() {
           <span>Explore Unified Jobs</span>
           <ArrowRight className="w-3.5 h-3.5" />
         </Link>
+      </div>
       </div>
     </div>
   );

@@ -3,7 +3,6 @@ import { Inter, Manrope, Roboto_Mono } from 'next/font/google';
 import './globals.css';
 import { ActivityProvider } from '@/context/ActivityContext';
 import { DesktopSidebar } from '@/components/layout/DesktopSidebar';
-import { TopHeader } from '@/components/layout/TopHeader';
 import { MobileBottomNav } from '@/components/layout/MobileBottomNav';
 
 const inter = Inter({
@@ -45,10 +44,9 @@ export default function RootLayout({
             {/* Desktop Left Fixed Sidebar */}
             <DesktopSidebar />
 
-            {/* Main Content Area with Top Header */}
+            {/* Main Content Area without Top Header */}
             <div className="flex-1 lg:pl-64 flex flex-col min-h-screen min-w-0">
-              <TopHeader />
-              <main className="flex-1 pb-24 lg:pb-12 px-4 lg:px-8 py-6 max-w-7xl w-full mx-auto">
+              <main className="flex-1 pb-24 lg:pb-12 px-4 lg:px-8 max-w-7xl w-full mx-auto">
                 {children}
               </main>
             </div>

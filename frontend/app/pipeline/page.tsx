@@ -103,12 +103,14 @@ function PipelineContent() {
     : 0;
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-300">
+    <div className="relative max-w-7xl mx-auto pb-16">
       {/* Centered Dynamic Hero */}
       <PageHero />
 
-      {/* Action Controls & Backlog Badge */}
-      <div className="flex items-center justify-between gap-3 flex-wrap pb-2 border-b border-[#262626]">
+      {/* Main Content Starting After Half Viewport */}
+      <div className="relative z-10 -mt-8 pt-4 space-y-6 bg-[#131313] min-h-[60vh]">
+        {/* Action Controls & Backlog Badge */}
+        <div className="flex items-center justify-between gap-3 flex-wrap pb-2 border-b border-[#262626]">
         <div className="flex items-center gap-2">
           <div
             className={cn(
@@ -250,6 +252,7 @@ function PipelineContent() {
           />
         </div>
       </section>
+      </div>
     </div>
   );
 }

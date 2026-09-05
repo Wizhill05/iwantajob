@@ -248,18 +248,20 @@ function JobsExplorerContent() {
   };
 
   return (
-    <div className="space-y-4 max-w-7xl mx-auto pb-16">
+    <div className="relative max-w-7xl mx-auto pb-16">
       {/* Centered Dynamic Hero */}
       <PageHero />
 
-      {/* Collapsible Mobile/Desktop Filter Control */}
-      <JobsFilterBar
-        filters={filters}
-        onChange={setFilters}
-        onReset={handleResetFilters}
-        totalResults={displayedJobs.length}
-        isLoading={isLoading}
-      />
+      {/* Main Content Starting After Half Viewport with Pull-Up Overlay */}
+      <div className="relative z-10 -mt-8 pt-4 space-y-4 bg-[#131313] min-h-[60vh]">
+        {/* Collapsible Mobile/Desktop Filter Control */}
+        <JobsFilterBar
+          filters={filters}
+          onChange={setFilters}
+          onReset={handleResetFilters}
+          totalResults={displayedJobs.length}
+          isLoading={isLoading}
+        />
 
       {/* Triage Folder Tabs: Active / Saved / Archived */}
       <div className="flex items-center justify-between gap-3 flex-wrap border-b border-[#262626] pb-3">
@@ -479,6 +481,7 @@ function JobsExplorerContent() {
         isOpen={isDrawerOpen}
         onClose={handleCloseModal}
       />
+      </div>
     </div>
   );
 }
