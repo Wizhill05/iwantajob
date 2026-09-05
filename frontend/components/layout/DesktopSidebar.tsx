@@ -124,7 +124,7 @@ export function DesktopSidebar() {
               <Server className="w-3.5 h-3.5" />
               <span>Backend API</span>
             </div>
-            <span className="text-[#6b7280] font-mono text-[10px]">localhost:8000</span>
+            <span className="text-[#6b7280] font-mono text-[10px]">localhost:8020</span>
           </div>
 
           <div className="flex items-center justify-between pt-1 border-t border-[#262626]/60 text-[10px] font-mono text-[#6b7280]">

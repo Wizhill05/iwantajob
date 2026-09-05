@@ -112,9 +112,12 @@ export function ActivityProvider({ children }: { children: ReactNode }) {
         );
       }
 
-      setActiveProcesses((prev) =>
-        prev.map((p) => (p.id === id ? { ...p, status, message } : p))
-      );
+      setActiveProcesses((prev) => {
+        const updated = prev.map((p) => (p.id === id ? { ...p, status, message } : p));
+        const running = updated.filter((p) => p.status === 'running');
+        const finished = updated.filter((p) => p.status !== 'running');
+        return [...running, ...finished.slice(0, 10)];
+      });
     },
     [addLog]
   );

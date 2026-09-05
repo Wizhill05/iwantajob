@@ -135,7 +135,7 @@ export default function OverviewPage() {
         <div className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/20 flex items-start gap-3 text-xs font-mono text-rose-400">
           <WarningTriangle className="w-4 h-4 shrink-0 mt-0.5 text-rose-400" />
           <div className="flex-1 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-            <span>{error} Backend may be offline at http://localhost:8000.</span>
+            <span>{error} Backend may be offline at http://localhost:8020.</span>
             <button
               type="button"
               onClick={() => fetchStatus(true)}

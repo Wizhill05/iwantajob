@@ -367,7 +367,7 @@ export function LogsTerminalView() {
             <div className="flex items-center gap-1.5 text-[#9ca3af]">
               <Terminal className="w-3.5 h-3.5 text-[#3ecf8e]" />
               <span className="text-white font-medium">system.log</span>
-              <span className="text-[#6b7280]">// opencode-worker-stdout</span>
+              <span className="text-[#6b7280]">{"// opencode-worker-stdout"}</span>
             </div>
           </div>
 

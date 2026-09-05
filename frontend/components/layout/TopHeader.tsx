@@ -108,7 +108,7 @@ export function TopHeader() {
             isOnline === true
               ? `Backend healthy (${latencyMs}ms)`
               : isOnline === false
-              ? 'Backend unreachable (localhost:8000)'
+              ? 'Backend unreachable (localhost:8020)'
               : 'Checking backend status...'
           }
         >
