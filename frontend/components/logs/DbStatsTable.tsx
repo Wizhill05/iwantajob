@@ -171,7 +171,7 @@ export function DbStatsTable({ onRefresh, autoRefreshInterval }: DbStatsTablePro
         {/* Card 1: PostgreSQL Host */}
         <div className="bg-[#181818] border border-[#262626] rounded-xl p-4 shadow-sm">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-mono text-[#9ca3af] uppercase tracking-wider">
+            <span className="text-[11px] font-sans text-[#9ca3af]">
               PostgreSQL Host
             </span>
             <Database className="w-4 h-4 text-[#3ecf8e]" />
@@ -179,9 +179,9 @@ export function DbStatsTable({ onRefresh, autoRefreshInterval }: DbStatsTablePro
           <div className="mt-2 flex items-baseline gap-2">
             <span className="text-base font-semibold font-mono text-white">localhost:5432</span>
           </div>
-          <div className="mt-1 flex items-center gap-1.5 text-[11px] font-mono text-[#6b7280]">
+          <div className="mt-1 flex items-center gap-1.5 text-[11px] font-sans text-[#6b7280]">
             <span>DB:</span>
-            <span className="text-white font-medium">iwantajob_db</span>
+            <span className="text-white font-medium font-mono text-[11px]">iwantajob_db</span>
             <span>(pgvector)</span>
           </div>
         </div>
@@ -189,7 +189,7 @@ export function DbStatsTable({ onRefresh, autoRefreshInterval }: DbStatsTablePro
         {/* Card 2: Backend API & Latency */}
         <div className="bg-[#181818] border border-[#262626] rounded-xl p-4 shadow-sm">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-mono text-[#9ca3af] uppercase tracking-wider">
+            <span className="text-[11px] font-sans text-[#9ca3af]">
               Backend API
             </span>
             <Server className="w-4 h-4 text-sky-400" />
@@ -198,7 +198,7 @@ export function DbStatsTable({ onRefresh, autoRefreshInterval }: DbStatsTablePro
             <span className="text-base font-semibold font-mono text-white">localhost:8020</span>
             <span
               className={cn(
-                'px-2 py-0.5 rounded text-[10px] font-mono font-semibold uppercase border flex items-center gap-1',
+                'px-2 py-0.5 rounded text-[10px] font-sans font-semibold border flex items-center gap-1',
                 isOnline
                   ? 'bg-[#3ecf8e]/10 text-[#3ecf8e] border-[#3ecf8e]/30'
                   : 'bg-rose-500/10 text-rose-400 border-rose-500/30'
@@ -213,9 +213,9 @@ export function DbStatsTable({ onRefresh, autoRefreshInterval }: DbStatsTablePro
               {isOnline ? 'Healthy' : 'Offline'}
             </span>
           </div>
-          <div className="mt-1 flex items-center justify-between text-[11px] font-mono text-[#6b7280]">
+          <div className="mt-1 flex items-center justify-between text-[11px] font-sans text-[#6b7280]">
             <span>Latency</span>
-            <span className="text-sky-300 font-medium">
+            <span className="text-sky-300 font-medium font-mono text-[11px]">
               {latencyMs !== null ? `${latencyMs}ms RTT` : '—'}
             </span>
           </div>
@@ -224,7 +224,7 @@ export function DbStatsTable({ onRefresh, autoRefreshInterval }: DbStatsTablePro
         {/* Card 3: Bronze Staging Inventory */}
         <div className="bg-[#181818] border border-[#262626] rounded-xl p-4 shadow-sm">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-mono text-[#9ca3af] uppercase tracking-wider">
+            <span className="text-[11px] font-sans text-[#9ca3af]">
               Bronze Tier Records
             </span>
             <Cpu className="w-4 h-4 text-amber-400" />
@@ -233,13 +233,13 @@ export function DbStatsTable({ onRefresh, autoRefreshInterval }: DbStatsTablePro
             <span className="text-xl font-bold font-mono text-white">
               {isLoading && !parsingStatus ? '—' : totalRawCount.toLocaleString()}
             </span>
-            <span className="text-[11px] font-mono text-[#6b7280]">raw items</span>
+            <span className="text-[11px] font-sans text-[#6b7280]">raw items</span>
           </div>
-          <div className="mt-1 flex items-center justify-between text-[11px] font-mono text-[#6b7280]">
+          <div className="mt-1 flex items-center justify-between text-[11px] font-sans text-[#6b7280]">
             <span>Pending Normalization</span>
             <span
               className={cn(
-                'font-medium',
+                'font-medium font-mono text-[11px]',
                 totalPendingCount > 0 ? 'text-amber-400' : 'text-[#3ecf8e]'
               )}
             >
@@ -251,7 +251,7 @@ export function DbStatsTable({ onRefresh, autoRefreshInterval }: DbStatsTablePro
         {/* Card 4: Silver Clean Target */}
         <div className="bg-[#181818] border border-[#262626] rounded-xl p-4 shadow-sm">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-mono text-[#9ca3af] uppercase tracking-wider">
+            <span className="text-[11px] font-sans text-[#9ca3af]">
               Silver Clean Store
             </span>
             <Activity className="w-4 h-4 text-[#3ecf8e]" />
@@ -260,9 +260,9 @@ export function DbStatsTable({ onRefresh, autoRefreshInterval }: DbStatsTablePro
             <span className="text-xl font-bold font-mono text-[#3ecf8e]">
               {isLoading && !parsingStatus ? '—' : totalUnifiedCount.toLocaleString()}
             </span>
-            <span className="text-[11px] font-mono text-[#6b7280]">jobs</span>
+            <span className="text-[11px] font-sans text-[#6b7280]">jobs</span>
           </div>
-          <div className="mt-1 flex items-center justify-between text-[11px] font-mono text-[#6b7280]">
+          <div className="mt-1 flex items-center justify-between text-[11px] font-sans text-[#6b7280]">
             <span>Storage Efficiency</span>
             <span className="text-[#9ca3af] font-medium">100% Normalized</span>
           </div>
@@ -279,7 +279,7 @@ export function DbStatsTable({ onRefresh, autoRefreshInterval }: DbStatsTablePro
               <h3 className="text-sm font-semibold font-heading text-white">
                 PostgreSQL Staging & Production Tables
               </h3>
-              <p className="text-[11px] font-mono text-[#9ca3af]">
+              <p className="text-[11px] font-sans text-[#9ca3af]">
                 Decoupled Bronze raw ingestion stores and Silver normalized unified schema
               </p>
             </div>
@@ -287,15 +287,15 @@ export function DbStatsTable({ onRefresh, autoRefreshInterval }: DbStatsTablePro
 
           <div className="flex items-center gap-2.5">
             {lastChecked && (
-              <span className="text-[11px] font-mono text-[#6b7280] hidden sm:inline">
-                Polled at {lastChecked.toLocaleTimeString([], { hour12: false })}
+              <span className="text-[11px] font-sans text-[#6b7280] hidden sm:inline">
+                Polled at <span className="font-mono">{lastChecked.toLocaleTimeString([], { hour12: false })}</span>
               </span>
             )}
             <button
               type="button"
               onClick={() => fetchDatabaseStats(false)}
               disabled={isRefreshing}
-              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-[#262626] bg-[#202020] text-[#9ca3af] hover:text-white hover:border-[#383838] transition-colors text-xs font-mono disabled:opacity-50"
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-[#262626] bg-[#202020] text-[#9ca3af] hover:text-white hover:border-[#383838] transition-colors text-xs font-sans disabled:opacity-50"
             >
               <Refresh className={cn('w-3.5 h-3.5', isRefreshing && 'animate-spin text-[#3ecf8e]')} />
               <span>Refresh</span>
@@ -304,7 +304,7 @@ export function DbStatsTable({ onRefresh, autoRefreshInterval }: DbStatsTablePro
         </div>
 
         {error && (
-          <div className="mt-4 p-3 rounded-lg bg-rose-500/10 border border-rose-500/30 flex items-center gap-2.5 text-xs font-mono text-rose-300">
+          <div className="mt-4 p-3 rounded-lg bg-rose-500/10 border border-rose-500/30 flex items-center gap-2.5 text-xs font-sans text-rose-300">
             <WarningTriangle className="w-4 h-4 text-rose-400 shrink-0" />
             <span>Database Status Warning: {error}</span>
           </div>
@@ -314,7 +314,7 @@ export function DbStatsTable({ onRefresh, autoRefreshInterval }: DbStatsTablePro
         <div className="mt-4 overflow-x-auto">
           <table className="w-full text-left font-mono text-xs border-collapse">
             <thead>
-              <tr className="border-b border-[#262626] text-[#9ca3af] text-[11px] uppercase">
+              <tr className="border-b border-[#262626] text-[#9ca3af] text-[11px] font-sans">
                 <th className="py-2.5 px-3 font-medium">Table Name</th>
                 <th className="py-2.5 px-3 font-medium">Tier</th>
                 <th className="py-2.5 px-3 font-medium">Provider / Architecture</th>
@@ -341,9 +341,9 @@ export function DbStatsTable({ onRefresh, autoRefreshInterval }: DbStatsTablePro
                             isSilver ? 'text-[#3ecf8e]' : 'text-amber-400'
                           )}
                         />
-                        <span className="font-semibold text-white">{row.tableName}</span>
+                        <span className="font-semibold text-white font-mono">{row.tableName}</span>
                       </div>
-                      <p className="text-[10px] text-[#6b7280] mt-0.5 max-w-xs truncate">
+                      <p className="text-[10px] text-[#6b7280] mt-0.5 max-w-xs truncate font-sans">
                         {row.description}
                       </p>
                     </td>
@@ -352,7 +352,7 @@ export function DbStatsTable({ onRefresh, autoRefreshInterval }: DbStatsTablePro
                     <td className="py-3 px-3">
                       <span
                         className={cn(
-                          'px-2 py-0.5 rounded text-[10px] font-bold uppercase border',
+                          'px-2 py-0.5 rounded text-[10px] font-bold font-sans border',
                           isSilver
                             ? 'bg-[#3ecf8e]/10 text-[#3ecf8e] border-[#3ecf8e]/30'
                             : 'bg-amber-500/10 text-amber-300 border-amber-500/30'
@@ -363,7 +363,7 @@ export function DbStatsTable({ onRefresh, autoRefreshInterval }: DbStatsTablePro
                     </td>
 
                     {/* Source Provider */}
-                    <td className="py-3 px-3">
+                    <td className="py-3 px-3 font-sans">
                       <span className="text-[#9ca3af]">{row.sourceLabel}</span>
                     </td>
 

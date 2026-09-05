@@ -81,16 +81,16 @@ export function RawJsonViewer({
       <div className="flex items-center justify-between px-4 py-3 bg-[#181818] border-b border-[#262626]">
         <div className="flex items-center gap-2.5">
           <span className="w-2 h-2 rounded-full bg-[#3ecf8e]" />
-          <span className="text-xs font-mono font-medium text-white">{title}</span>
-          <span className="text-[11px] font-mono text-[#9ca3af]">
-            {lineCount} lines
+          <span className="text-xs font-sans font-medium text-white">{title}</span>
+          <span className="text-[11px] font-sans text-[#9ca3af]">
+            <span className="font-mono">{lineCount}</span> lines
           </span>
         </div>
 
         <button
           type="button"
           onClick={handleCopy}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#202020] hover:bg-[#262626] border border-[#262626] hover:border-[#383838] text-xs font-mono text-[#f3f4f6] transition-all"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#202020] hover:bg-[#262626] border border-[#262626] hover:border-[#383838] text-xs font-sans font-medium text-[#f3f4f6] transition-all"
         >
           {copied ? (
             <>

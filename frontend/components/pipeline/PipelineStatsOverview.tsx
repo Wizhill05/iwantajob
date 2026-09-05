@@ -92,7 +92,7 @@ export function PipelineStatsOverview({
       {/* 1. Raw vs Clean Records */}
       <Card className="bg-[#181818] border-[#262626] rounded-xl p-5 shadow-sm hover:border-[#383838] transition-all flex flex-col justify-between">
         <div>
-          <div className="flex items-center justify-between text-xs font-mono text-[#9ca3af] uppercase tracking-wider">
+          <div className="flex items-center justify-between text-xs font-sans text-[#9ca3af]">
             <span>Staging vs Clean</span>
             <Database className="w-4 h-4 text-[#9ca3af]" />
           </div>
@@ -100,27 +100,27 @@ export function PipelineStatsOverview({
             <Metric className="text-2xl font-mono font-semibold text-white">
               {totalRaw.toLocaleString()}
             </Metric>
-            <span className="text-xs font-mono text-[#9ca3af]">raw</span>
+            <span className="text-xs font-sans text-[#9ca3af]">raw</span>
             <span className="text-xs text-[#6b7280]">/</span>
             <Metric className="text-2xl font-mono font-semibold text-[#3ecf8e]">
               {totalClean.toLocaleString()}
             </Metric>
-            <span className="text-xs font-mono text-[#3ecf8e]">clean</span>
+            <span className="text-xs font-sans text-[#3ecf8e]">clean</span>
           </div>
         </div>
 
-        <div className="mt-4 pt-3 border-t border-[#262626] space-y-1.5 text-[11px] font-mono">
+        <div className="mt-4 pt-3 border-t border-[#262626] space-y-1.5 text-[11px] font-sans">
           <div className="flex items-center justify-between text-[#9ca3af]">
             <span>Indeed GraphQL:</span>
-            <span className="text-white">{indeedRaw}</span>
+            <span className="text-white font-mono">{indeedRaw}</span>
           </div>
           <div className="flex items-center justify-between text-[#9ca3af]">
             <span>LinkedIn Guest:</span>
-            <span className="text-white">{linkedinRaw}</span>
+            <span className="text-white font-mono">{linkedinRaw}</span>
           </div>
           <div className="flex items-center justify-between text-[#9ca3af]">
             <span>Wellfound SSR:</span>
-            <span className="text-white">{wellfoundRaw}</span>
+            <span className="text-white font-mono">{wellfoundRaw}</span>
           </div>
         </div>
       </Card>
@@ -128,7 +128,7 @@ export function PipelineStatsOverview({
       {/* 2. Overall Promotion Yield */}
       <Card className="bg-[#181818] border-[#262626] rounded-xl p-5 shadow-sm hover:border-[#383838] transition-all flex flex-col justify-between">
         <div>
-          <div className="flex items-center justify-between text-xs font-mono text-[#9ca3af] uppercase tracking-wider">
+          <div className="flex items-center justify-between text-xs font-sans text-[#9ca3af]">
             <span>Promotion Yield</span>
             <RefreshDouble className="w-4 h-4 text-[#3ecf8e]" />
           </div>
@@ -149,17 +149,17 @@ export function PipelineStatsOverview({
           </div>
         </div>
 
-        <div className="mt-4 pt-3 border-t border-[#262626] flex items-center justify-between text-[11px] font-mono">
+        <div className="mt-4 pt-3 border-t border-[#262626] flex items-center justify-between text-[11px] font-sans">
           <span className="text-[#9ca3af]">Remaining backlog:</span>
           <span
             className={cn(
-              'px-1.5 py-0.2 rounded border text-[10px]',
+              'px-1.5 py-0.2 rounded border text-[10px] font-sans',
               unparsedBacklog > 0
                 ? 'bg-amber-500/10 text-amber-400 border-amber-500/20'
                 : 'bg-[#3ecf8e]/10 text-[#3ecf8e] border-[#3ecf8e]/20'
             )}
           >
-            {unparsedBacklog} unparsed
+            <span className="font-mono">{unparsedBacklog}</span> unparsed
           </span>
         </div>
       </Card>
@@ -167,7 +167,7 @@ export function PipelineStatsOverview({
       {/* 3. Fresher Conversion & Detection */}
       <Card className="bg-[#181818] border-[#262626] rounded-xl p-5 shadow-sm hover:border-[#383838] transition-all flex flex-col justify-between">
         <div>
-          <div className="flex items-center justify-between text-xs font-mono text-[#9ca3af] uppercase tracking-wider">
+          <div className="flex items-center justify-between text-xs font-sans text-[#9ca3af]">
             <span>Fresher Detection</span>
             <GraduationCap className="w-4 h-4 text-[#3ecf8e]" />
           </div>
@@ -175,8 +175,8 @@ export function PipelineStatsOverview({
             <Metric className="text-2xl font-mono font-semibold text-white">
               {sampleCount > 0 ? `${fresherPct}%` : 'N/A'}
             </Metric>
-            <span className="text-xs font-mono text-[#3ecf8e]">
-              {fresherCount} roles
+            <span className="text-xs font-sans text-[#3ecf8e]">
+              <span className="font-mono">{fresherCount}</span> roles
             </span>
           </div>
           <div className="mt-2.5">
@@ -188,10 +188,10 @@ export function PipelineStatsOverview({
           </div>
         </div>
 
-        <div className="mt-4 pt-3 border-t border-[#262626] flex items-center justify-between text-[11px] font-mono text-[#9ca3af]">
+        <div className="mt-4 pt-3 border-t border-[#262626] flex items-center justify-between text-[11px] font-sans text-[#9ca3af]">
           <span>Criteria:</span>
           <span className="text-white text-[10px] px-1.5 py-0.5 rounded bg-[#202020] border border-[#262626]">
-            &lt;= 1 yr / Interns
+            &le; 1 yr / Interns
           </span>
         </div>
       </Card>
@@ -199,7 +199,7 @@ export function PipelineStatsOverview({
       {/* 4. Normalization Method Distribution */}
       <Card className="bg-[#181818] border-[#262626] rounded-xl p-5 shadow-sm hover:border-[#383838] transition-all flex flex-col justify-between">
         <div>
-          <div className="flex items-center justify-between text-xs font-mono text-[#9ca3af] uppercase tracking-wider">
+          <div className="flex items-center justify-between text-xs font-sans text-[#9ca3af]">
             <span>Method Distribution</span>
             <Cpu className="w-4 h-4 text-purple-400" />
           </div>
@@ -207,7 +207,7 @@ export function PipelineStatsOverview({
             <Metric className="text-2xl font-mono font-semibold text-white">
               {sampleCount > 0 ? `${deterministicYieldPct}%` : '100%'}
             </Metric>
-            <span className="text-xs font-mono text-[#3ecf8e]">Deterministic</span>
+            <span className="text-xs font-sans text-[#3ecf8e]">Deterministic</span>
           </div>
           <div className="mt-2.5">
             <ProgressBar
@@ -218,18 +218,18 @@ export function PipelineStatsOverview({
           </div>
         </div>
 
-        <div className="mt-4 pt-3 border-t border-[#262626] grid grid-cols-3 gap-1 text-center text-[10px] font-mono">
+        <div className="mt-4 pt-3 border-t border-[#262626] grid grid-cols-3 gap-1 text-center text-[10px] font-sans">
           <div className="p-1 rounded bg-[#141414] border border-[#262626]">
             <span className="text-[#9ca3af] block">Native</span>
-            <span className="text-white font-semibold">{salaryMethods.native + experienceMethods.native}</span>
+            <span className="text-white font-semibold font-mono">{salaryMethods.native + experienceMethods.native}</span>
           </div>
           <div className="p-1 rounded bg-[#141414] border border-[#262626]">
             <span className="text-[#9ca3af] block">Regex</span>
-            <span className="text-[#3ecf8e] font-semibold">{salaryMethods.regex + experienceMethods.regex}</span>
+            <span className="text-[#3ecf8e] font-semibold font-mono">{salaryMethods.regex + experienceMethods.regex}</span>
           </div>
           <div className="p-1 rounded bg-[#141414] border border-[#262626]">
             <span className="text-purple-400 block">LLM</span>
-            <span className="text-purple-300 font-semibold">{salaryMethods.llm + experienceMethods.llm}</span>
+            <span className="text-purple-300 font-semibold font-mono">{salaryMethods.llm + experienceMethods.llm}</span>
           </div>
         </div>
       </Card>

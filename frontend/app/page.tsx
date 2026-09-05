@@ -77,7 +77,7 @@ export default function OverviewPage() {
       {/* Overview Top Header & Action Row */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <div className="flex items-center gap-2 text-xs font-mono text-[#3ecf8e] uppercase tracking-wider mb-1">
+          <div className="flex items-center gap-2 text-xs font-sans font-medium text-[#3ecf8e] mb-1">
             <span className="w-1.5 h-1.5 rounded-full bg-[#3ecf8e]"></span>
             <span>Platform Overview</span>
           </div>
@@ -92,8 +92,8 @@ export default function OverviewPage() {
         {/* Action Controls */}
         <div className="flex items-center gap-2.5 self-start md:self-auto flex-wrap">
           {lastUpdated && (
-            <span className="text-[11px] font-mono text-[#6b7280] hidden xl:inline">
-              Updated {lastUpdated.toLocaleTimeString([], { hour12: false })}
+            <span className="text-[11px] font-sans text-[#6b7280] hidden xl:inline">
+              Updated <span className="font-mono">{lastUpdated.toLocaleTimeString([], { hour12: false })}</span>
             </span>
           )}
 
@@ -102,7 +102,7 @@ export default function OverviewPage() {
             type="button"
             onClick={() => fetchStatus(false)}
             disabled={isRefreshing}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#262626] bg-[#181818] hover:bg-[#202020] text-xs font-mono text-[#9ca3af] hover:text-white transition-all disabled:opacity-50"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#262626] bg-[#181818] hover:bg-[#202020] text-xs font-sans text-[#9ca3af] hover:text-white transition-all disabled:opacity-50"
             title="Refresh status now"
           >
             <Refresh
@@ -114,7 +114,7 @@ export default function OverviewPage() {
           {/* Quick Navigation Links */}
           <Link
             href="/scrapers"
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#262626] bg-[#181818] hover:bg-[#202020] text-xs font-mono text-white transition-all hover:border-[#383838]"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#262626] bg-[#181818] hover:bg-[#202020] text-xs font-sans text-white transition-all hover:border-[#383838]"
           >
             <Cpu className="w-3.5 h-3.5 text-[#3ecf8e]" />
             <span>Scraper Lab</span>
@@ -122,7 +122,7 @@ export default function OverviewPage() {
 
           <Link
             href="/pipeline"
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#3ecf8e]/30 bg-[#3ecf8e]/10 hover:bg-[#3ecf8e]/20 text-xs font-mono text-[#3ecf8e] transition-all"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#3ecf8e]/30 bg-[#3ecf8e]/10 hover:bg-[#3ecf8e]/20 text-xs font-sans font-medium text-[#3ecf8e] transition-all"
           >
             <RefreshDouble className="w-3.5 h-3.5" />
             <span>Pipeline</span>
@@ -132,7 +132,7 @@ export default function OverviewPage() {
 
       {/* Backend Connection Error Banner */}
       {error && (
-        <div className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/20 flex items-start gap-3 text-xs font-mono text-rose-400">
+        <div className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/20 flex items-start gap-3 text-xs font-sans text-rose-400">
           <WarningTriangle className="w-4 h-4 shrink-0 mt-0.5 text-rose-400" />
           <div className="flex-1 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
             <span>{error} Backend may be offline at http://localhost:8020.</span>
@@ -172,12 +172,12 @@ export default function OverviewPage() {
               Bronze Scraper Engines & Staging Backlog
             </h2>
           </div>
-          <span className="text-[11px] font-mono text-[#6b7280]">
+          <span className="text-[11px] font-sans text-[#6b7280]">
             Lossless Raw Stores
           </span>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-0 md:gap-4 lg:gap-5 divide-y md:divide-y-0 divide-[#262626] border-y md:border-y-0 border-[#262626] md:rounded-xl">
           <ProviderCard
             provider="indeed"
             stats={parsingStatus?.indeed}
@@ -225,14 +225,14 @@ export default function OverviewPage() {
               Silver Unified Job Repository
             </h3>
             <p className="text-xs text-[#9ca3af] mt-0.5">
-              Explore {parsingStatus?.unified_total || 0} parsed, validated jobs with normalized annual INR salaries and experience bounds.
+              Explore <span className="font-mono">{parsingStatus?.unified_total || 0}</span> parsed, validated jobs with normalized annual INR salaries and experience bounds.
             </p>
           </div>
         </div>
 
         <Link
           href="/jobs"
-          className="flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-[#3ecf8e] hover:bg-[#3ecf8e]/90 text-xs font-mono font-semibold text-[#131313] transition-all shrink-0"
+          className="flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-[#3ecf8e] hover:bg-[#3ecf8e]/90 text-xs font-sans font-semibold text-[#131313] transition-all shrink-0"
         >
           <span>Explore Unified Jobs</span>
           <ArrowRight className="w-3.5 h-3.5" />

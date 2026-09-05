@@ -106,7 +106,7 @@ function PipelineContent() {
       {/* Top Header & Action Controls */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <div className="flex items-center gap-2 text-xs font-mono text-[#3ecf8e] uppercase tracking-wider mb-1">
+          <div className="flex items-center gap-2 text-xs font-sans font-medium text-[#3ecf8e] mb-1">
             <span className="w-1.5 h-1.5 rounded-full bg-[#3ecf8e]"></span>
             <span>Pipeline Manager</span>
           </div>
@@ -120,22 +120,22 @@ function PipelineContent() {
 
         <div className="flex items-center gap-2.5 self-start md:self-auto flex-wrap">
           {lastUpdated && (
-            <span className="text-[11px] font-mono text-[#6b7280] hidden xl:inline">
-              Synced {lastUpdated.toLocaleTimeString([], { hour12: false })}
+            <span className="text-[11px] font-sans text-[#6b7280] hidden xl:inline">
+              Synced <span className="font-mono">{lastUpdated.toLocaleTimeString([], { hour12: false })}</span>
             </span>
           )}
 
           {/* Unparsed Backlog Badge */}
           <div
             className={cn(
-              'px-2.5 py-1 rounded-lg border text-xs font-mono flex items-center gap-1.5',
+              'px-2.5 py-1 rounded-lg border text-xs font-sans flex items-center gap-1.5',
               totalUnparsed > 0
                 ? 'bg-amber-500/10 border-amber-500/20 text-amber-400'
                 : 'bg-[#3ecf8e]/10 border-[#3ecf8e]/20 text-[#3ecf8e]'
             )}
           >
             <span className="w-1.5 h-1.5 rounded-full bg-current"></span>
-            <span>{totalUnparsed} unparsed backlog</span>
+            <span><span className="font-mono">{totalUnparsed}</span> unparsed backlog</span>
           </div>
 
           {/* Refresh Button */}
@@ -143,7 +143,7 @@ function PipelineContent() {
             type="button"
             onClick={() => loadPipelineData(false)}
             disabled={isRefreshing}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#262626] bg-[#181818] hover:bg-[#202020] text-xs font-mono text-[#9ca3af] hover:text-white transition-all disabled:opacity-50"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#262626] bg-[#181818] hover:bg-[#202020] text-xs font-sans text-[#9ca3af] hover:text-white transition-all disabled:opacity-50"
             title="Refresh pipeline status"
           >
             <Refresh
@@ -156,7 +156,7 @@ function PipelineContent() {
 
       {/* Backend Error Banner */}
       {error && (
-        <div className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/20 flex items-start gap-3 text-xs font-mono text-rose-400">
+        <div className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/20 flex items-start gap-3 text-xs font-sans text-rose-400">
           <WarningTriangle className="w-4 h-4 shrink-0 mt-0.5 text-rose-400" />
           <div className="flex-1 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
             <span>{error} Backend may be offline at http://localhost:8020.</span>

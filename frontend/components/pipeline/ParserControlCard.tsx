@@ -154,7 +154,7 @@ export function ParserControlCard({
       className={cn(
         'bg-[#181818] border-[#262626] rounded-xl p-5 shadow-sm transition-all flex flex-col justify-between',
         isHighlighted
-          ? 'border-[#3ecf8e] shadow-[0_0_15px_rgba(62,207,142,0.15)] ring-1 ring-[#3ecf8e]'
+          ? 'border-[#3ecf8e] ring-1 ring-[#3ecf8e]'
           : 'hover:border-[#383838]'
       )}
     >
@@ -168,7 +168,7 @@ export function ParserControlCard({
               </h3>
               <span
                 className={cn(
-                  'px-2 py-0.5 text-[10px] font-mono font-medium rounded-full border',
+                  'px-2 py-0.5 text-[10px] font-sans font-medium rounded-full border',
                   meta.badgeClass
                 )}
               >
@@ -184,7 +184,7 @@ export function ParserControlCard({
         {/* Backlog Metrics Row */}
         <div className="mt-4 pt-3 border-t border-[#262626] grid grid-cols-3 gap-2 text-center">
           <div className="p-2.5 rounded-lg bg-[#141414] border border-[#262626]">
-            <span className="text-[10px] font-mono uppercase tracking-wider text-[#9ca3af] block">
+            <span className="text-[10px] font-sans text-[#9ca3af] block">
               Total Raw
             </span>
             <span className="mt-0.5 text-base font-mono font-semibold text-white block">
@@ -193,7 +193,7 @@ export function ParserControlCard({
           </div>
 
           <div className="p-2.5 rounded-lg bg-[#141414] border border-[#262626]">
-            <span className="text-[10px] font-mono uppercase tracking-wider text-[#9ca3af] block">
+            <span className="text-[10px] font-sans text-[#9ca3af] block">
               Parsed Clean
             </span>
             <span className="mt-0.5 text-base font-mono font-semibold text-[#3ecf8e] block">
@@ -209,7 +209,7 @@ export function ParserControlCard({
                 : 'bg-[#3ecf8e]/10 border-[#3ecf8e]/20 text-[#3ecf8e]'
             )}
           >
-            <span className="text-[10px] font-mono uppercase tracking-wider block opacity-80">
+            <span className="text-[10px] font-sans block opacity-80">
               Unparsed Backlog
             </span>
             <span className="mt-0.5 text-base font-mono font-semibold block">
@@ -220,9 +220,9 @@ export function ParserControlCard({
 
         {/* Progress Bar */}
         <div className="mt-4">
-          <div className="flex items-center justify-between text-[11px] font-mono text-[#9ca3af] mb-1.5">
+          <div className="flex items-center justify-between text-[11px] font-sans text-[#9ca3af] mb-1.5">
             <span>Staging Progress</span>
-            <span>{percentParsed}% normalized</span>
+            <span><span className="font-mono">{percentParsed}%</span> normalized</span>
           </div>
           <ProgressBar
             value={percentParsed}
@@ -235,12 +235,12 @@ export function ParserControlCard({
         <div className="mt-5 pt-4 border-t border-[#262626] space-y-4">
           {/* Batch Size Slider & Input */}
           <div>
-            <div className="flex items-center justify-between text-xs font-mono mb-2">
+            <div className="flex items-center justify-between text-xs font-sans mb-2">
               <label htmlFor={`batch-size-${provider}`} className="text-white font-medium flex items-center gap-1.5">
                 <Filter className="w-3.5 h-3.5 text-[#3ecf8e]" />
                 <span>Batch Size:</span>
               </label>
-              <span className="text-[#3ecf8e] font-semibold px-2 py-0.5 rounded bg-[#202020] border border-[#262626]">
+              <span className="text-[#3ecf8e] font-semibold px-2 py-0.5 rounded bg-[#202020] border border-[#262626] font-mono">
                 {batchSize} records
               </span>
             </div>
@@ -280,11 +280,11 @@ export function ParserControlCard({
               <div>
                 <label
                   htmlFor={`llm-toggle-${provider}`}
-                  className="text-xs font-mono font-medium text-white cursor-pointer block"
+                  className="text-xs font-sans font-medium text-white cursor-pointer block"
                 >
                   LLM Fallback (Gemini 3.7 Flash)
                 </label>
-                <p className="text-[11px] text-[#9ca3af] mt-0.5 leading-relaxed">
+                <p className="text-[11px] text-[#9ca3af] mt-0.5 leading-relaxed font-sans">
                   Dispatches to Gemini 3.7 Flash Tiered via FreeAPI if regex pay/experience extraction yields nothing from description.
                 </p>
               </div>
@@ -320,54 +320,54 @@ export function ParserControlCard({
           onClick={handleRunNormalization}
           disabled={isProcessing}
           className={cn(
-            'w-full py-2.5 px-4 rounded-lg font-mono text-xs font-semibold flex items-center justify-center gap-2 transition-all',
+            'w-full py-2.5 px-4 rounded-lg font-sans text-xs font-semibold flex items-center justify-center gap-2 transition-all',
             isProcessing
               ? 'bg-[#262626] text-[#9ca3af] cursor-not-allowed'
-              : 'bg-[#3ecf8e] text-[#131313] hover:bg-[#3ecf8e]/90 shadow-[0_0_15px_rgba(62,207,142,0.15)] active:scale-[0.99]'
+              : 'bg-[#3ecf8e] text-[#131313] hover:bg-[#3ecf8e]/90 active:scale-[0.99]'
           )}
         >
           <RefreshDouble
             className={cn('w-4 h-4', isProcessing && 'animate-spin')}
           />
-          <span>{isProcessing ? 'Normalizing Staged Records...' : `Run Normalizer (${batchSize})`}</span>
+          <span>{isProcessing ? 'Normalizing Staged Records...' : <>Run Normalizer (<span className="font-mono">{batchSize}</span>)</>}</span>
         </button>
 
         {/* Feedback Panel: Success or Error */}
         {lastError && (
-          <div className="p-3 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs font-mono flex items-start gap-2">
+          <div className="p-3 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs font-sans flex items-start gap-2">
             <WarningTriangle className="w-4 h-4 shrink-0 mt-0.5" />
             <div className="flex-1">
               <span className="font-semibold block">Execution Error</span>
-              <span className="text-[11px] opacity-90">{lastError}</span>
+              <span className="text-[11px] opacity-90 font-mono">{lastError}</span>
             </div>
           </div>
         )}
 
         {lastResult && !lastError && (
-          <div className="p-3 rounded-lg bg-[#141414] border border-[#262626] text-xs font-mono space-y-1.5">
+          <div className="p-3 rounded-lg bg-[#141414] border border-[#262626] text-xs font-sans space-y-1.5">
             <div className="flex items-center justify-between text-white font-medium">
               <div className="flex items-center gap-1.5 text-[#3ecf8e]">
                 <CheckCircle className="w-3.5 h-3.5" />
                 <span>Last Normalization Run</span>
               </div>
               {lastDurationMs !== null && (
-                <span className="text-[11px] text-[#9ca3af]">{lastDurationMs}ms</span>
+                <span className="text-[11px] font-mono text-[#9ca3af]">{lastDurationMs}ms</span>
               )}
             </div>
 
             <div className="grid grid-cols-2 gap-2 text-[11px] pt-1">
               <div className="text-[#9ca3af]">
-                Processed: <strong className="text-white">{lastResult.processed}</strong>
+                Processed: <strong className="text-white font-mono">{lastResult.processed}</strong>
               </div>
               <div className="text-[#9ca3af]">
-                Promoted: <strong className="text-[#3ecf8e]">{lastResult.promoted_to_unified}</strong>
+                Promoted: <strong className="text-[#3ecf8e] font-mono">{lastResult.promoted_to_unified}</strong>
               </div>
             </div>
 
             {lastResult.errors && lastResult.errors.length > 0 && (
-              <div className="mt-1 pt-1.5 border-t border-[#262626] text-[10px] text-amber-400">
-                <span className="font-semibold">{lastResult.errors.length} Warnings/Errors:</span>
-                <ul className="list-disc list-inside mt-0.5 space-y-0.5 text-[#9ca3af]">
+              <div className="mt-1 pt-1.5 border-t border-[#262626] text-[10px] text-amber-400 font-sans">
+                <span className="font-semibold"><span className="font-mono">{lastResult.errors.length}</span> Warnings/Errors:</span>
+                <ul className="list-disc list-inside mt-0.5 space-y-0.5 text-[#9ca3af] font-mono">
                   {lastResult.errors.slice(0, 3).map((err, idx) => (
                     <li key={idx} className="truncate">{err}</li>
                   ))}

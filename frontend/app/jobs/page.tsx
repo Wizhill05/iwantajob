@@ -184,14 +184,14 @@ function JobsExplorerContent() {
       {/* Top Header Banner */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 border-b border-[#262626] pb-5">
         <div>
-          <div className="flex items-center gap-2 text-xs font-mono text-[#3ecf8e] mb-1">
+          <div className="flex items-center gap-2 text-xs font-sans text-[#3ecf8e] mb-1">
             <Database className="w-3.5 h-3.5" />
-            <span>SILVER TIER / UNIFIED JOBS</span>
+            <span>Silver Tier / Unified Jobs</span>
           </div>
           <h1 className="text-xl md:text-2xl font-bold font-heading text-white tracking-tight">
             Clean Silver Jobs Explorer
           </h1>
-          <p className="text-xs md:text-sm text-[#9ca3af] mt-1">
+          <p className="text-xs md:text-sm text-[#9ca3af] mt-1 font-sans">
             Browse normalized, deduplicated positions with standardized annual INR
             compensation and extracted experience bounds.
           </p>
@@ -200,7 +200,7 @@ function JobsExplorerContent() {
         <div className="flex items-center gap-3">
           <Link
             href="/pipeline"
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#202020] hover:bg-[#262626] border border-[#262626] hover:border-[#383838] text-xs font-mono text-[#9ca3af] hover:text-white transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#202020] hover:bg-[#262626] border border-[#262626] hover:border-[#383838] text-xs font-sans text-[#9ca3af] hover:text-white transition-colors"
           >
             <RefreshDouble className="w-3.5 h-3.5 text-[#3ecf8e]" />
             <span>Parser Pipeline</span>
@@ -210,7 +210,7 @@ function JobsExplorerContent() {
             type="button"
             onClick={() => fetchJobs(currentPage, true)}
             disabled={isLoading || isRefreshing}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#3ecf8e]/15 hover:bg-[#3ecf8e]/25 border border-[#3ecf8e]/30 hover:border-[#3ecf8e]/50 text-xs font-mono font-medium text-[#3ecf8e] transition-all disabled:opacity-50"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#3ecf8e]/15 hover:bg-[#3ecf8e]/25 border border-[#3ecf8e]/30 hover:border-[#3ecf8e]/50 text-xs font-sans font-medium text-[#3ecf8e] transition-all disabled:opacity-50"
           >
             <Refresh className={cn('w-3.5 h-3.5', isRefreshing && 'animate-spin')} />
             <span>{isRefreshing ? 'Refreshing...' : 'Refresh'}</span>
@@ -230,7 +230,7 @@ function JobsExplorerContent() {
       {/* Results Header: Dynamic Counter & Active Status */}
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div className="flex items-center gap-2">
-          <span className="text-xs font-mono text-white font-semibold">
+          <span className="text-xs font-sans text-white font-semibold">
             {isLoading ? (
               <span className="text-[#9ca3af]">Querying unified repository...</span>
             ) : (
@@ -245,15 +245,15 @@ function JobsExplorerContent() {
           </span>
 
           {activeCount > 0 && (
-            <span className="text-[11px] font-mono text-[#6b7280]">
+            <span className="text-[11px] font-sans text-[#6b7280]">
               (filtered from central database)
             </span>
           )}
         </div>
 
         {/* Page indicator */}
-        <div className="flex items-center gap-2 text-xs font-mono text-[#9ca3af]">
-          <span>Page {currentPage}</span>
+        <div className="flex items-center gap-2 text-xs font-sans text-[#9ca3af]">
+          <span>Page <span className="font-mono">{currentPage}</span></span>
           <div className="flex items-center gap-1">
             <button
               type="button"
@@ -281,11 +281,11 @@ function JobsExplorerContent() {
       {error && (
         <div className="rounded-xl bg-rose-500/10 border border-rose-500/25 p-4 flex items-start gap-3">
           <WarningTriangle className="w-5 h-5 text-rose-400 flex-shrink-0 mt-0.5" />
-          <div className="flex-1 min-w-0 text-xs font-mono">
+          <div className="flex-1 min-w-0 text-xs font-sans">
             <h4 className="font-semibold text-rose-300">
               Failed to load unified jobs
             </h4>
-            <p className="text-rose-400/90 mt-0.5 leading-relaxed">{error}</p>
+            <p className="text-rose-400/90 mt-0.5 leading-relaxed font-mono">{error}</p>
             <button
               type="button"
               onClick={() => fetchJobs(currentPage)}

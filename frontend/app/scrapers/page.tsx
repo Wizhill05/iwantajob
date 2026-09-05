@@ -94,7 +94,7 @@ function ScrapersContent() {
             <h1 className="text-xl sm:text-2xl font-bold font-heading text-white tracking-tight">
               Scraper Testing Lab
             </h1>
-            <span className="px-2 py-0.5 text-[10px] font-mono font-medium rounded-full bg-[#3ecf8e]/10 border border-[#3ecf8e]/30 text-[#3ecf8e]">
+            <span className="px-2 py-0.5 text-[10px] font-sans font-medium rounded-full bg-[#3ecf8e]/10 border border-[#3ecf8e]/30 text-[#3ecf8e]">
               Interactive Benchmarking
             </span>
           </div>
@@ -104,7 +104,7 @@ function ScrapersContent() {
         </div>
 
         {/* Global indicator pill */}
-        <div className="flex items-center gap-2 text-xs font-mono text-[#9ca3af]">
+        <div className="flex items-center gap-2 text-xs font-sans text-[#9ca3af]">
           <span className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-[#181818] border border-[#262626]">
             <Cpu className="w-3.5 h-3.5 text-[#3ecf8e]" />
             <span>3 Scraping Gateways</span>
@@ -158,15 +158,15 @@ function ScrapersContent() {
             </h2>
 
             {executionState.provider && (
-              <span className="px-2 py-0.5 text-[10px] font-mono rounded bg-[#202020] border border-[#262626] text-[#9ca3af]">
+              <span className="px-2 py-0.5 text-[10px] font-sans rounded bg-[#202020] border border-[#262626] text-[#9ca3af]">
                 {executionState.provider}
               </span>
             )}
 
             {executionState.latencyMs !== null && (
-              <span className="flex items-center gap-1 text-[11px] font-mono text-[#3ecf8e]">
+              <span className="flex items-center gap-1 text-[11px] font-sans text-[#3ecf8e]">
                 <Timer className="w-3.5 h-3.5" />
-                <span>{executionState.latencyMs}ms</span>
+                <span className="font-mono">{executionState.latencyMs}ms</span>
               </span>
             )}
 
@@ -183,7 +183,7 @@ function ScrapersContent() {
               type="button"
               onClick={() => setViewMode('cards')}
               className={cn(
-                'flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-mono transition-all',
+                'flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-sans transition-all',
                 viewMode === 'cards'
                   ? 'bg-[#202020] text-white border border-[#262626] shadow-sm'
                   : 'text-[#9ca3af] hover:text-white'
@@ -200,7 +200,7 @@ function ScrapersContent() {
               type="button"
               onClick={() => setViewMode('json')}
               className={cn(
-                'flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-mono transition-all',
+                'flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-sans transition-all',
                 viewMode === 'json'
                   ? 'bg-[#202020] text-white border border-[#262626] shadow-sm'
                   : 'text-[#9ca3af] hover:text-white'
@@ -214,11 +214,11 @@ function ScrapersContent() {
 
         {/* Error Notification */}
         {errorMessage && (
-          <div className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/30 text-xs font-mono text-rose-300 flex items-start gap-3">
+          <div className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/30 text-xs font-sans text-rose-300 flex items-start gap-3">
             <WarningTriangle className="w-4 h-4 text-rose-400 flex-shrink-0 mt-0.5" />
             <div>
               <div className="font-semibold text-rose-200">Scrape Error Occurred</div>
-              <div className="mt-0.5 text-rose-300/90">{errorMessage}</div>
+              <div className="mt-0.5 text-rose-300/90 font-mono">{errorMessage}</div>
             </div>
           </div>
         )}
@@ -226,7 +226,7 @@ function ScrapersContent() {
         {/* Loading Skeletons */}
         {isLoading && (
           <div className="space-y-3">
-            <div className="p-4 rounded-xl bg-[#181818] border border-[#262626] text-center font-mono text-xs text-[#9ca3af] flex items-center justify-center gap-2">
+            <div className="p-4 rounded-xl bg-[#181818] border border-[#262626] text-center font-sans text-xs text-[#9ca3af] flex items-center justify-center gap-2">
               <RefreshDouble className="w-4 h-4 text-[#3ecf8e] animate-spin" />
               <span>Querying upstream gateway and processing responses...</span>
             </div>

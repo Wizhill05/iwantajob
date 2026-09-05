@@ -2,7 +2,7 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { Card, Metric, Text, ProgressBar, Badge } from '@tremor/react';
+import { ProgressBar } from '@tremor/react';
 import {
   Play,
   RefreshDouble,
@@ -74,7 +74,7 @@ export function ProviderCard({
 
   if (isLoading && !stats) {
     return (
-      <div className="rounded-xl bg-[#181818] border border-[#262626] p-5 animate-pulse flex flex-col justify-between h-64">
+      <div className="rounded-none md:rounded-xl bg-[#181818] border-0 md:border border-[#262626] p-5 animate-pulse flex flex-col justify-between h-64">
         <div className="flex items-center justify-between">
           <div className="h-4 w-28 bg-[#262626] rounded"></div>
           <div className="h-5 w-24 bg-[#262626] rounded-full"></div>
@@ -90,7 +90,7 @@ export function ProviderCard({
   }
 
   return (
-    <Card className="bg-[#181818] border-[#262626] rounded-xl p-5 shadow-sm hover:border-[#383838] transition-all flex flex-col justify-between">
+    <div className="bg-[#181818] border-0 md:border border-[#262626] rounded-none md:rounded-xl p-4 sm:p-5 shadow-none md:shadow-sm hover:border-[#383838] transition-all flex flex-col justify-between">
       <div>
         {/* Header Row */}
         <div className="flex items-start justify-between gap-2">
@@ -101,7 +101,7 @@ export function ProviderCard({
               </h3>
               <span
                 className={cn(
-                  'px-2 py-0.5 text-[10px] font-mono font-medium rounded-full border',
+                  'px-2 py-0.5 text-[10px] font-sans font-medium rounded-full border',
                   meta.colorClass
                 )}
               >
@@ -117,43 +117,43 @@ export function ProviderCard({
         {/* Stats Row */}
         <div className="mt-4 pt-3 border-t border-[#262626] grid grid-cols-2 gap-3">
           <div>
-            <Text className="text-[11px] font-mono text-[#9ca3af] uppercase tracking-wider">
+            <span className="text-[11px] font-sans text-[#9ca3af] block">
               Total Raw
-            </Text>
+            </span>
             <div className="mt-0.5 flex items-center gap-1.5">
               <Database className="w-3.5 h-3.5 text-[#9ca3af]" />
-              <Metric className="text-lg font-mono font-semibold text-white">
+              <span className="text-lg font-mono font-semibold text-white">
                 {totalRaw.toLocaleString()}
-              </Metric>
+              </span>
             </div>
           </div>
 
           <div>
-            <Text className="text-[11px] font-mono text-[#9ca3af] uppercase tracking-wider">
+            <span className="text-[11px] font-sans text-[#9ca3af] block">
               Parsed Clean
-            </Text>
+            </span>
             <div className="mt-0.5 flex items-center gap-1.5">
               <RefreshDouble className="w-3.5 h-3.5 text-[#3ecf8e]" />
-              <Metric className="text-lg font-mono font-semibold text-[#3ecf8e]">
+              <span className="text-lg font-mono font-semibold text-[#3ecf8e]">
                 {parsed.toLocaleString()}
-              </Metric>
+              </span>
             </div>
           </div>
         </div>
 
         {/* Progress & Backlog Bar */}
         <div className="mt-4">
-          <div className="flex items-center justify-between text-[11px] font-mono text-[#9ca3af] mb-1.5">
-            <span>Progress: {parsedPercentage.toFixed(0)}%</span>
+          <div className="flex items-center justify-between text-[11px] font-sans text-[#9ca3af] mb-1.5">
+            <span>Progress: <span className="font-mono">{parsedPercentage.toFixed(0)}%</span></span>
             <span
               className={cn(
-                'px-1.5 py-0.5 rounded text-[10px] font-mono font-medium border',
+                'px-1.5 py-0.5 rounded text-[10px] font-medium border',
                 unparsed > 0
                   ? 'bg-amber-500/10 text-amber-400 border-amber-500/20'
                   : 'bg-[#3ecf8e]/10 text-[#3ecf8e] border-[#3ecf8e]/20'
               )}
             >
-              {unparsed} unparsed
+              <span className="font-mono">{unparsed}</span> unparsed
             </span>
           </div>
           <ProgressBar
@@ -168,7 +168,7 @@ export function ProviderCard({
       <div className="mt-5 pt-3 border-t border-[#262626] grid grid-cols-2 gap-2">
         <Link
           href={meta.scraperLink}
-          className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-[#202020] hover:bg-[#262626] border border-[#262626] text-xs font-mono font-medium text-white transition-all hover:border-[#383838]"
+          className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-[#202020] hover:bg-[#262626] border border-[#262626] text-xs font-sans font-medium text-white transition-all hover:border-[#383838]"
         >
           <Play className="w-3.5 h-3.5 text-[#3ecf8e]" />
           <span>Test Scraper</span>
@@ -176,13 +176,13 @@ export function ProviderCard({
 
         <Link
           href={meta.pipelineLink}
-          className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-[#3ecf8e]/10 hover:bg-[#3ecf8e]/20 border border-[#3ecf8e]/30 text-xs font-mono font-medium text-[#3ecf8e] transition-all"
+          className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-[#3ecf8e]/10 hover:bg-[#3ecf8e]/20 border border-[#3ecf8e]/30 text-xs font-sans font-medium text-[#3ecf8e] transition-all"
         >
           <RefreshDouble className="w-3.5 h-3.5" />
           <span>Trigger Pipeline</span>
         </Link>
       </div>
-    </Card>
+    </div>
   );
 }
 

@@ -160,16 +160,16 @@ export function JobDescriptionModal({
                 className="w-12 h-12 rounded-xl object-contain bg-[#202020] border border-[#262626] p-1 flex-shrink-0"
               />
             ) : (
-              <div className="w-12 h-12 rounded-xl bg-[#202020] border border-[#262626] flex items-center justify-center flex-shrink-0 text-base font-mono font-bold text-[#3ecf8e]">
+              <div className="w-12 h-12 rounded-xl bg-[#202020] border border-[#262626] flex items-center justify-center flex-shrink-0 text-base font-sans font-bold text-[#3ecf8e]">
                 {initialLetter || <Building className="w-6 h-6 text-[#9ca3af]" />}
               </div>
             )}
 
             <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-2 flex-wrap">
+              <div className="flex items-center gap-2 flex-wrap font-sans">
                 <span
                   className={cn(
-                    'px-2 py-0.5 text-[10px] font-mono font-medium rounded-full border',
+                    'px-2 py-0.5 text-[10px] font-sans font-medium rounded-full border',
                     sourceConfig.badgeClass
                   )}
                 >
@@ -177,27 +177,27 @@ export function JobDescriptionModal({
                 </span>
 
                 {job.city && (
-                  <span className="px-2 py-0.5 text-[10px] font-mono rounded-full border border-[#262626] bg-[#141414] text-[#d1d5db] capitalize">
+                  <span className="px-2 py-0.5 text-[10px] font-sans rounded-full border border-[#262626] bg-[#141414] text-[#d1d5db] capitalize">
                     {job.city}
                   </span>
                 )}
 
                 {job.is_remote && (
-                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded border text-[10px] font-mono bg-emerald-500/10 text-[#3ecf8e] border-emerald-500/25">
+                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded border text-[10px] font-sans bg-emerald-500/10 text-[#3ecf8e] border-emerald-500/25">
                     <Globe className="w-3 h-3" />
                     Remote
                   </span>
                 )}
 
                 {job.easy_apply_available && (
-                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded border text-[10px] font-mono bg-amber-500/10 text-amber-300 border-amber-500/25">
+                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded border text-[10px] font-sans bg-amber-500/10 text-amber-300 border-amber-500/25">
                     <Flash className="w-3 h-3" />
                     Easy Apply
                   </span>
                 )}
 
                 {job.is_fresher_friendly && (
-                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded border text-[10px] font-mono bg-teal-500/10 text-teal-300 border-teal-500/25">
+                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded border text-[10px] font-sans bg-teal-500/10 text-teal-300 border-teal-500/25">
                     <GraduationCap className="w-3 h-3" />
                     Fresher Friendly
                   </span>
@@ -210,7 +210,7 @@ export function JobDescriptionModal({
               >
                 {job.title}
               </h2>
-              <p className="text-xs text-[#9ca3af] font-medium mt-0.5">
+              <p className="text-xs text-[#9ca3af] font-medium mt-0.5 font-sans">
                 {job.company_name || 'Confidential Employer'}
               </p>
             </div>
@@ -232,14 +232,14 @@ export function JobDescriptionModal({
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {/* Compensation Box */}
             <div className="p-3 rounded-xl bg-[#141414] border border-[#262626] space-y-2">
-              <div className="flex items-center justify-between text-xs font-mono text-[#9ca3af]">
+              <div className="flex items-center justify-between text-xs font-sans text-[#9ca3af]">
                 <div className="flex items-center gap-1.5">
                   <Coins className="w-4 h-4 text-[#3ecf8e]" />
                   <span>Annual Compensation</span>
                 </div>
                 <span
                   className={cn(
-                    'px-1.5 py-0.2 rounded text-[10px] font-mono border uppercase',
+                    'px-1.5 py-0.2 rounded text-[10px] font-sans font-medium border',
                     salaryMethodConfig.badgeClass
                   )}
                 >
@@ -250,7 +250,7 @@ export function JobDescriptionModal({
                 {salaryFormatted}
               </div>
               {job.salary_raw && (
-                <div className="text-[11px] font-mono text-[#6b7280]">
+                <div className="text-[11px] font-sans text-[#6b7280]">
                   Raw: &quot;{job.salary_raw}&quot;
                 </div>
               )}
@@ -258,21 +258,21 @@ export function JobDescriptionModal({
 
             {/* Experience Box */}
             <div className="p-3 rounded-xl bg-[#141414] border border-[#262626] space-y-2">
-              <div className="flex items-center justify-between text-xs font-mono text-[#9ca3af]">
+              <div className="flex items-center justify-between text-xs font-sans text-[#9ca3af]">
                 <div className="flex items-center gap-1.5">
                   <GraduationCap className="w-4 h-4 text-[#3ecf8e]" />
                   <span>Experience Required</span>
                 </div>
                 <span
                   className={cn(
-                    'px-1.5 py-0.2 rounded text-[10px] font-mono border uppercase',
+                    'px-1.5 py-0.2 rounded text-[10px] font-sans font-medium border',
                     expMethodConfig.badgeClass
                   )}
                 >
                   {expMethodConfig.label}
                 </span>
               </div>
-              <div className="text-base font-mono font-bold text-[#3ecf8e]">
+              <div className="text-base font-sans font-bold text-[#3ecf8e]">
                 {job.is_fresher_friendly || job.experience_min_years === 0
                   ? 'Fresher Eligible (0 yrs)'
                   : job.experience_min_years != null
@@ -281,14 +281,14 @@ export function JobDescriptionModal({
                     } years`
                   : 'Not specified'}
               </div>
-              <div className="text-[11px] font-mono text-[#6b7280]">
+              <div className="text-[11px] font-sans text-[#6b7280]">
                 Fresher Flag: {job.is_fresher_friendly ? 'TRUE' : 'FALSE'}
               </div>
             </div>
           </div>
 
           {/* Staging & Provenance Metadata Accordion / Card */}
-          <div className="rounded-xl bg-[#141414] border border-[#262626] p-4 space-y-3 font-mono text-xs">
+          <div className="rounded-xl bg-[#141414] border border-[#262626] p-4 space-y-3 font-sans text-xs">
             <div className="flex items-center justify-between border-b border-[#262626] pb-2 text-[11px] text-[#9ca3af]">
               <div className="flex items-center gap-1.5 text-[#3ecf8e] font-semibold">
                 <Database className="w-3.5 h-3.5" />
@@ -344,7 +344,7 @@ export function JobDescriptionModal({
           {/* Job Description Container */}
           <div className="space-y-2.5">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2 text-xs font-mono text-white font-semibold">
+              <div className="flex items-center gap-2 text-xs font-sans text-white font-semibold">
                 <Notes className="w-4 h-4 text-[#3ecf8e]" />
                 <span>Job Description</span>
               </div>
@@ -352,7 +352,7 @@ export function JobDescriptionModal({
               <button
                 type="button"
                 onClick={handleCopyDescription}
-                className="flex items-center gap-1 text-[11px] font-mono text-[#9ca3af] hover:text-[#3ecf8e] transition-colors"
+                className="flex items-center gap-1 text-[11px] font-sans text-[#9ca3af] hover:text-[#3ecf8e] transition-colors"
               >
                 {copiedDesc ? (
                   <>
@@ -385,7 +385,7 @@ export function JobDescriptionModal({
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-2 rounded-lg bg-[#202020] hover:bg-[#262626] border border-[#262626] text-xs font-mono text-[#9ca3af] hover:text-white transition-colors"
+            className="px-4 py-2 rounded-lg bg-[#202020] hover:bg-[#262626] border border-[#262626] text-xs font-sans text-[#9ca3af] hover:text-white transition-colors"
           >
             Close
           </button>
@@ -394,7 +394,7 @@ export function JobDescriptionModal({
             href={job.url}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-2 px-5 py-2 rounded-lg bg-[#3ecf8e] hover:bg-[#3ecf8e]/90 text-xs font-mono font-bold text-[#131313] transition-all shadow-[0_0_15px_rgba(62,207,142,0.3)] hover:shadow-[0_0_20px_rgba(62,207,142,0.5)]"
+            className="flex items-center gap-2 px-5 py-2 rounded-lg bg-[#3ecf8e] hover:bg-[#3ecf8e]/90 text-xs font-sans font-bold text-[#131313] transition-all"
           >
             <span>Direct Apply on {sourceConfig.label}</span>
             <OpenNewWindow className="w-4 h-4" />

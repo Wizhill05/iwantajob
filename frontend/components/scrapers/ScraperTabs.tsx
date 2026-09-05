@@ -102,7 +102,7 @@ export function ScraperTabs({ activeTab, onTabChange }: ScraperTabsProps) {
 
                 <span
                   className={cn(
-                    'hidden md:inline-block px-1.5 py-0.5 text-[9px] font-mono rounded border',
+                    'hidden md:inline-block px-1.5 py-0.5 text-[9px] font-sans rounded border',
                     isActive
                       ? cn(tab.activeText, tab.activeBg, tab.activeBorder)
                       : 'text-[#6b7280] border-[#262626] bg-[#131313]'
@@ -112,7 +112,7 @@ export function ScraperTabs({ activeTab, onTabChange }: ScraperTabsProps) {
                 </span>
               </div>
 
-              <span className="text-[11px] font-mono text-[#9ca3af] mt-0.5">
+              <span className="text-[11px] font-sans text-[#9ca3af] mt-0.5">
                 {tab.sublabel}
               </span>
             </button>

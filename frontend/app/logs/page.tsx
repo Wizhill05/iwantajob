@@ -33,10 +33,10 @@ export default function SystemLogsPage() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-[#262626]">
         <div>
           <div className="flex items-center gap-2 mb-1">
-            <span className="px-2 py-0.5 rounded text-[11px] font-mono font-semibold uppercase bg-[#3ecf8e]/10 text-[#3ecf8e] border border-[#3ecf8e]/30">
+            <span className="px-2 py-0.5 rounded text-[11px] font-sans font-semibold bg-[#3ecf8e]/10 text-[#3ecf8e] border border-[#3ecf8e]/30">
               System Console
             </span>
-            <span className="text-[11px] font-mono text-[#6b7280]">
+            <span className="text-[11px] font-sans text-[#6b7280]">
               Operational Diagnostics &amp; Audit Trail
             </span>
           </div>
@@ -51,7 +51,7 @@ export default function SystemLogsPage() {
         {/* Header Action Controls: Auto-Poll & Refresh */}
         <div className="flex items-center gap-2.5 flex-wrap sm:flex-nowrap">
           {/* Polling Interval Selector */}
-          <div className="flex items-center p-0.5 rounded-lg bg-[#181818] border border-[#262626] text-xs font-mono">
+          <div className="flex items-center p-0.5 rounded-lg bg-[#181818] border border-[#262626] text-xs font-sans">
             <span className="px-2 text-[#6b7280] hidden sm:inline">Poll:</span>
             {[
               { label: '5s', val: 5000 },
@@ -79,7 +79,7 @@ export default function SystemLogsPage() {
             type="button"
             onClick={handleManualRefresh}
             disabled={isRefreshing}
-            className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-[#262626] bg-[#181818] text-[#9ca3af] hover:text-white hover:border-[#383838] transition-colors text-xs font-mono disabled:opacity-50"
+            className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-[#262626] bg-[#181818] text-[#9ca3af] hover:text-white hover:border-[#383838] transition-colors text-xs font-sans disabled:opacity-50"
           >
             <Refresh className={cn('w-3.5 h-3.5', isRefreshing && 'animate-spin text-[#3ecf8e]')} />
             <span>Sync</span>
@@ -92,11 +92,11 @@ export default function SystemLogsPage() {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Database className="w-4 h-4 text-[#3ecf8e]" />
-            <h2 className="text-sm font-semibold font-heading text-white uppercase tracking-wider">
+            <h2 className="text-sm font-semibold font-heading text-white">
               PostgreSQL Staging Health
             </h2>
           </div>
-          <span className="text-[11px] font-mono text-[#6b7280]">
+          <span className="text-[11px] font-sans text-[#6b7280]">
             Bronze Raw / Silver Unified
           </span>
         </div>
@@ -108,11 +108,11 @@ export default function SystemLogsPage() {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Activity className="w-4 h-4 text-sky-400" />
-            <h2 className="text-sm font-semibold font-heading text-white uppercase tracking-wider">
+            <h2 className="text-sm font-semibold font-heading text-white">
               Active Process Monitor
             </h2>
           </div>
-          <span className="text-[11px] font-mono text-[#6b7280]">
+          <span className="text-[11px] font-sans text-[#6b7280]">
             Concurrent Scrapers &amp; Parsers
           </span>
         </div>
@@ -124,11 +124,11 @@ export default function SystemLogsPage() {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Terminal className="w-4 h-4 text-[#3ecf8e]" />
-            <h2 className="text-sm font-semibold font-heading text-white uppercase tracking-wider">
+            <h2 className="text-sm font-semibold font-heading text-white">
               Execution Log Console
             </h2>
           </div>
-          <span className="text-[11px] font-mono text-[#6b7280]">
+          <span className="text-[11px] font-sans text-[#6b7280]">
             Streaming Output &amp; Structured Diagnostics
           </span>
         </div>

@@ -63,7 +63,7 @@ export function ScrapedJobCard({ job, index }: ScrapedJobCardProps) {
               className="w-10 h-10 rounded-lg object-contain bg-[#202020] border border-[#262626] p-1 flex-shrink-0"
             />
           ) : (
-            <div className="w-10 h-10 rounded-lg bg-[#202020] border border-[#262626] flex items-center justify-center flex-shrink-0 text-sm font-mono font-semibold text-[#3ecf8e]">
+            <div className="w-10 h-10 rounded-lg bg-[#202020] border border-[#262626] flex items-center justify-center flex-shrink-0 text-sm font-sans font-semibold text-[#3ecf8e]">
               {initialLetter || <Building className="w-5 h-5 text-[#9ca3af]" />}
             </div>
           )}
@@ -76,14 +76,14 @@ export function ScrapedJobCard({ job, index }: ScrapedJobCardProps) {
               </h4>
               <span
                 className={cn(
-                  'px-2 py-0.5 text-[10px] font-mono font-medium rounded-full border',
+                  'px-2 py-0.5 text-[10px] font-sans font-medium rounded-full border',
                   sourceConfig.badgeClass
                 )}
               >
                 {sourceConfig.label}
               </span>
             </div>
-            <p className="text-xs text-[#9ca3af] font-medium truncate mt-0.5">
+            <p className="text-xs text-[#9ca3af] font-medium truncate mt-0.5 font-sans">
               {job.company_name || 'Confidential Employer'}
             </p>
           </div>
@@ -94,7 +94,7 @@ export function ScrapedJobCard({ job, index }: ScrapedJobCardProps) {
           href={job.url}
           target="_blank"
           rel="noopener noreferrer"
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#202020] hover:bg-[#262626] border border-[#262626] hover:border-[#3ecf8e]/50 text-xs font-mono font-medium text-[#3ecf8e] transition-all flex-shrink-0"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#202020] hover:bg-[#262626] border border-[#262626] hover:border-[#383838] text-xs font-sans font-medium text-[#3ecf8e] transition-all flex-shrink-0"
         >
           <span>Apply</span>
           <OpenNewWindow className="w-3.5 h-3.5" />
@@ -102,10 +102,10 @@ export function ScrapedJobCard({ job, index }: ScrapedJobCardProps) {
       </div>
 
       {/* Metadata Badges / Tags Row */}
-      <div className="flex items-center gap-1.5 md:gap-2 flex-wrap text-xs text-[#9ca3af]">
+      <div className="flex items-center gap-1.5 md:gap-2 flex-wrap text-xs text-[#9ca3af] font-sans">
         {/* Location */}
         {job.location_raw && (
-          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-[#202020] border border-[#262626] text-[11px] font-mono text-[#d1d5db]">
+          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-[#202020] border border-[#262626] text-[11px] font-sans text-[#d1d5db]">
             <MapPin className="w-3 h-3 text-[#9ca3af]" />
             <span className="truncate max-w-[180px]">{job.location_raw}</span>
           </span>
@@ -113,14 +113,14 @@ export function ScrapedJobCard({ job, index }: ScrapedJobCardProps) {
 
         {/* City if separate and distinct */}
         {job.city && job.city.toLowerCase() !== job.location_raw.toLowerCase() && (
-          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-[#202020] border border-[#262626] text-[11px] font-mono text-[#9ca3af] capitalize">
+          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-[#202020] border border-[#262626] text-[11px] font-sans text-[#9ca3af] capitalize">
             {job.city}
           </span>
         )}
 
         {/* Remote Status */}
         {job.is_remote && (
-          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-[#3ecf8e]/10 border border-[#3ecf8e]/30 text-[11px] font-mono text-[#3ecf8e]">
+          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-[#3ecf8e]/10 border border-[#3ecf8e]/30 text-[11px] font-sans text-[#3ecf8e]">
             <Globe className="w-3 h-3" />
             <span>Remote</span>
           </span>
@@ -128,7 +128,7 @@ export function ScrapedJobCard({ job, index }: ScrapedJobCardProps) {
 
         {/* Easy Apply */}
         {job.easy_apply_available && (
-          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-[#3ecf8e]/10 border border-[#3ecf8e]/30 text-[11px] font-mono text-[#3ecf8e]">
+          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-[#3ecf8e]/10 border border-[#3ecf8e]/30 text-[11px] font-sans text-[#3ecf8e]">
             <Check className="w-3 h-3" />
             <span>Easy Apply</span>
           </span>
@@ -136,7 +136,7 @@ export function ScrapedJobCard({ job, index }: ScrapedJobCardProps) {
 
         {/* Salary */}
         {job.salary_raw && (
-          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-emerald-500/10 border border-emerald-500/30 text-[11px] font-mono text-emerald-400">
+          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-emerald-500/10 border border-emerald-500/30 text-[11px] font-sans text-emerald-400">
             <Coins className="w-3 h-3" />
             <span>{job.salary_raw}</span>
           </span>
@@ -144,7 +144,7 @@ export function ScrapedJobCard({ job, index }: ScrapedJobCardProps) {
 
         {/* Posted Timestamp */}
         {job.posted_at && (
-          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-[#202020] border border-[#262626] text-[11px] font-mono text-[#9ca3af]">
+          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-[#202020] border border-[#262626] text-[11px] font-sans text-[#9ca3af]">
             <Clock className="w-3 h-3 text-[#9ca3af]" />
             <span>{formatRelativeTime(job.posted_at)}</span>
           </span>
@@ -161,7 +161,7 @@ export function ScrapedJobCard({ job, index }: ScrapedJobCardProps) {
             return (
               <span
                 key={i}
-                className="inline-flex items-center px-2 py-0.5 rounded bg-[#202020] border border-[#262626] text-[10px] font-mono text-[#9ca3af]"
+                className="inline-flex items-center px-2 py-0.5 rounded bg-[#202020] border border-[#262626] text-[10px] font-sans text-[#9ca3af]"
               >
                 {label}
               </span>
@@ -175,7 +175,7 @@ export function ScrapedJobCard({ job, index }: ScrapedJobCardProps) {
           <button
             type="button"
             onClick={() => setExpanded(!expanded)}
-            className="flex items-center gap-1.5 text-xs font-mono text-[#9ca3af] hover:text-white transition-colors"
+            className="flex items-center gap-1.5 text-xs font-sans text-[#9ca3af] hover:text-white transition-colors"
           >
             {expanded ? (
               <>
@@ -202,7 +202,7 @@ export function ScrapedJobCard({ job, index }: ScrapedJobCardProps) {
                 {job.description_text}
               </p>
             ) : (
-              <p className="text-xs font-mono text-[#6b7280] italic">
+              <p className="text-xs font-sans text-[#6b7280] italic">
                 No description text captured in card payload.
               </p>
             )}

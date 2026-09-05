@@ -36,7 +36,7 @@ export function MobileBottomNav() {
   return (
     <nav
       aria-label="Mobile navigation dock"
-      className="lg:hidden fixed bottom-4 inset-x-4 max-w-md mx-auto z-50 bg-[#181818]/90 backdrop-blur-md rounded-2xl border border-[#2a2a2a] shadow-2xl px-3 py-2 flex justify-around items-center select-none"
+      className="lg:hidden fixed bottom-6 left-1/2 -translate-x-1/2 w-[calc(100%-2.5rem)] max-w-[340px] z-50 rounded-full border border-[#2a2a2a] bg-[#181818]/95 backdrop-blur-xl p-1 shadow-2xl grid grid-cols-5 items-center select-none"
     >
       {NAV_ITEMS.map((item) => {
         const Icon = item.icon;
@@ -52,16 +52,16 @@ export function MobileBottomNav() {
             key={item.href}
             href={item.href}
             className={cn(
-              'relative flex flex-col items-center justify-center min-w-[52px] py-1 px-2 rounded-xl transition-all duration-150',
+              'relative rounded-full py-1.5 px-0.5 flex flex-col items-center justify-center transition-all duration-150',
               isActive
-                ? 'bg-[#3ecf8e]/15 text-[#3ecf8e] border border-[#3ecf8e]/30 shadow-[0_0_12px_rgba(62,207,142,0.15)]'
+                ? 'bg-[#3ecf8e]/15 text-[#3ecf8e] border border-[#3ecf8e]/30'
                 : 'text-[#9ca3af] hover:text-[#f3f4f6] border border-transparent'
             )}
           >
             <div className="relative">
               <Icon
                 className={cn(
-                  'w-5 h-5 transition-transform duration-150',
+                  'w-4 h-4 transition-transform duration-150',
                   isActive ? 'text-[#3ecf8e] scale-105' : 'text-[#9ca3af]'
                 )}
               />
@@ -76,7 +76,7 @@ export function MobileBottomNav() {
 
             <span
               className={cn(
-                'text-[10px] tracking-tight mt-0.5 font-medium transition-colors',
+                'text-[10px] tracking-tight mt-0.5 font-sans font-medium transition-colors',
                 isActive ? 'text-[#3ecf8e] font-semibold' : 'text-[#6b7280]'
               )}
             >

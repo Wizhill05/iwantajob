@@ -167,28 +167,28 @@ export function WellfoundTester({
             <h3 className="text-sm font-semibold font-heading text-white">
               Wellfound Apollo SSR Engine
             </h3>
-            <span className="px-2 py-0.5 text-[10px] font-mono font-medium rounded-full bg-rose-500/10 border border-rose-500/30 text-rose-400">
+            <span className="px-2 py-0.5 text-[10px] font-sans font-medium rounded-full bg-rose-500/10 border border-rose-500/30 text-rose-400">
               __NEXT_DATA__ Graph
             </span>
           </div>
-          <p className="text-xs text-[#9ca3af] mt-0.5">
+          <p className="text-xs text-[#9ca3af] mt-0.5 font-sans">
             Direct SSR state extraction bypassing Cloudflare Turnstile bot challenges.
           </p>
         </div>
 
         {/* Execution Metrics Badge */}
-        <div className="flex items-center gap-2 font-mono text-xs">
+        <div className="flex items-center gap-2 text-xs font-sans">
           {latencyMs !== null && (
             <span className="flex items-center gap-1 px-2.5 py-1 rounded-md bg-[#202020] border border-[#262626] text-[#9ca3af]">
               <Timer className="w-3.5 h-3.5 text-[#3ecf8e]" />
-              <span>{latencyMs}ms</span>
+              <span className="font-mono">{latencyMs}ms</span>
             </span>
           )}
 
           {itemCount !== null && (
             <span className="flex items-center gap-1 px-2.5 py-1 rounded-md bg-[#202020] border border-[#262626] text-white">
               <CheckCircle className="w-3.5 h-3.5 text-[#3ecf8e]" />
-              <span>{itemCount} jobs</span>
+              <span><span className="font-mono">{itemCount}</span> jobs</span>
             </span>
           )}
 
@@ -202,16 +202,16 @@ export function WellfoundTester({
       </div>
 
       {/* Parameter Form */}
-      <form onSubmit={handleRun} className="space-y-4">
+      <form onSubmit={handleRun} className="space-y-4 font-sans">
         {/* Row 1: Canonical Role and Location Slugs */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <div className="flex items-center justify-between mb-1.5">
-              <label className="text-xs font-mono text-[#9ca3af]">
+              <label className="text-xs text-[#9ca3af] font-sans">
                 Canonical Role Slug
               </label>
               {rolesLoading && (
-                <span className="text-[10px] font-mono text-[#6b7280]">
+                <span className="text-[10px] font-sans text-[#6b7280]">
                   Loading slugs...
                 </span>
               )}
@@ -219,7 +219,7 @@ export function WellfoundTester({
             <select
               value={roleSlug}
               onChange={(e) => setRoleSlug(e.target.value)}
-              className="w-full px-3 py-2 rounded-lg bg-[#131313] border border-[#262626] focus:border-[#3ecf8e] text-xs font-mono text-white outline-none transition-colors"
+              className="w-full px-3 py-2 rounded-lg bg-[#131313] border border-[#262626] focus:border-[#3ecf8e] text-xs font-sans text-white outline-none transition-colors"
             >
               {roles.map((r) => (
                 <option key={r.slug} value={r.slug}>
@@ -231,11 +231,11 @@ export function WellfoundTester({
 
           <div>
             <div className="flex items-center justify-between mb-1.5">
-              <label className="text-xs font-mono text-[#9ca3af]">
+              <label className="text-xs text-[#9ca3af] font-sans">
                 Canonical Location Slug
               </label>
               {rolesLoading && (
-                <span className="text-[10px] font-mono text-[#6b7280]">
+                <span className="text-[10px] font-sans text-[#6b7280]">
                   Loading locations...
                 </span>
               )}
@@ -243,7 +243,7 @@ export function WellfoundTester({
             <select
               value={locationSlug}
               onChange={(e) => setLocationSlug(e.target.value)}
-              className="w-full px-3 py-2 rounded-lg bg-[#131313] border border-[#262626] focus:border-[#3ecf8e] text-xs font-mono text-white outline-none transition-colors"
+              className="w-full px-3 py-2 rounded-lg bg-[#131313] border border-[#262626] focus:border-[#3ecf8e] text-xs font-sans text-white outline-none transition-colors"
             >
               {locations.map((loc) => (
                 <option key={loc.slug} value={loc.slug}>
@@ -258,11 +258,11 @@ export function WellfoundTester({
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div>
             <div className="flex items-center justify-between mb-1.5">
-              <label className="text-xs font-mono text-[#9ca3af]">
+              <label className="text-xs text-[#9ca3af] font-sans">
                 Page (1 – 20)
               </label>
               {isPageExceeded && (
-                <span className="flex items-center gap-1 text-[10px] font-mono text-amber-400 bg-amber-500/10 px-1 py-0.5 rounded border border-amber-500/20">
+                <span className="flex items-center gap-1 text-[10px] font-sans text-amber-400 bg-amber-500/10 px-1 py-0.5 rounded border border-amber-500/20">
                   <WarningTriangle className="w-3 h-3" />
                   Max 20
                 </span>
@@ -281,13 +281,13 @@ export function WellfoundTester({
                   : 'border-[#262626] focus:border-[#3ecf8e]'
               )}
             />
-            <p className="text-[10px] font-mono text-[#6b7280] mt-1">
+            <p className="text-[10px] font-sans text-[#6b7280] mt-1">
               Ceiling guardrail: Page &gt; 20 triggers Cloudflare Turnstile blocks.
             </p>
           </div>
 
           <div>
-            <label className="block text-xs font-mono text-[#9ca3af] mb-1.5">
+            <label className="block text-xs text-[#9ca3af] mb-1.5 font-sans">
               Limit (1 – 100)
             </label>
             <input
@@ -301,7 +301,7 @@ export function WellfoundTester({
           </div>
 
           <div>
-            <label className="block text-xs font-mono text-[#9ca3af] mb-1.5">
+            <label className="block text-xs text-[#9ca3af] mb-1.5 font-sans">
               Max Age (Days, 1 – 180)
             </label>
             <input
@@ -311,7 +311,7 @@ export function WellfoundTester({
               value={maxAgeDays}
               onChange={(e) => setMaxAgeDays(e.target.value)}
               placeholder="e.g. 14 (Optional)"
-              className="w-full px-3 py-2 rounded-lg bg-[#131313] border border-[#262626] focus:border-[#3ecf8e] text-xs font-mono text-white placeholder-[#6b7280] outline-none transition-colors"
+              className="w-full px-3 py-2 rounded-lg bg-[#131313] border border-[#262626] focus:border-[#3ecf8e] text-xs font-sans text-white placeholder-[#6b7280] outline-none transition-colors"
             />
           </div>
         </div>
@@ -321,11 +321,11 @@ export function WellfoundTester({
           {/* Include All Company Jobs */}
           <label className="flex items-center justify-between p-3 rounded-lg bg-[#131313] border border-[#262626] cursor-pointer hover:border-[#383838] transition-all">
             <div>
-              <div className="flex items-center gap-1.5 text-xs font-mono font-medium text-white">
+              <div className="flex items-center gap-1.5 text-xs font-sans font-medium text-white">
                 <Building className="w-3.5 h-3.5 text-[#9ca3af]" />
                 <span>Traverse All Company Jobs</span>
               </div>
-              <div className="text-[11px] font-mono text-[#9ca3af]">
+              <div className="text-[11px] font-sans text-[#9ca3af]">
                 Traverse entire Apollo company graph instead of highlighted only
               </div>
             </div>
@@ -340,11 +340,11 @@ export function WellfoundTester({
           {/* Persist to Bronze DB Toggle */}
           <label className="flex items-center justify-between p-3 rounded-lg bg-[#131313] border border-[#262626] cursor-pointer hover:border-[#383838] transition-all">
             <div>
-              <div className="flex items-center gap-1.5 text-xs font-mono font-medium text-white">
+              <div className="flex items-center gap-1.5 text-xs font-sans font-medium text-white">
                 <Database className="w-3.5 h-3.5 text-[#3ecf8e]" />
                 <span>Persist to Bronze DB</span>
               </div>
-              <div className="text-[11px] font-mono text-[#9ca3af]">
+              <div className="text-[11px] font-sans text-[#9ca3af]">
                 Save raw Apollo nodes to raw_wellfound_jobs table
               </div>
             </div>
@@ -363,10 +363,10 @@ export function WellfoundTester({
             type="submit"
             disabled={loading}
             className={cn(
-              'w-full sm:w-auto flex items-center justify-center gap-2 px-5 py-2.5 rounded-lg text-xs font-mono font-semibold transition-all',
+              'w-full sm:w-auto flex items-center justify-center gap-2 px-5 py-2.5 rounded-lg text-xs font-sans font-semibold transition-all',
               loading
                 ? 'bg-[#202020] border border-[#262626] text-[#6b7280] cursor-not-allowed'
-                : 'bg-[#3ecf8e] hover:bg-[#3ecf8e]/90 text-[#131313] shadow-[0_0_15px_rgba(62,207,142,0.2)]'
+                : 'bg-[#3ecf8e] hover:bg-[#3ecf8e]/90 text-[#131313]'
             )}
           >
             {loading ? (

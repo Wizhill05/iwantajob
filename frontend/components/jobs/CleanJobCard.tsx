@@ -129,7 +129,7 @@ export function CleanJobCard({ job, onViewDetails }: CleanJobCardProps) {
                 className="w-10 h-10 rounded-lg object-contain bg-[#202020] border border-[#262626] p-1 flex-shrink-0"
               />
             ) : (
-              <div className="w-10 h-10 rounded-lg bg-[#202020] border border-[#262626] flex items-center justify-center flex-shrink-0 text-sm font-mono font-semibold text-[#3ecf8e]">
+              <div className="w-10 h-10 rounded-lg bg-[#202020] border border-[#262626] flex items-center justify-center flex-shrink-0 text-sm font-sans font-semibold text-[#3ecf8e]">
                 {initialLetter || <Building className="w-5 h-5 text-[#9ca3af]" />}
               </div>
             )}
@@ -142,14 +142,14 @@ export function CleanJobCard({ job, onViewDetails }: CleanJobCardProps) {
                 </h4>
                 <span
                   className={cn(
-                    'px-2 py-0.5 text-[10px] font-mono font-medium rounded-full border',
+                    'px-2 py-0.5 text-[10px] font-sans font-medium rounded-full border',
                     sourceConfig.badgeClass
                   )}
                 >
                   {sourceConfig.label}
                 </span>
               </div>
-              <p className="text-xs text-[#9ca3af] font-medium truncate mt-0.5">
+              <p className="text-xs text-[#9ca3af] font-medium truncate mt-0.5 font-sans">
                 {job.company_name || 'Confidential Employer'}
               </p>
             </div>
@@ -161,14 +161,14 @@ export function CleanJobCard({ job, onViewDetails }: CleanJobCardProps) {
             target="_blank"
             rel="noopener noreferrer"
             title="Open canonical job page"
-            className="p-1.5 rounded-lg bg-[#202020] hover:bg-[#262626] border border-[#262626] hover:border-[#3ecf8e]/50 text-[#9ca3af] hover:text-[#3ecf8e] transition-all flex-shrink-0"
+            className="p-1.5 rounded-lg bg-[#202020] hover:bg-[#262626] border border-[#262626] hover:border-[#383838] text-[#9ca3af] hover:text-[#3ecf8e] transition-all flex-shrink-0"
           >
             <OpenNewWindow className="w-4 h-4" />
           </a>
         </div>
 
         {/* Standardized Location & Setting Pills */}
-        <div className="flex items-center gap-2 flex-wrap text-[11px] font-mono">
+        <div className="flex items-center gap-2 flex-wrap text-[11px] font-sans">
           {/* Standardized City Slug */}
           <div className="flex items-center gap-1 text-[#d1d5db]">
             <MapPin className="w-3.5 h-3.5 text-[#3ecf8e] flex-shrink-0" />
@@ -213,11 +213,11 @@ export function CleanJobCard({ job, onViewDetails }: CleanJobCardProps) {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-2 border-t border-[#262626]/80">
           {/* Salary Box */}
           <div className="p-2 rounded-lg bg-[#141414] border border-[#262626] space-y-1">
-            <div className="flex items-center justify-between text-[10px] font-mono text-[#9ca3af]">
-              <span className="uppercase tracking-wider">Annual Compensation</span>
+            <div className="flex items-center justify-between text-[10px] font-sans text-[#9ca3af]">
+              <span>Annual Compensation</span>
               <span
                 className={cn(
-                  'px-1 rounded text-[9px] font-mono border uppercase',
+                  'px-1 rounded text-[9px] font-sans font-medium border',
                   salaryMethodConfig.badgeClass
                 )}
                 title={`Extraction method: ${job.salary_extraction_method}`}
@@ -232,11 +232,11 @@ export function CleanJobCard({ job, onViewDetails }: CleanJobCardProps) {
 
           {/* Experience Box */}
           <div className="p-2 rounded-lg bg-[#141414] border border-[#262626] space-y-1">
-            <div className="flex items-center justify-between text-[10px] font-mono text-[#9ca3af]">
-              <span className="uppercase tracking-wider">Experience</span>
+            <div className="flex items-center justify-between text-[10px] font-sans text-[#9ca3af]">
+              <span>Experience</span>
               <span
                 className={cn(
-                  'px-1 rounded text-[9px] font-mono border uppercase',
+                  'px-1 rounded text-[9px] font-sans font-medium border',
                   expMethodConfig.badgeClass
                 )}
                 title={`Extraction method: ${job.experience_extraction_method}`}
@@ -259,7 +259,7 @@ export function CleanJobCard({ job, onViewDetails }: CleanJobCardProps) {
       </div>
 
       {/* Card Footer: Metadata & Actions */}
-      <div className="pt-3 border-t border-[#262626] flex items-center justify-between gap-2 text-xs font-mono">
+      <div className="pt-3 border-t border-[#262626] flex items-center justify-between gap-2 text-xs font-sans">
         <div className="flex items-center gap-1.5 text-[#6b7280] text-[11px]">
           <Clock className="w-3.5 h-3.5" />
           <span>{formatRelativeTime(job.posted_at || job.parsed_at)}</span>
@@ -270,7 +270,7 @@ export function CleanJobCard({ job, onViewDetails }: CleanJobCardProps) {
           <button
             type="button"
             onClick={() => onViewDetails(job)}
-            className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-[#202020] hover:bg-[#262626] border border-[#262626] hover:border-[#383838] text-xs font-mono text-[#d1d5db] hover:text-white transition-all"
+            className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-[#202020] hover:bg-[#262626] border border-[#262626] hover:border-[#383838] text-xs font-sans text-[#d1d5db] hover:text-white transition-all"
           >
             <Notes className="w-3.5 h-3.5 text-[#3ecf8e]" />
             <span>Details</span>
@@ -281,7 +281,7 @@ export function CleanJobCard({ job, onViewDetails }: CleanJobCardProps) {
             href={job.url}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#3ecf8e]/15 hover:bg-[#3ecf8e]/25 border border-[#3ecf8e]/30 hover:border-[#3ecf8e]/50 text-xs font-mono font-semibold text-[#3ecf8e] transition-all"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#3ecf8e]/15 hover:bg-[#3ecf8e]/25 border border-[#3ecf8e]/30 hover:border-[#3ecf8e]/50 text-xs font-sans font-semibold text-[#3ecf8e] transition-all"
           >
             <span>Apply</span>
             <OpenNewWindow className="w-3.5 h-3.5" />

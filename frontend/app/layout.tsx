@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { Inter, Manrope, JetBrains_Mono } from 'next/font/google';
+import { Inter, Manrope, Roboto_Mono } from 'next/font/google';
 import './globals.css';
 import { ActivityProvider } from '@/context/ActivityContext';
 import { DesktopSidebar } from '@/components/layout/DesktopSidebar';
@@ -18,9 +18,9 @@ const manrope = Manrope({
   display: 'swap',
 });
 
-const jetbrainsMono = JetBrains_Mono({
+const robotoMono = Roboto_Mono({
   subsets: ['latin'],
-  variable: '--font-jetbrains-mono',
+  variable: '--font-roboto-mono',
   display: 'swap',
 });
 
@@ -37,7 +37,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${inter.variable} ${manrope.variable} ${jetbrainsMono.variable} dark`}
+      className={`${inter.variable} ${manrope.variable} ${robotoMono.variable} dark`}
     >
       <body className="bg-[#131313] text-[#f3f4f6] font-sans antialiased min-h-screen selection:bg-[#3ecf8e]/20 selection:text-[#3ecf8e]">
         <ActivityProvider>

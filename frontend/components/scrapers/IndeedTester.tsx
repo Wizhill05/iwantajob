@@ -100,31 +100,31 @@ export function IndeedTester({
             <h3 className="text-sm font-semibold font-heading text-white">
               Indeed Mobile GraphQL Gateway
             </h3>
-            <span className="px-2 py-0.5 text-[10px] font-mono font-medium rounded-full bg-sky-500/10 border border-sky-500/30 text-sky-400">
+            <span className="px-2 py-0.5 text-[10px] font-sans font-medium rounded-full bg-sky-500/10 border border-sky-500/30 text-sky-400">
               apis.indeed.com/graphql
             </span>
           </div>
-          <p className="text-xs text-[#9ca3af] mt-0.5">
+          <p className="text-xs text-[#9ca3af] mt-0.5 font-sans">
             Native mobile app GraphQL schema with cursor pagination and easy-apply detection.
           </p>
         </div>
 
         {/* Execution Metrics Badge */}
-        <div className="flex items-center gap-2 font-mono text-xs">
+        <div className="flex items-center gap-2 text-xs font-sans">
           {latencyMs !== null && (
             <span className="flex items-center gap-1 px-2.5 py-1 rounded-md bg-[#202020] border border-[#262626] text-[#9ca3af]">
               <Timer className="w-3.5 h-3.5 text-[#3ecf8e]" />
-              <span>{latencyMs}ms</span>
+              <span className="font-mono">{latencyMs}ms</span>
             </span>
           )}
 
           {itemCount !== null && (
             <span className="flex items-center gap-1 px-2.5 py-1 rounded-md bg-[#202020] border border-[#262626] text-white">
               <CheckCircle className="w-3.5 h-3.5 text-[#3ecf8e]" />
-              <span>{itemCount} jobs</span>
+              <span><span className="font-mono">{itemCount}</span> jobs</span>
               {totalAvailable !== null && (
                 <span className="text-[#9ca3af] text-[10px]">
-                  of {totalAvailable.toLocaleString()}
+                  of <span className="font-mono">{totalAvailable.toLocaleString()}</span>
                 </span>
               )}
             </span>
@@ -140,11 +140,11 @@ export function IndeedTester({
       </div>
 
       {/* Parameter Form */}
-      <form onSubmit={handleRun} className="space-y-4">
+      <form onSubmit={handleRun} className="space-y-4 font-sans">
         {/* Row 1: What and Where */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label className="block text-xs font-mono text-[#9ca3af] mb-1.5">
+            <label className="block text-xs text-[#9ca3af] mb-1.5 font-sans">
               What (Job Title or Keywords)
             </label>
             <input
@@ -152,13 +152,13 @@ export function IndeedTester({
               value={what}
               onChange={(e) => setWhat(e.target.value)}
               placeholder="e.g. ai engineer or python"
-              className="w-full px-3 py-2 rounded-lg bg-[#131313] border border-[#262626] focus:border-[#3ecf8e] text-xs font-mono text-white placeholder-[#6b7280] outline-none transition-colors"
+              className="w-full px-3 py-2 rounded-lg bg-[#131313] border border-[#262626] focus:border-[#3ecf8e] text-xs font-sans text-white placeholder-[#6b7280] outline-none transition-colors"
               required
             />
           </div>
 
           <div>
-            <label className="block text-xs font-mono text-[#9ca3af] mb-1.5">
+            <label className="block text-xs text-[#9ca3af] mb-1.5 font-sans">
               Where (Location or City)
             </label>
             <input
@@ -166,7 +166,7 @@ export function IndeedTester({
               value={where}
               onChange={(e) => setWhere(e.target.value)}
               placeholder="e.g. India or Bengaluru"
-              className="w-full px-3 py-2 rounded-lg bg-[#131313] border border-[#262626] focus:border-[#3ecf8e] text-xs font-mono text-white placeholder-[#6b7280] outline-none transition-colors"
+              className="w-full px-3 py-2 rounded-lg bg-[#131313] border border-[#262626] focus:border-[#3ecf8e] text-xs font-sans text-white placeholder-[#6b7280] outline-none transition-colors"
               required
             />
           </div>
@@ -175,7 +175,7 @@ export function IndeedTester({
         {/* Row 2: Limit and Sort */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label className="block text-xs font-mono text-[#9ca3af] mb-1.5">
+            <label className="block text-xs text-[#9ca3af] mb-1.5 font-sans">
               Limit (1 – 100)
             </label>
             <input
@@ -189,13 +189,13 @@ export function IndeedTester({
           </div>
 
           <div>
-            <label className="block text-xs font-mono text-[#9ca3af] mb-1.5">
+            <label className="block text-xs text-[#9ca3af] mb-1.5 font-sans">
               Sort Order
             </label>
             <select
               value={sort}
               onChange={(e) => setSort(e.target.value as 'relevance' | 'date')}
-              className="w-full px-3 py-2 rounded-lg bg-[#131313] border border-[#262626] focus:border-[#3ecf8e] text-xs font-mono text-white outline-none transition-colors"
+              className="w-full px-3 py-2 rounded-lg bg-[#131313] border border-[#262626] focus:border-[#3ecf8e] text-xs font-sans text-white outline-none transition-colors"
             >
               <option value="relevance">Relevance (Indeed ranking)</option>
               <option value="date">Date (Newest first)</option>
@@ -207,11 +207,11 @@ export function IndeedTester({
         <div className="pt-2 border-t border-[#262626]">
           <label className="flex items-center justify-between p-3 rounded-lg bg-[#131313] border border-[#262626] cursor-pointer hover:border-[#383838] transition-all">
             <div>
-              <div className="flex items-center gap-1.5 text-xs font-mono font-medium text-white">
+              <div className="flex items-center gap-1.5 text-xs font-sans font-medium text-white">
                 <Database className="w-3.5 h-3.5 text-[#3ecf8e]" />
                 <span>Persist to Bronze DB</span>
               </div>
-              <div className="text-[11px] font-mono text-[#9ca3af]">
+              <div className="text-[11px] font-sans text-[#9ca3af]">
                 Save unmodified GraphQL items to raw_indeed_jobs table
               </div>
             </div>
@@ -230,10 +230,10 @@ export function IndeedTester({
             type="submit"
             disabled={loading}
             className={cn(
-              'w-full sm:w-auto flex items-center justify-center gap-2 px-5 py-2.5 rounded-lg text-xs font-mono font-semibold transition-all',
+              'w-full sm:w-auto flex items-center justify-center gap-2 px-5 py-2.5 rounded-lg text-xs font-sans font-semibold transition-all',
               loading
                 ? 'bg-[#202020] border border-[#262626] text-[#6b7280] cursor-not-allowed'
-                : 'bg-[#3ecf8e] hover:bg-[#3ecf8e]/90 text-[#131313] shadow-[0_0_15px_rgba(62,207,142,0.2)]'
+                : 'bg-[#3ecf8e] hover:bg-[#3ecf8e]/90 text-[#131313]'
             )}
           >
             {loading ? (

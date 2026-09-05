@@ -295,7 +295,7 @@ export function LogsTerminalView() {
             onClick={() => setAutoScroll((prev) => !prev)}
             title={autoScroll ? 'Auto-scroll is locked to latest entry' : 'Auto-scroll paused'}
             className={cn(
-              'flex items-center gap-1 px-2.5 py-1 rounded-lg border text-xs font-mono transition-colors whitespace-nowrap',
+              'flex items-center gap-1 px-2.5 py-1 rounded-lg border text-xs font-sans transition-colors whitespace-nowrap',
               autoScroll
                 ? 'bg-[#3ecf8e]/10 text-[#3ecf8e] border-[#3ecf8e]/30'
                 : 'bg-[#202020] text-[#9ca3af] border-[#262626] hover:text-white'
@@ -310,7 +310,7 @@ export function LogsTerminalView() {
             type="button"
             onClick={() => setSortOrder((prev) => (prev === 'newest' ? 'oldest' : 'newest'))}
             title={`Showing ${sortOrder} first`}
-            className="px-2.5 py-1 rounded-lg border border-[#262626] bg-[#202020] text-[#9ca3af] hover:text-white text-xs font-mono transition-colors whitespace-nowrap"
+            className="px-2.5 py-1 rounded-lg border border-[#262626] bg-[#202020] text-[#9ca3af] hover:text-white text-xs font-sans transition-colors whitespace-nowrap"
           >
             {sortOrder === 'newest' ? 'Newest' : 'Oldest'}
           </button>
@@ -321,7 +321,7 @@ export function LogsTerminalView() {
             onClick={handleCopyLogs}
             disabled={filteredLogs.length === 0}
             title="Copy logs to clipboard"
-            className="flex items-center gap-1 px-2.5 py-1 rounded-lg border border-[#262626] bg-[#202020] text-[#9ca3af] hover:text-white hover:border-[#383838] text-xs font-mono transition-colors disabled:opacity-40"
+            className="flex items-center gap-1 px-2.5 py-1 rounded-lg border border-[#262626] bg-[#202020] text-[#9ca3af] hover:text-white hover:border-[#383838] text-xs font-sans transition-colors disabled:opacity-40"
           >
             {copied ? <Check className="w-3 h-3 text-[#3ecf8e]" /> : <Copy className="w-3 h-3" />}
             <span className="hidden sm:inline">{copied ? 'Copied' : 'Copy'}</span>
@@ -333,7 +333,7 @@ export function LogsTerminalView() {
             onClick={handleExportJson}
             disabled={filteredLogs.length === 0}
             title="Export filtered logs as JSON"
-            className="flex items-center gap-1 px-2.5 py-1 rounded-lg border border-[#262626] bg-[#202020] text-[#9ca3af] hover:text-white hover:border-[#383838] text-xs font-mono transition-colors disabled:opacity-40"
+            className="flex items-center gap-1 px-2.5 py-1 rounded-lg border border-[#262626] bg-[#202020] text-[#9ca3af] hover:text-white hover:border-[#383838] text-xs font-sans transition-colors disabled:opacity-40"
           >
             <Download className="w-3 h-3" />
             <span className="hidden sm:inline">Export</span>
@@ -345,7 +345,7 @@ export function LogsTerminalView() {
             onClick={clearLogs}
             disabled={logs.length === 0}
             title="Clear all log entries"
-            className="flex items-center gap-1 px-2.5 py-1 rounded-lg border border-[#262626] bg-[#202020] text-[#9ca3af] hover:text-rose-400 hover:border-rose-500/30 text-xs font-mono transition-colors disabled:opacity-40"
+            className="flex items-center gap-1 px-2.5 py-1 rounded-lg border border-[#262626] bg-[#202020] text-[#9ca3af] hover:text-rose-400 hover:border-rose-500/30 text-xs font-sans transition-colors disabled:opacity-40"
           >
             <Trash className="w-3 h-3" />
             <span className="hidden sm:inline">Clear</span>
@@ -469,7 +469,7 @@ export function LogsTerminalView() {
                       {/* Level Badge */}
                       <span
                         className={cn(
-                          'px-1.5 py-0.2 rounded text-[10px] uppercase font-bold border shrink-0 select-none',
+                          'px-1.5 py-0.2 rounded text-[10px] font-bold border shrink-0 select-none font-sans',
                           style.tag
                         )}
                       >
