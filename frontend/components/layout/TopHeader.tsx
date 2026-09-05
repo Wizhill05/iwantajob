@@ -69,48 +69,39 @@ export function TopHeader() {
   };
 
   return (
-    <header className="sticky top-0 z-20 bg-[#131313]/80 backdrop-blur-md border-b border-[#262626] px-4 lg:px-8 py-3 flex items-center justify-between min-h-[57px]">
-      {/* Breadcrumbs & Title */}
-      <div className="flex flex-col">
-        <div className="flex items-center gap-1.5 text-[11px] font-sans text-[#6b7280]">
-          <span>{currentMeta.category}</span>
-          <span>/</span>
-          <span className="text-[#9ca3af]">{pathname === '/' ? 'Home' : pathname.replace('/', '')}</span>
-        </div>
-        <h1 className="text-base font-semibold font-heading text-white tracking-tight">
+    <header className="sticky top-0 z-20 bg-[#131313]/90 backdrop-blur-md border-b border-[#262626] px-4 lg:px-8 py-2.5 flex items-center justify-between transition-colors min-h-[50px]">
+      {/* Route Title */}
+      <div className="flex items-center gap-2">
+        <h2 className="text-sm font-semibold font-heading text-white tracking-tight">
           {currentMeta.title}
-        </h1>
+        </h2>
       </div>
 
-      {/* Right-aligned Stats & Health Indicators */}
-      <div className="flex items-center gap-2 sm:gap-3">
-        {/* Active Processes Pill */}
-        {runningCount > 0 ? (
+      {/* Right Controls: Backend Ping Dot & Refresh */}
+      <div className="flex items-center gap-2 sm:gap-2.5">
+        {/* Active process pill if tasks are running */}
+        {runningCount > 0 && (
           <Link
             href="/logs"
-            className="flex items-center gap-2 px-2.5 py-1 rounded-full bg-[#3ecf8e]/10 border border-[#3ecf8e]/30 text-[#3ecf8e] text-xs font-sans font-medium transition-all hover:bg-[#3ecf8e]/20"
+            className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#3ecf8e]/10 border border-[#3ecf8e]/30 text-[11px] font-sans text-[#3ecf8e]"
           >
-            <Activity className="w-3.5 h-3.5 animate-spin" />
-            <span className="hidden sm:inline"><span className="font-mono">{runningCount}</span> active task{runningCount > 1 ? 's' : ''}</span>
-            <span className="sm:hidden"><span className="font-mono">{runningCount}</span> active</span>
+            <span className="w-1.5 h-1.5 rounded-full bg-[#3ecf8e] animate-pulse" />
+            <span>
+              <span className="font-mono">{runningCount}</span> active
+            </span>
           </Link>
-        ) : (
-          <div className="hidden md:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#181818] border border-[#262626] text-[11px] font-sans text-[#6b7280]">
-            <span className="w-1.5 h-1.5 rounded-full bg-[#6b7280]/60"></span>
-            <span>Idle</span>
-          </div>
         )}
 
-        {/* Live Backend Health Indicator */}
+        {/* Server Status Dot */}
         <div
-          className="flex items-center gap-2 px-2.5 py-1 rounded-full bg-[#181818] border border-[#262626] text-xs font-sans"
           title={
             isOnline === true
-              ? `Backend healthy (${latencyMs}ms)`
+              ? `Backend Connected (${latencyMs ?? 0}ms)`
               : isOnline === false
               ? 'Backend unreachable (localhost:8020)'
-              : 'Checking backend status...'
+              : 'Checking API status...'
           }
+          className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-[#181818] border border-[#262626] text-[11px] font-sans text-[#9ca3af]"
         >
           <span className="relative flex h-2 w-2">
             {isOnline === true ? (
@@ -125,38 +116,22 @@ export function TopHeader() {
             )}
           </span>
 
-          <span
-            className={cn(
-              'text-[11px] font-medium hidden sm:inline',
-              isOnline === true
-                ? 'text-[#3ecf8e]'
-                : isOnline === false
-                ? 'text-rose-400'
-                : 'text-amber-300'
-            )}
-          >
-            {isOnline === true
-              ? latencyMs !== null
-                ? <span className="font-mono">{latencyMs}ms</span>
-                : 'Live'
-              : isOnline === false
-              ? 'Offline'
-              : 'Connecting'}
-          </span>
+          {latencyMs !== null && isOnline && (
+            <span className="font-mono text-[10px] text-[#9ca3af] hidden sm:inline">
+              {latencyMs}ms
+            </span>
+          )}
         </div>
 
-        {/* Quick Reload Button */}
+        {/* Manual Refresh Button */}
         <button
           type="button"
           onClick={handleQuickReload}
           disabled={isChecking}
-          title="Quick reload status"
-          aria-label="Quick reload status"
-          className="p-1.5 rounded-lg border border-[#262626] bg-[#181818] text-[#9ca3af] hover:text-white hover:border-[#383838] transition-colors disabled:opacity-50"
+          title="Reload system metrics"
+          className="p-1.5 rounded-lg text-[#9ca3af] hover:text-white hover:bg-[#202020] border border-transparent hover:border-[#262626] transition-all disabled:opacity-50"
         >
-          <Refresh
-            className={cn('w-4 h-4', isChecking && 'animate-spin text-[#3ecf8e]')}
-          />
+          <Refresh className={cn('w-3.5 h-3.5', isChecking && 'animate-spin text-[#3ecf8e]')} />
         </button>
       </div>
     </header>

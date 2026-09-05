@@ -17,6 +17,7 @@ import { IndeedTester } from '@/components/scrapers/IndeedTester';
 import { WellfoundTester } from '@/components/scrapers/WellfoundTester';
 import { ScrapedJobCard } from '@/components/scrapers/ScrapedJobCard';
 import { RawJsonViewer } from '@/components/scrapers/RawJsonViewer';
+import { PageHero } from '@/components/layout/PageHero';
 import type { JobItem } from '@/lib/types';
 import { cn } from '@/lib/utils';
 
@@ -87,30 +88,8 @@ function ScrapersContent() {
 
   return (
     <div className="space-y-6">
-      {/* Top Page Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-xl sm:text-2xl font-bold font-heading text-white tracking-tight">
-              Scraper Testing Lab
-            </h1>
-            <span className="px-2 py-0.5 text-[10px] font-sans font-medium rounded-full bg-[#3ecf8e]/10 border border-[#3ecf8e]/30 text-[#3ecf8e]">
-              Interactive Benchmarking
-            </span>
-          </div>
-          <p className="text-xs sm:text-sm text-[#9ca3af] mt-1 leading-relaxed">
-            Execute and benchmark raw job extractions across LinkedIn, Indeed, and Wellfound gateways.
-          </p>
-        </div>
-
-        {/* Global indicator pill */}
-        <div className="flex items-center gap-2 text-xs font-sans text-[#9ca3af]">
-          <span className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-[#181818] border border-[#262626]">
-            <Cpu className="w-3.5 h-3.5 text-[#3ecf8e]" />
-            <span>3 Scraping Gateways</span>
-          </span>
-        </div>
-      </div>
+      {/* Centered Dynamic Hero */}
+      <PageHero />
 
       {/* Provider Selector Tabs */}
       <ScraperTabs activeTab={activeTab} onTabChange={handleTabChange} />

@@ -17,6 +17,7 @@ import type { ParsingStatus, UnifiedJobItem } from '@/lib/types';
 import { PipelineStatsOverview } from '@/components/pipeline/PipelineStatsOverview';
 import { PipelineFlowDiagram } from '@/components/pipeline/PipelineFlowDiagram';
 import { ParserControlCard, type PipelineProvider } from '@/components/pipeline/ParserControlCard';
+import { PageHero } from '@/components/layout/PageHero';
 import { cn } from '@/lib/utils';
 
 function PipelineContent() {
@@ -102,30 +103,13 @@ function PipelineContent() {
     : 0;
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-300">
-      {/* Top Header & Action Controls */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2 text-xs font-sans font-medium text-[#3ecf8e] mb-1">
-            <span className="w-1.5 h-1.5 rounded-full bg-[#3ecf8e]"></span>
-            <span>Pipeline Manager</span>
-          </div>
-          <h1 className="text-2xl font-bold font-heading text-white tracking-tight">
-            Bronze-to-Silver Normalization Engine
-          </h1>
-          <p className="mt-1 text-xs sm:text-sm text-[#9ca3af]">
-            Manual batch triggers, deterministic currency/experience parsers, and LLM fallback management.
-          </p>
-        </div>
+    <div className="space-y-6 animate-in fade-in duration-300">
+      {/* Centered Dynamic Hero */}
+      <PageHero />
 
-        <div className="flex items-center gap-2.5 self-start md:self-auto flex-wrap">
-          {lastUpdated && (
-            <span className="text-[11px] font-sans text-[#6b7280] hidden xl:inline">
-              Synced <span className="font-mono">{lastUpdated.toLocaleTimeString([], { hour12: false })}</span>
-            </span>
-          )}
-
-          {/* Unparsed Backlog Badge */}
+      {/* Action Controls & Backlog Badge */}
+      <div className="flex items-center justify-between gap-3 flex-wrap pb-2 border-b border-[#262626]">
+        <div className="flex items-center gap-2">
           <div
             className={cn(
               'px-2.5 py-1 rounded-lg border text-xs font-sans flex items-center gap-1.5',
@@ -138,20 +122,24 @@ function PipelineContent() {
             <span><span className="font-mono">{totalUnparsed}</span> unparsed backlog</span>
           </div>
 
-          {/* Refresh Button */}
-          <button
-            type="button"
-            onClick={() => loadPipelineData(false)}
-            disabled={isRefreshing}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#262626] bg-[#181818] hover:bg-[#202020] text-xs font-sans text-[#9ca3af] hover:text-white transition-all disabled:opacity-50"
-            title="Refresh pipeline status"
-          >
-            <Refresh
-              className={cn('w-3.5 h-3.5', isRefreshing && 'animate-spin text-[#3ecf8e]')}
-            />
-            <span>Refresh</span>
-          </button>
+          {lastUpdated && (
+            <span className="text-[11px] font-sans text-[#6b7280] hidden sm:inline">
+              Synced <span className="font-mono">{lastUpdated.toLocaleTimeString([], { hour12: false })}</span>
+            </span>
+          )}
         </div>
+
+        <button
+          type="button"
+          onClick={() => loadPipelineData(false)}
+          disabled={isRefreshing}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#262626] bg-[#181818] hover:bg-[#202020] text-xs font-sans text-[#9ca3af] hover:text-white transition-all disabled:opacity-50"
+        >
+          <Refresh
+            className={cn('w-3.5 h-3.5', isRefreshing && 'animate-spin text-[#3ecf8e]')}
+          />
+          <span>{isRefreshing ? 'Refreshing...' : 'Refresh Status'}</span>
+        </button>
       </div>
 
       {/* Backend Error Banner */}

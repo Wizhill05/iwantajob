@@ -17,6 +17,7 @@ import { KpiGrid } from '@/components/overview/KpiGrid';
 import { ProviderCard } from '@/components/overview/ProviderCard';
 import { ActiveProcessesList } from '@/components/overview/ActiveProcessesList';
 import { RecentActivityLog } from '@/components/overview/RecentActivityLog';
+import { PageHero } from '@/components/layout/PageHero';
 import { cn } from '@/lib/utils';
 
 export default function OverviewPage() {
@@ -73,81 +74,11 @@ export default function OverviewPage() {
   }, [fetchStatus]);
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-300">
-      {/* Overview Top Header & Action Row */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2 text-xs font-sans font-medium text-[#3ecf8e] mb-1">
-            <span className="w-1.5 h-1.5 rounded-full bg-[#3ecf8e]"></span>
-            <span>Platform Overview</span>
-          </div>
-          <h1 className="text-2xl font-bold font-heading text-white tracking-tight">
-            Job Ingestion & Parsing Platform
-          </h1>
-          <p className="mt-1 text-xs sm:text-sm text-[#9ca3af]">
-            Decoupled Bronze-to-Silver staging architecture with deterministic pay and experience normalization.
-          </p>
-        </div>
+    <div className="space-y-6 animate-in fade-in duration-300">
+      {/* Centered Dynamic Hero */}
+      <PageHero />
 
-        {/* Action Controls */}
-        <div className="flex items-center gap-2.5 self-start md:self-auto flex-wrap">
-          {lastUpdated && (
-            <span className="text-[11px] font-sans text-[#6b7280] hidden xl:inline">
-              Updated <span className="font-mono">{lastUpdated.toLocaleTimeString([], { hour12: false })}</span>
-            </span>
-          )}
-
-          {/* Quick Refresh Button */}
-          <button
-            type="button"
-            onClick={() => fetchStatus(false)}
-            disabled={isRefreshing}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#262626] bg-[#181818] hover:bg-[#202020] text-xs font-sans text-[#9ca3af] hover:text-white transition-all disabled:opacity-50"
-            title="Refresh status now"
-          >
-            <Refresh
-              className={cn('w-3.5 h-3.5', isRefreshing && 'animate-spin text-[#3ecf8e]')}
-            />
-            <span>Refresh</span>
-          </button>
-
-          {/* Quick Navigation Links */}
-          <Link
-            href="/scrapers"
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#262626] bg-[#181818] hover:bg-[#202020] text-xs font-sans text-white transition-all hover:border-[#383838]"
-          >
-            <Cpu className="w-3.5 h-3.5 text-[#3ecf8e]" />
-            <span>Scraper Lab</span>
-          </Link>
-
-          <Link
-            href="/pipeline"
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#3ecf8e]/30 bg-[#3ecf8e]/10 hover:bg-[#3ecf8e]/20 text-xs font-sans font-medium text-[#3ecf8e] transition-all"
-          >
-            <RefreshDouble className="w-3.5 h-3.5" />
-            <span>Pipeline</span>
-          </Link>
-        </div>
-      </div>
-
-      {/* Backend Connection Error Banner */}
-      {error && (
-        <div className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/20 flex items-start gap-3 text-xs font-sans text-rose-400">
-          <WarningTriangle className="w-4 h-4 shrink-0 mt-0.5 text-rose-400" />
-          <div className="flex-1 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-            <span>{error} Backend may be offline at http://localhost:8020.</span>
-            <button
-              type="button"
-              onClick={() => fetchStatus(true)}
-              className="px-2.5 py-1 rounded bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 text-xs font-medium underline self-start sm:self-auto"
-            >
-              Retry
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* KPI Grid (4 Metrics Cards) */}
+      {/* KPI Grid */}
       <section aria-labelledby="kpi-section-title">
         <h2 id="kpi-section-title" className="sr-only">
           Platform Key Performance Indicators

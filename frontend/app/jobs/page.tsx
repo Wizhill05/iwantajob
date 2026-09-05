@@ -27,6 +27,7 @@ import {
 } from '@/components/jobs/JobsFilterBar';
 import { CompactJobRow } from '@/components/jobs/CompactJobRow';
 import { JobDescriptionModal } from '@/components/jobs/JobDescriptionModal';
+import { PageHero } from '@/components/layout/PageHero';
 import { triageStorage } from '@/lib/triageStorage';
 import { cn } from '@/lib/utils';
 
@@ -247,42 +248,9 @@ function JobsExplorerContent() {
   };
 
   return (
-    <div className="space-y-5 max-w-7xl mx-auto pb-16">
-      {/* Top Header Banner */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-[#262626] pb-4">
-        <div>
-          <div className="flex items-center gap-2 text-xs font-sans text-[#3ecf8e] mb-1">
-            <Database className="w-3.5 h-3.5" />
-            <span>Silver Tier / Unified Jobs</span>
-          </div>
-          <h1 className="text-xl md:text-2xl font-bold font-heading text-white tracking-tight">
-            Clean Silver Jobs Explorer
-          </h1>
-          <p className="text-xs text-[#9ca3af] mt-0.5 font-sans">
-            Swipe right to archive, swipe left to save. Click any row to expand details.
-          </p>
-        </div>
-
-        <div className="flex items-center gap-2 shrink-0">
-          <Link
-            href="/pipeline"
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#202020] hover:bg-[#262626] border border-[#262626] hover:border-[#383838] text-xs font-sans text-[#9ca3af] hover:text-white transition-colors"
-          >
-            <RefreshDouble className="w-3.5 h-3.5 text-[#3ecf8e]" />
-            <span>Pipeline</span>
-          </Link>
-
-          <button
-            type="button"
-            onClick={() => fetchJobs(currentPage, true)}
-            disabled={isLoading || isRefreshing}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#3ecf8e]/15 hover:bg-[#3ecf8e]/25 border border-[#3ecf8e]/30 hover:border-[#3ecf8e]/50 text-xs font-sans font-medium text-[#3ecf8e] transition-all disabled:opacity-50"
-          >
-            <Refresh className={cn('w-3.5 h-3.5', isRefreshing && 'animate-spin')} />
-            <span>{isRefreshing ? 'Refreshing...' : 'Refresh'}</span>
-          </button>
-        </div>
-      </div>
+    <div className="space-y-4 max-w-7xl mx-auto pb-16">
+      {/* Centered Dynamic Hero */}
+      <PageHero />
 
       {/* Collapsible Mobile/Desktop Filter Control */}
       <JobsFilterBar

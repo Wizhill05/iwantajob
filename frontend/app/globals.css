@@ -39,3 +39,27 @@ body {
 ::-webkit-scrollbar-thumb:hover {
   background: #383838;
 }
+
+/* Subtle dynamic text shimmer effect */
+@keyframes text-shimmer {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+.animate-shimmer {
+  background-size: 200% auto;
+  animation: text-shimmer 6s ease-in-out infinite;
+}
+
+/* Micro-texture background overlay */
+.bg-micro-texture {
+  background-image: radial-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 1px);
+  background-size: 16px 16px;
+}
