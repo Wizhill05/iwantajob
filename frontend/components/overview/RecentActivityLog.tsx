@@ -18,21 +18,9 @@ import { useActivity } from '@/context/ActivityContext';
 import { cn } from '@/lib/utils';
 import type { LogEntry, LogLevel } from '@/lib/types';
 
-type FilterTab = 'all' | 'scrapes' | 'parses' | 'errors';
-
 export function RecentActivityLog() {
   const { logs, clearLogs } = useActivity();
-  const [activeFilter, setActiveFilter] = useState<FilterTab>('all');
   const [expandedLogId, setExpandedLogId] = useState<string | null>(null);
-
-  const filteredLogs = logs.filter((entry) => {
-    if (activeFilter === 'all') return true;
-    if (activeFilter === 'scrapes') return entry.level === 'SCRAPE';
-    if (activeFilter === 'parses') return entry.level === 'PARSE';
-    if (activeFilter === 'errors')
-      return entry.level === 'ERROR' || entry.level === 'WARN';
-    return true;
-  });
 
   const toggleExpand = (id: string) => {
     setExpandedLogId((prev) => (prev === id ? null : id));
@@ -69,44 +57,25 @@ export function RecentActivityLog() {
   };
 
   return (
-    <div className="bg-transparent lg:bg-[#181818] border-0 lg:border lg:border-[#262626] rounded-xl p-0 lg:p-5 shadow-none lg:shadow-sm">
+    <div className="-mx-4 sm:mx-0 border-y sm:border border-[#262626] sm:rounded-lg bg-transparent sm:bg-[#181818] p-3.5 sm:p-5 shadow-none sm:shadow-sm">
       {/* Header Row */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 lg:pb-4 border-b border-[#262626]">
+      <div className="flex items-center justify-between gap-3 pb-3 lg:pb-4 border-b border-[#262626]">
         <div className="flex items-center gap-2.5">
           <Terminal className="w-5 h-5 text-[#3ecf8e]" />
-          <div>
-            <h3 className="text-sm font-semibold font-heading text-white">
-              Recent Activity Feed
-            </h3>
-            <p className="text-[11px] font-sans text-[#9ca3af]">
-              Live operational event stream and latency diagnostics
-            </p>
-          </div>
+          <h3 className="text-sm font-semibold font-heading text-white">
+            Recent Activity Feed
+          </h3>
+          <Link
+            href="/logs"
+            title="View full console"
+            className="text-[#9ca3af] hover:text-[#3ecf8e] transition-colors p-1 rounded hover:bg-[#202020]"
+          >
+            <OpenNewWindow className="w-4 h-4" />
+          </Link>
         </div>
 
-        {/* Right Actions: Filter Tabs + Controls */}
-        <div className="flex items-center gap-2 flex-wrap">
-          {/* Filter Pills */}
-          <div className="flex items-center p-0.5 rounded-lg bg-[#202020] border border-[#262626] text-xs font-sans">
-            {(['all', 'scrapes', 'parses', 'errors'] as FilterTab[]).map(
-              (tab) => (
-                <button
-                  key={tab}
-                  type="button"
-                  onClick={() => setActiveFilter(tab)}
-                  className={cn(
-                    'px-2.5 py-1 rounded-md capitalize transition-all',
-                    activeFilter === tab
-                      ? 'bg-[#181818] text-[#3ecf8e] font-medium border border-[#3ecf8e]/30 shadow-sm'
-                      : 'text-[#9ca3af] hover:text-white'
-                  )}
-                >
-                  {tab}
-                </button>
-              )
-            )}
-          </div>
-
+        {/* Right Actions */}
+        <div className="flex items-center gap-2">
           {/* Clear Logs */}
           <button
             type="button"
@@ -117,27 +86,17 @@ export function RecentActivityLog() {
           >
             <Trash className="w-3.5 h-3.5" />
           </button>
-
-          {/* View Full System Logs */}
-          <Link
-            href="/logs"
-            title="View system console"
-            className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-[#262626] bg-[#202020] text-[#9ca3af] hover:text-white hover:border-[#383838] transition-colors text-xs font-sans font-medium"
-          >
-            <span>Full Console</span>
-            <OpenNewWindow className="w-3 h-3" />
-          </Link>
         </div>
       </div>
 
       {/* Logs Table / List */}
-      {filteredLogs.length === 0 ? (
+      {logs.length === 0 ? (
         <div className="py-8 lg:py-12 flex flex-col items-center justify-center text-center">
           <div className="w-10 h-10 rounded-full bg-[#202020] border border-[#262626] flex items-center justify-center text-[#6b7280] mb-3">
             <InfoCircle className="w-5 h-5" />
           </div>
           <p className="text-xs font-sans font-medium text-[#9ca3af]">
-            No activity logged for this filter
+            No activity logged yet
           </p>
           <p className="text-[11px] font-sans text-[#6b7280] mt-1">
             Trigger a scrape or normalization run to see live execution events.
@@ -145,7 +104,7 @@ export function RecentActivityLog() {
         </div>
       ) : (
         <div className="mt-2 lg:mt-3 divide-y divide-[#262626] overflow-hidden">
-          {filteredLogs.slice(0, 15).map((log: LogEntry) => {
+          {logs.slice(0, 5).map((log: LogEntry) => {
             const isExpanded = expandedLogId === log.id;
             const hasDetails = Boolean(log.details);
 
@@ -222,6 +181,20 @@ export function RecentActivityLog() {
               </div>
             );
           })}
+
+          {/* Redirect to full logs page if more than 5 logs exist */}
+          {logs.length > 5 && (
+            <div className="pt-2.5 mt-1 border-t border-[#262626] flex items-center justify-between text-xs font-sans text-[#9ca3af]">
+              <span>Showing 5 of {logs.length} events</span>
+              <Link
+                href="/logs"
+                className="flex items-center gap-1 text-[#3ecf8e] hover:underline font-medium"
+              >
+                <span>View Full Console</span>
+                <OpenNewWindow className="w-3 h-3" />
+              </Link>
+            </div>
+          )}
         </div>
       )}
     </div>

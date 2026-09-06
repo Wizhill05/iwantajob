@@ -107,13 +107,11 @@ class UnifiedJob(Base):
     salary_max_inr_year = Column(BigInteger, nullable=True, index=True)
     salary_raw = Column(String, nullable=True)
     salary_currency_raw = Column(String, nullable=True)
-    salary_extraction_method = Column(String, nullable=False, default="none")  # 'native', 'regex', 'llm', 'none'
 
     # Normalized Experience (Fresher Focus)
     experience_min_years = Column(Integer, nullable=True, index=True)
     experience_max_years = Column(Integer, nullable=True, index=True)
     is_fresher_friendly = Column(Boolean, default=False, nullable=False, index=True)
-    experience_extraction_method = Column(String, nullable=False, default="none")  # 'native', 'regex', 'llm', 'none'
 
     description_text = Column(Text, nullable=False)
     posted_at = Column(DateTime(timezone=True), nullable=True, index=True)

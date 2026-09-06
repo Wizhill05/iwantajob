@@ -46,10 +46,19 @@ export default function RootLayout({
 
             {/* Main Content Area without Top Header */}
             <div className="flex-1 lg:pl-64 flex flex-col min-h-screen min-w-0">
-              <main className="flex-1 pb-24 lg:pb-12 px-4 lg:px-8 max-w-7xl w-full mx-auto">
+              <main className="flex-1 px-4 lg:px-8 max-w-7xl w-full mx-auto">
                 {children}
+
+                {/* 30% Vertical Height Empty Clearance Spacer */}
+                <div className="h-[30vh] w-full pointer-events-none" aria-hidden="true" />
               </main>
             </div>
+
+            {/* Subtle Gradient Fog Behind Mobile Bottom Nav */}
+            <div
+              className="lg:hidden fixed bottom-0 inset-x-0 h-36 bg-gradient-to-t from-[#131313] via-[#131313]/90 to-transparent pointer-events-none z-40"
+              aria-hidden="true"
+            />
 
             {/* Mobile iOS Style Bottom Floating Dock */}
             <MobileBottomNav />

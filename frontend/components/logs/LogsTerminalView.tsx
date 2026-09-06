@@ -224,7 +224,7 @@ export function LogsTerminalView() {
   return (
     <div className="flex flex-col space-y-3 font-mono">
       {/* Control Bar: Filters, Search, Actions */}
-      <div className="bg-[#181818] border border-[#262626] rounded-xl p-3 flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+      <div className="bg-[#181818] border-y sm:border border-[#262626] sm:rounded-lg p-3 flex flex-col lg:flex-row lg:items-center justify-between gap-3">
         {/* Level Filters */}
         <div className="flex items-center gap-1.5 flex-wrap">
           {(['ALL', 'INFO', 'SCRAPE', 'PARSE', 'WARN', 'ERROR'] as LevelFilter[]).map((lvl) => {
@@ -354,7 +354,7 @@ export function LogsTerminalView() {
       </div>
 
       {/* Monospace Terminal Body */}
-      <div className="bg-[#0a0a0a] border border-[#262626] rounded-xl overflow-hidden shadow-2xl flex flex-col">
+      <div className="bg-[#0a0a0a] border-y sm:border border-[#262626] sm:rounded-lg overflow-hidden shadow-2xl flex flex-col">
         {/* Terminal Title Bar */}
         <div className="bg-[#121212] px-4 py-2.5 border-b border-[#202020] flex items-center justify-between text-xs select-none">
           {/* Window dots decoration & session title */}

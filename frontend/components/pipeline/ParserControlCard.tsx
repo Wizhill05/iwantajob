@@ -71,7 +71,6 @@ export function ParserControlCard({
 
   // Configuration controls
   const [batchSize, setBatchSize] = useState<number>(50);
-  const [useLlm, setUseLlm] = useState<boolean>(false);
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
 
   // Execution result
@@ -93,7 +92,6 @@ export function ParserControlCard({
 
     const procId = startProcess('parse', provider, {
       batch_size: batchSize,
-      use_llm: useLlm,
     });
 
     const startTime = performance.now();
@@ -101,7 +99,6 @@ export function ParserControlCard({
     try {
       const result = await api.triggerParse(provider, {
         batchSize,
-        useLlm,
       });
 
       const elapsed = Math.round(performance.now() - startTime);
@@ -271,43 +268,24 @@ export function ParserControlCard({
             </div>
           </div>
 
-          {/* LLM Fallback Switch */}
-          <div className="p-3 rounded-lg bg-[#141414] border border-[#262626] flex items-start justify-between gap-3">
-            <div className="flex items-start gap-2.5">
-              <div className="w-6 h-6 rounded bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-purple-400 shrink-0 mt-0.5">
+          {/* Direct Gemini LLM Engine Badge */}
+          <div className="p-3 rounded-lg bg-[#141414] border border-[#262626] flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5">
+              <div className="w-6 h-6 rounded bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-purple-400 shrink-0">
                 <Spark className="w-3.5 h-3.5" />
               </div>
               <div>
-                <label
-                  htmlFor={`llm-toggle-${provider}`}
-                  className="text-xs font-sans font-medium text-white cursor-pointer block"
-                >
-                  LLM Fallback (Gemini 3.7 Flash)
-                </label>
+                <span className="text-xs font-sans font-medium text-white block">
+                  Gemini 3.7 Flash Engine
+                </span>
                 <p className="text-[11px] text-[#9ca3af] mt-0.5 leading-relaxed font-sans">
-                  Dispatches to Gemini 3.7 Flash Tiered via FreeAPI if regex pay/experience extraction yields nothing from description.
+                  Direct cognitive LLM parsing for Indian compensation (monthly annualization, LPA) & experience bounds.
                 </p>
               </div>
             </div>
-            <button
-              id={`llm-toggle-${provider}`}
-              type="button"
-              role="switch"
-              aria-checked={useLlm}
-              onClick={() => setUseLlm(!useLlm)}
-              disabled={isProcessing}
-              className={cn(
-                'relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none mt-1',
-                useLlm ? 'bg-[#3ecf8e]' : 'bg-[#262626]'
-              )}
-            >
-              <span
-                className={cn(
-                  'pointer-events-none inline-block h-4 w-4 transform rounded-full bg-[#131313] shadow ring-0 transition duration-200 ease-in-out',
-                  useLlm ? 'translate-x-4' : 'translate-x-0'
-                )}
-              />
-            </button>
+            <span className="px-2 py-0.5 rounded text-[10px] font-mono font-medium bg-purple-500/10 text-purple-400 border border-purple-500/20 whitespace-nowrap">
+              Active
+            </span>
           </div>
         </div>
       </div>
@@ -329,7 +307,7 @@ export function ParserControlCard({
           <RefreshDouble
             className={cn('w-4 h-4', isProcessing && 'animate-spin')}
           />
-          <span>{isProcessing ? 'Normalizing Staged Records...' : <>Run Normalizer (<span className="font-mono">{batchSize}</span>)</>}</span>
+          <span>{isProcessing ? 'Parsing with Gemini...' : <>Parse Jobs with Gemini (<span className="font-mono">{batchSize}</span>)</>}</span>
         </button>
 
         {/* Feedback Panel: Success or Error */}

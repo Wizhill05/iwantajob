@@ -11,8 +11,6 @@ import {
   ArrowRight,
   ShieldCheck,
   Code,
-  Coins,
-  GraduationCap,
   FastArrowRight,
 } from 'iconoir-react';
 import type { ParsingStatus } from '@/lib/types';
@@ -35,7 +33,7 @@ export function PipelineFlowDiagram({ status, isLoading = false }: PipelineFlowD
   const totalClean = status?.unified_total || 0;
 
   return (
-    <div className="rounded-xl bg-[#181818] border border-[#262626] p-5 sm:p-6 overflow-hidden">
+    <div className="border-y sm:border sm:rounded-lg bg-[#181818] border-[#262626] p-4 sm:p-5 overflow-hidden">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-5 border-b border-[#262626]">
         <div className="flex items-center gap-2.5">
@@ -154,57 +152,25 @@ export function PipelineFlowDiagram({ status, isLoading = false }: PipelineFlowD
             </span>
           </div>
 
-          {/* Engine 1: PayNormalizer */}
-          <div className="p-3.5 rounded-lg bg-[#141414] border border-[#262626] hover:border-[#383838] transition-all">
-            <div className="flex items-start justify-between gap-2">
-              <div className="flex items-center gap-2">
-                <Coins className="w-3.5 h-3.5 text-[#3ecf8e] shrink-0" />
-                <span className="text-xs font-sans font-semibold text-white">PayNormalizer</span>
-              </div>
-              <span className="text-[10px] font-sans px-1.5 py-0.5 rounded bg-[#3ecf8e]/10 border border-[#3ecf8e]/20 text-[#3ecf8e]">
-                Deterministic
-              </span>
-            </div>
-            <p className="mt-1.5 text-[11px] text-[#9ca3af] leading-relaxed">
-              Standardizes all pay to annual INR integer bounds (<span className="text-white font-mono">salary_min/max_inr_year</span>). Converts LPA (100k), USD (x85), EUR (x92), GBP (x108), and monthly/hourly rates.
-            </p>
-          </div>
-
-          {/* Engine 2: ExperienceExtractor */}
-          <div className="p-3.5 rounded-lg bg-[#141414] border border-[#262626] hover:border-[#383838] transition-all">
-            <div className="flex items-start justify-between gap-2">
-              <div className="flex items-center gap-2">
-                <GraduationCap className="w-3.5 h-3.5 text-[#3ecf8e] shrink-0" />
-                <span className="text-xs font-sans font-semibold text-white">ExperienceExtractor</span>
-              </div>
-              <span className="text-[10px] font-sans px-1.5 py-0.5 rounded bg-[#3ecf8e]/10 border border-[#3ecf8e]/20 text-[#3ecf8e]">
-                Regex + Heuristics
-              </span>
-            </div>
-            <p className="mt-1.5 text-[11px] text-[#9ca3af] leading-relaxed">
-              Extracts <span className="text-white font-mono">experience_min/max_years</span> and flags <span className="text-[#3ecf8e] font-mono">is_fresher_friendly</span> for internships, college grads, 0-1 yrs, and entry-level attributes.
-            </p>
-          </div>
-
-          {/* Engine 3: Gemini 3.7 Flash Tiered Fallback */}
-          <div className="p-3.5 rounded-lg bg-[#141414] border border-[#262626] hover:border-[#383838] transition-all">
+          {/* Direct Engine: Gemini 3.7 Flash Tiered */}
+          <div className="p-3.5 rounded-lg bg-[#141414] border border-purple-500/30 hover:border-purple-500/50 transition-all">
             <div className="flex items-start justify-between gap-2">
               <div className="flex items-center gap-2">
                 <Spark className="w-3.5 h-3.5 text-purple-400 shrink-0" />
-                <span className="text-xs font-sans font-semibold text-white">Gemini 3.7 Flash Tiered</span>
+                <span className="text-xs font-sans font-semibold text-white">Gemini 3.7 Flash Engine</span>
               </div>
               <span className="text-[10px] font-sans px-1.5 py-0.5 rounded bg-purple-500/10 border border-purple-500/20 text-purple-400">
-                LLM Fallback
+                Direct LLM Parser
               </span>
             </div>
             <p className="mt-1.5 text-[11px] text-[#9ca3af] leading-relaxed">
-              Dispatched via FreeAPI only when <span className="text-purple-300 font-mono">use_llm=true</span> and deterministic regex yields nothing from the raw description.
+              Every staged job is directly parsed by Gemini via FreeAPI. Accurately reasons through unstated monthly figures (e.g. ₹20k-50k annualized), LPA bounds, foreign currency conversions, and fresher eligibility.
             </p>
           </div>
 
           <div className="text-[11px] font-sans text-[#6b7280] flex items-center gap-1.5 pt-1">
             <Cpu className="w-3.5 h-3.5 text-purple-400" />
-            <span>Zero scrapers touch the LLM; parsing runs independently</span>
+            <span>Zero fragile regex; 100% cognitive LLM extraction</span>
           </div>
         </div>
 

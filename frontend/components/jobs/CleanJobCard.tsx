@@ -38,28 +38,6 @@ const SOURCE_CONFIG = {
   },
 };
 
-const EXTRACTION_METHOD_CONFIG: Record<
-  string,
-  { label: string; badgeClass: string }
-> = {
-  native: {
-    label: 'native',
-    badgeClass: 'text-[#3ecf8e] bg-[#3ecf8e]/10 border-[#3ecf8e]/25',
-  },
-  regex: {
-    label: 'regex',
-    badgeClass: 'text-cyan-400 bg-cyan-500/10 border-cyan-500/25',
-  },
-  llm: {
-    label: 'llm',
-    badgeClass: 'text-purple-400 bg-purple-500/10 border-purple-500/25',
-  },
-  none: {
-    label: 'none',
-    badgeClass: 'text-[#6b7280] bg-[#262626] border-[#383838]',
-  },
-};
-
 function formatExperience(job: UnifiedJobItem): string {
   if (job.is_fresher_friendly || job.experience_min_years === 0) {
     if (job.experience_max_years && job.experience_max_years > 0) {
@@ -93,14 +71,6 @@ export function CleanJobCard({ job, onViewDetails }: CleanJobCardProps) {
     label: job.source,
     badgeClass: 'text-gray-400 bg-gray-500/10 border-gray-500/25',
   };
-
-  const salaryMethodConfig =
-    EXTRACTION_METHOD_CONFIG[job.salary_extraction_method] ||
-    EXTRACTION_METHOD_CONFIG.none;
-
-  const expMethodConfig =
-    EXTRACTION_METHOD_CONFIG[job.experience_extraction_method] ||
-    EXTRACTION_METHOD_CONFIG.none;
 
   const salaryText = formatSalaryLPA(
     job.salary_min_inr_year,
@@ -213,17 +183,8 @@ export function CleanJobCard({ job, onViewDetails }: CleanJobCardProps) {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-2 border-t border-[#262626]/80">
           {/* Salary Box */}
           <div className="p-2 rounded-lg bg-[#141414] border border-[#262626] space-y-1">
-            <div className="flex items-center justify-between text-[10px] font-sans text-[#9ca3af]">
+            <div className="text-[10px] font-sans text-[#9ca3af]">
               <span>Annual Compensation</span>
-              <span
-                className={cn(
-                  'px-1 rounded text-[9px] font-sans font-medium border',
-                  salaryMethodConfig.badgeClass
-                )}
-                title={`Extraction method: ${job.salary_extraction_method}`}
-              >
-                {salaryMethodConfig.label}
-              </span>
             </div>
             <div className="text-xs font-mono font-semibold text-white">
               {salaryText}
@@ -232,17 +193,8 @@ export function CleanJobCard({ job, onViewDetails }: CleanJobCardProps) {
 
           {/* Experience Box */}
           <div className="p-2 rounded-lg bg-[#141414] border border-[#262626] space-y-1">
-            <div className="flex items-center justify-between text-[10px] font-sans text-[#9ca3af]">
+            <div className="text-[10px] font-sans text-[#9ca3af]">
               <span>Experience</span>
-              <span
-                className={cn(
-                  'px-1 rounded text-[9px] font-sans font-medium border',
-                  expMethodConfig.badgeClass
-                )}
-                title={`Extraction method: ${job.experience_extraction_method}`}
-              >
-                {expMethodConfig.label}
-              </span>
             </div>
             <div className="text-xs font-mono font-semibold text-[#3ecf8e]">
               {expText}

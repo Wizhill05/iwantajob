@@ -104,4 +104,52 @@ export const triageStorage = {
     archived.delete(jobId);
     writeIds(STORAGE_KEYS.ARCHIVED, archived);
   },
+
+  saveMany(jobIds: string[]): void {
+    if (jobIds.length === 0) return;
+    const saved = readIds(STORAGE_KEYS.SAVED);
+    const archived = readIds(STORAGE_KEYS.ARCHIVED);
+    for (const id of jobIds) {
+      saved.add(id);
+      archived.delete(id);
+    }
+    writeIds(STORAGE_KEYS.SAVED, saved);
+    writeIds(STORAGE_KEYS.ARCHIVED, archived);
+  },
+
+  archiveMany(jobIds: string[]): void {
+    if (jobIds.length === 0) return;
+    const saved = readIds(STORAGE_KEYS.SAVED);
+    const archived = readIds(STORAGE_KEYS.ARCHIVED);
+    for (const id of jobIds) {
+      archived.add(id);
+      saved.delete(id);
+    }
+    writeIds(STORAGE_KEYS.ARCHIVED, archived);
+    writeIds(STORAGE_KEYS.SAVED, saved);
+  },
+
+  unarchiveMany(jobIds: string[]): void {
+    if (jobIds.length === 0) return;
+    const archived = readIds(STORAGE_KEYS.ARCHIVED);
+    for (const id of jobIds) {
+      archived.delete(id);
+    }
+    writeIds(STORAGE_KEYS.ARCHIVED, archived);
+  },
+
+  deleteMany(jobIds: string[]): void {
+    if (jobIds.length === 0) return;
+    const deleted = readIds(STORAGE_KEYS.DELETED);
+    const saved = readIds(STORAGE_KEYS.SAVED);
+    const archived = readIds(STORAGE_KEYS.ARCHIVED);
+    for (const id of jobIds) {
+      deleted.add(id);
+      saved.delete(id);
+      archived.delete(id);
+    }
+    writeIds(STORAGE_KEYS.DELETED, deleted);
+    writeIds(STORAGE_KEYS.SAVED, saved);
+    writeIds(STORAGE_KEYS.ARCHIVED, archived);
+  },
 };

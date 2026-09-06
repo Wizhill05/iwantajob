@@ -66,7 +66,7 @@ export function ScraperTabs({ activeTab, onTabChange }: ScraperTabsProps) {
               type="button"
               onClick={() => onTabChange(tab.key)}
               className={cn(
-                'flex flex-col items-start p-3 rounded-xl border text-left transition-all relative overflow-hidden',
+                'flex flex-col items-start p-2.5 sm:p-3 rounded-lg border text-left transition-all relative overflow-hidden',
                 isActive
                   ? cn('bg-[#181818]', tab.activeBorder, 'shadow-sm')
                   : 'bg-[#181818]/60 border-[#262626] hover:border-[#383838] hover:bg-[#181818]'

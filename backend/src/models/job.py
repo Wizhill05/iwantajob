@@ -137,6 +137,11 @@ class JobItem(BaseModel):
         description="URL to company profile or direct website.",
         examples=["https://www.linkedin.com/company/shamrock-ai"],
     )
+    is_in_db: bool = Field(
+        default=False,
+        description="Whether this job posting already exists in the database (raw or unified).",
+        examples=[False],
+    )
 
     model_config = {
         "json_schema_extra": {

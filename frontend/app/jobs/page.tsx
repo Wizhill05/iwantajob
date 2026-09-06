@@ -16,6 +16,8 @@ import {
   Archive,
   Trash,
   Undo,
+  Check,
+  Xmark,
 } from 'iconoir-react';
 import { api } from '@/lib/api';
 import type { UnifiedJobItem, UnifiedJobsQueryParams } from '@/lib/types';
@@ -27,6 +29,7 @@ import {
 } from '@/components/jobs/JobsFilterBar';
 import { CompactJobRow } from '@/components/jobs/CompactJobRow';
 import { JobDescriptionModal } from '@/components/jobs/JobDescriptionModal';
+import { DeleteConfirmModal } from '@/components/jobs/DeleteConfirmModal';
 import { PageHero } from '@/components/layout/PageHero';
 import { triageStorage } from '@/lib/triageStorage';
 import { cn } from '@/lib/utils';
@@ -82,11 +85,61 @@ function JobsExplorerContent() {
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [selectedJob, setSelectedJob] = useState<UnifiedJobItem | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState<boolean>(false);
+  const [expandedJobId, setExpandedJobId] = useState<string | null>(null);
 
   // Triage state (synchronized with localStorage)
   const [savedIds, setSavedIds] = useState<Set<string>>(new Set());
   const [archivedIds, setArchivedIds] = useState<Set<string>>(new Set());
   const [deletedIds, setDeletedIds] = useState<Set<string>>(new Set());
+
+  // Sliding pill state for triage tabs
+  const tabRefs = React.useRef<{ [key in TriageTab]?: HTMLButtonElement | null }>({});
+  const tabContainerRef = React.useRef<HTMLDivElement | null>(null);
+  const [tabPillStyle, setTabPillStyle] = useState<{ left: number; width: number; opacity: number }>({
+    left: 0,
+    width: 0,
+    opacity: 0,
+  });
+
+  useEffect(() => {
+    const updateTabPill = () => {
+      const activeEl = tabRefs.current[activeTab];
+      const containerEl = tabContainerRef.current;
+      if (activeEl && containerEl) {
+        const activeRect = activeEl.getBoundingClientRect();
+        const containerRect = containerEl.getBoundingClientRect();
+        // Exact offset relative to container's left edge
+        setTabPillStyle({
+          left: activeRect.left - containerRect.left,
+          width: activeRect.width,
+          opacity: 1,
+        });
+      }
+    };
+    updateTabPill();
+    const handleResize = () => updateTabPill();
+    window.addEventListener('resize', handleResize);
+    const timer = setTimeout(updateTabPill, 40);
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      clearTimeout(timer);
+    };
+  }, [activeTab, jobs.length]);
+
+  // Multi-selection state
+  const [isSelectMode, setIsSelectMode] = useState<boolean>(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
+  // Delete Confirmation Modal State
+  const [deleteModalState, setDeleteModalState] = useState<{
+    isOpen: boolean;
+    jobIds: string[];
+    isDeleting: boolean;
+  }>({
+    isOpen: false,
+    jobIds: [],
+    isDeleting: false,
+  });
 
   // Load triage state from localStorage on client mount
   useEffect(() => {
@@ -97,7 +150,7 @@ function JobsExplorerContent() {
 
   // Fetch clean jobs from /api/jobs/unified
   const fetchJobs = useCallback(
-    async (pageToLoad = currentPage, showRefreshAnimation = false) => {
+    async (showRefreshAnimation = false) => {
       if (showRefreshAnimation) {
         setIsRefreshing(true);
       } else {
@@ -105,10 +158,9 @@ function JobsExplorerContent() {
       }
       setError(null);
 
-      const offset = (pageToLoad - 1) * PAGE_SIZE;
       const params: UnifiedJobsQueryParams = {
-        limit: PAGE_SIZE,
-        offset,
+        limit: 200,
+        offset: 0,
       };
 
       if (filters.source !== 'all') {
@@ -144,58 +196,14 @@ function JobsExplorerContent() {
         setIsRefreshing(false);
       }
     },
-    [filters, currentPage]
+    [filters]
   );
 
   // Trigger fetch when query filters change
   useEffect(() => {
     setCurrentPage(1);
-    fetchJobs(1);
-  }, [
-    filters.source,
-    filters.city,
-    filters.is_fresher_friendly,
-    filters.easy_apply_available,
-    filters.min_salary_lpa,
-  ]);
-
-  // Handle page navigation
-  const handlePageChange = (newPage: number) => {
-    if (newPage < 1) return;
-    setCurrentPage(newPage);
-    fetchJobs(newPage);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
-
-  // Reset filters handler
-  const handleResetFilters = () => {
-    setFilters({ ...DEFAULT_FILTERS });
-  };
-
-  // Triage Action Handlers
-  const handleToggleSave = (jobId: string) => {
-    triageStorage.toggleSave(jobId);
-    setSavedIds(triageStorage.getSavedIds());
-    setArchivedIds(triageStorage.getArchivedIds());
-  };
-
-  const handleArchive = (jobId: string) => {
-    triageStorage.archive(jobId);
-    setArchivedIds(triageStorage.getArchivedIds());
-    setSavedIds(triageStorage.getSavedIds());
-  };
-
-  const handleUnarchive = (jobId: string) => {
-    triageStorage.unarchive(jobId);
-    setArchivedIds(triageStorage.getArchivedIds());
-  };
-
-  const handleDelete = (jobId: string) => {
-    triageStorage.delete(jobId);
-    setDeletedIds(triageStorage.getDeletedIds());
-    setSavedIds(triageStorage.getSavedIds());
-    setArchivedIds(triageStorage.getArchivedIds());
-  };
+    fetchJobs();
+  }, [fetchJobs]);
 
   // Filter jobs based on active tab and search query
   const displayedJobs = useMemo(() => {
@@ -225,6 +233,164 @@ function JobsExplorerContent() {
 
     return list;
   }, [jobs, activeTab, savedIds, archivedIds, deletedIds, filters.searchQuery]);
+
+  // Compute total pages based on current displayed list
+  const totalPages = Math.max(1, Math.ceil(displayedJobs.length / PAGE_SIZE));
+
+  // Auto-adjust page if deletions reduced the number of available pages
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [totalPages, currentPage]);
+
+  // Slice continuous page items from the active list
+  const paginatedJobs = useMemo(() => {
+    const startIndex = (currentPage - 1) * PAGE_SIZE;
+    return displayedJobs.slice(startIndex, startIndex + PAGE_SIZE);
+  }, [displayedJobs, currentPage]);
+
+  // Handle page navigation
+  const handlePageChange = (newPage: number) => {
+    if (newPage < 1 || newPage > totalPages) return;
+    setCurrentPage(newPage);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  // Reset filters handler
+  const handleResetFilters = () => {
+    setFilters({ ...DEFAULT_FILTERS });
+  };
+
+  // Triage Action Handlers
+  const handleToggleSave = (jobId: string) => {
+    triageStorage.toggleSave(jobId);
+    setSavedIds(triageStorage.getSavedIds());
+    setArchivedIds(triageStorage.getArchivedIds());
+  };
+
+  const handleArchive = (jobId: string) => {
+    triageStorage.archive(jobId);
+    setArchivedIds(triageStorage.getArchivedIds());
+    setSavedIds(triageStorage.getSavedIds());
+  };
+
+  const handleUnarchive = (jobId: string) => {
+    triageStorage.unarchive(jobId);
+    setArchivedIds(triageStorage.getArchivedIds());
+  };
+
+  // Prompt Delete Confirmation Modal (single or batch)
+  const handleDeleteRequest = (jobId: string) => {
+    setDeleteModalState({
+      isOpen: true,
+      jobIds: [jobId],
+      isDeleting: false,
+    });
+  };
+
+  const handleBatchDeleteRequest = () => {
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) return;
+    setDeleteModalState({
+      isOpen: true,
+      jobIds: ids,
+      isDeleting: false,
+    });
+  };
+
+  const handleConfirmDelete = async () => {
+    const idsToDelete = deleteModalState.jobIds;
+    if (idsToDelete.length === 0) return;
+
+    setDeleteModalState((prev) => ({ ...prev, isDeleting: true }));
+
+    try {
+      // 1. Permanently delete from database
+      await api.deleteUnifiedJobs(idsToDelete);
+
+      // 2. Remove from local state
+      setJobs((prev) => prev.filter((j) => !idsToDelete.includes(j.id)));
+
+      // 3. Clear from local storage
+      triageStorage.deleteMany(idsToDelete);
+      setDeletedIds(triageStorage.getDeletedIds());
+      setSavedIds(triageStorage.getSavedIds());
+      setArchivedIds(triageStorage.getArchivedIds());
+
+      // 4. Exit select mode & close modal
+      handleCancelSelectMode();
+      setDeleteModalState({ isOpen: false, jobIds: [], isDeleting: false });
+    } catch (err: any) {
+      setError(err?.message || 'Failed to delete job(s) from database.');
+      setDeleteModalState((prev) => ({ ...prev, isDeleting: false }));
+    }
+  };
+
+  const handleCancelDelete = () => {
+    if (deleteModalState.isDeleting) return;
+    setDeleteModalState({ isOpen: false, jobIds: [], isDeleting: false });
+  };
+
+  // Multi-Selection Handlers
+  const handleStartSelectMode = (initialJobId?: string) => {
+    setIsSelectMode(true);
+    if (initialJobId) {
+      setSelectedIds(new Set([initialJobId]));
+    }
+  };
+
+  const handleToggleSelectJob = (jobId: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(jobId)) {
+        next.delete(jobId);
+        if (next.size === 0) {
+          setIsSelectMode(false);
+        }
+      } else {
+        next.add(jobId);
+      }
+      return next;
+    });
+  };
+
+  const handleSelectAll = () => {
+    if (selectedIds.size === paginatedJobs.length && paginatedJobs.length > 0) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(paginatedJobs.map((j) => j.id)));
+    }
+  };
+
+  const handleCancelSelectMode = () => {
+    setIsSelectMode(false);
+    setSelectedIds(new Set());
+  };
+
+  const handleBatchSave = () => {
+    const ids = Array.from(selectedIds);
+    triageStorage.saveMany(ids);
+    setSavedIds(triageStorage.getSavedIds());
+    setArchivedIds(triageStorage.getArchivedIds());
+    handleCancelSelectMode();
+  };
+
+  const handleBatchArchiveOrRegister = () => {
+    const ids = Array.from(selectedIds);
+    if (activeTab === 'archived') {
+      triageStorage.unarchiveMany(ids);
+    } else {
+      triageStorage.archiveMany(ids);
+    }
+    setArchivedIds(triageStorage.getArchivedIds());
+    setSavedIds(triageStorage.getSavedIds());
+    handleCancelSelectMode();
+  };
+
+  const handleBatchDelete = () => {
+    handleBatchDeleteRequest();
+  };
 
   // Counts for each tab badge
   const tabCounts = useMemo(() => {
@@ -264,22 +430,44 @@ function JobsExplorerContent() {
         />
 
       {/* Triage Folder Tabs: Active / Saved / Archived */}
-      <div className="flex items-center justify-between gap-3 flex-wrap border-b border-[#262626] pb-3">
-        <div className="flex items-center gap-1.5 bg-[#181818] p-1 rounded-xl border border-[#262626]">
+      <div className="flex items-center justify-between gap-3 border-b border-[#262626] pb-3">
+        <div
+          ref={tabContainerRef}
+          className="relative inline-flex items-center gap-1 rounded-full border border-[#2a2a2a] bg-[#181818]/95 backdrop-blur-xl p-1 shadow-lg select-none overflow-hidden"
+        >
+          {/* Animated Sliding Pill */}
+          <div
+            className={cn(
+              "absolute top-1 bottom-1 left-0 rounded-full transition-all duration-300 ease-[cubic-bezier(0.2,0.8,0.2,1)] pointer-events-none shadow-sm border",
+              activeTab === 'archived'
+                ? "bg-amber-400/15 border-amber-400/30"
+                : "bg-[#3ecf8e]/15 border-[#3ecf8e]/30"
+            )}
+            style={{
+              transform: `translateX(${tabPillStyle.left}px)`,
+              width: `${tabPillStyle.width}px`,
+              opacity: tabPillStyle.opacity,
+            }}
+          />
+
           {/* Active Tab */}
           <button
             type="button"
+            ref={(el) => {
+              tabRefs.current['active'] = el;
+            }}
             onClick={() => setActiveTab('active')}
+            aria-label={`Active roles (${tabCounts.active})`}
+            title={`Active roles (${tabCounts.active})`}
             className={cn(
-              'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-sans transition-all',
+              'relative z-10 flex items-center justify-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-sans transition-colors duration-200',
               activeTab === 'active'
-                ? 'bg-[#222222] text-white font-medium shadow-sm'
+                ? 'text-[#3ecf8e] font-medium'
                 : 'text-[#9ca3af] hover:text-white'
             )}
           >
             <Suitcase className="w-3.5 h-3.5 text-[#3ecf8e]" />
-            <span>Active Roles</span>
-            <span className="font-mono text-[11px] px-1.5 py-0.2 rounded-full bg-[#111] text-[#9ca3af]">
+            <span className="inline-flex items-center justify-center font-mono text-[11px] px-1.5 py-0.5 rounded-full bg-[#111] text-[#9ca3af] leading-none">
               {tabCounts.active}
             </span>
           </button>
@@ -287,17 +475,21 @@ function JobsExplorerContent() {
           {/* Saved Tab */}
           <button
             type="button"
+            ref={(el) => {
+              tabRefs.current['saved'] = el;
+            }}
             onClick={() => setActiveTab('saved')}
+            aria-label={`Saved roles (${tabCounts.saved})`}
+            title={`Saved roles (${tabCounts.saved})`}
             className={cn(
-              'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-sans transition-all',
+              'relative z-10 flex items-center justify-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-sans transition-colors duration-200',
               activeTab === 'saved'
-                ? 'bg-[#222222] text-[#3ecf8e] font-medium shadow-sm'
+                ? 'text-[#3ecf8e] font-medium'
                 : 'text-[#9ca3af] hover:text-white'
             )}
           >
             <Bookmark className="w-3.5 h-3.5 text-[#3ecf8e]" />
-            <span>Saved</span>
-            <span className="font-mono text-[11px] px-1.5 py-0.2 rounded-full bg-[#111] text-[#3ecf8e]">
+            <span className="inline-flex items-center justify-center font-mono text-[11px] px-1.5 py-0.5 rounded-full bg-[#111] text-[#3ecf8e] leading-none">
               {tabCounts.saved}
             </span>
           </button>
@@ -305,51 +497,31 @@ function JobsExplorerContent() {
           {/* Archived Tab */}
           <button
             type="button"
+            ref={(el) => {
+              tabRefs.current['archived'] = el;
+            }}
             onClick={() => setActiveTab('archived')}
+            aria-label={`Archived roles (${tabCounts.archived})`}
+            title={`Archived roles (${tabCounts.archived})`}
             className={cn(
-              'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-sans transition-all',
+              'relative z-10 flex items-center justify-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-sans transition-colors duration-200',
               activeTab === 'archived'
-                ? 'bg-[#222222] text-amber-400 font-medium shadow-sm'
+                ? 'text-amber-400 font-medium'
                 : 'text-[#9ca3af] hover:text-white'
             )}
           >
             <Archive className="w-3.5 h-3.5 text-amber-400" />
-            <span>Archived</span>
-            <span className="font-mono text-[11px] px-1.5 py-0.2 rounded-full bg-[#111] text-amber-400">
+            <span className="inline-flex items-center justify-center font-mono text-[11px] px-1.5 py-0.5 rounded-full bg-[#111] text-amber-400 leading-none">
               {tabCounts.archived}
             </span>
           </button>
         </div>
 
-        {/* Counter and Page Controls */}
-        <div className="flex items-center gap-3 text-xs font-sans text-[#9ca3af]">
+        {/* Counter */}
+        <div className="flex items-center gap-3 text-xs font-sans text-[#9ca3af] shrink-0">
           <span>
             Showing <strong className="font-mono text-white">{displayedJobs.length}</strong> roles
           </span>
-
-          <div className="flex items-center gap-1 border-l border-[#262626] pl-3">
-            <button
-              type="button"
-              onClick={() => handlePageChange(currentPage - 1)}
-              disabled={currentPage === 1 || isLoading}
-              aria-label="Previous Page"
-              className="p-1.5 rounded bg-[#181818] border border-[#262626] hover:border-[#383838] disabled:opacity-30 disabled:cursor-not-allowed text-white transition-colors"
-            >
-              <NavArrowLeft className="w-3.5 h-3.5" />
-            </button>
-            <span className="font-mono px-2 text-white">
-              Page {currentPage}
-            </span>
-            <button
-              type="button"
-              onClick={() => handlePageChange(currentPage + 1)}
-              disabled={jobs.length < PAGE_SIZE || isLoading}
-              aria-label="Next Page"
-              className="p-1.5 rounded bg-[#181818] border border-[#262626] hover:border-[#383838] disabled:opacity-30 disabled:cursor-not-allowed text-white transition-colors"
-            >
-              <NavArrowRight className="w-3.5 h-3.5" />
-            </button>
-          </div>
         </div>
       </div>
 
@@ -362,7 +534,7 @@ function JobsExplorerContent() {
             <p className="text-rose-400/90 mt-0.5 leading-relaxed font-mono">{error}</p>
             <button
               type="button"
-              onClick={() => fetchJobs(currentPage)}
+              onClick={() => fetchJobs(true)}
               className="mt-2.5 px-3 py-1 rounded bg-rose-500/20 hover:bg-rose-500/30 border border-rose-500/30 text-rose-300 font-medium transition-colors"
             >
               Retry Request
@@ -388,8 +560,8 @@ function JobsExplorerContent() {
 
       {/* Empty State */}
       {!isLoading && !error && displayedJobs.length === 0 && (
-        <div className="rounded-xl bg-[#181818] border border-[#262626] p-8 md:p-12 text-center space-y-4 max-w-lg mx-auto">
-          <div className="w-12 h-12 rounded-xl bg-[#202020] border border-[#262626] flex items-center justify-center mx-auto text-[#9ca3af]">
+        <div className="-mx-4 sm:mx-0 border-y sm:border sm:rounded-lg bg-[#181818] border-[#262626] p-8 md:p-12 text-center space-y-4 max-w-lg mx-auto">
+          <div className="w-10 h-10 rounded-lg bg-[#202020] border border-[#262626] flex items-center justify-center mx-auto text-[#9ca3af]">
             {activeTab === 'saved' ? (
               <Bookmark className="w-6 h-6 text-[#3ecf8e]" />
             ) : activeTab === 'archived' ? (
@@ -439,41 +611,160 @@ function JobsExplorerContent() {
         </div>
       )}
 
-      {/* Concise Table List View */}
-      {!isLoading && displayedJobs.length > 0 && (
-        <div className="rounded-xl border border-[#262626] bg-[#131313] overflow-hidden shadow-sm">
-          {/* Table Header Row (Desktop) */}
-          <div className="hidden sm:flex items-center justify-between px-4 py-2.5 bg-[#181818] border-b border-[#262626] text-[11px] font-sans text-[#9ca3af]">
-            <div className="flex items-center gap-6 flex-1">
-              <span className="w-4"></span>
-              <span>Role Title & Employer</span>
-            </div>
-            <div className="flex items-center gap-8 text-right">
-              <span>Annual Pay</span>
-              <span>Experience</span>
-              <span className="w-16">Source</span>
-              <span className="w-20 text-center">Actions</span>
-            </div>
-          </div>
+      {/* Sticky Multi-Selection Action Bar at the Top */}
+      {isSelectMode && (
+        <div className="sticky top-2 z-30 animate-in fade-in slide-in-from-top-2 duration-200">
+          <div className="bg-[#181818]/95 backdrop-blur-md border border-[#333] shadow-xl rounded-lg px-3 sm:px-4 py-2 flex items-center justify-between gap-3 text-xs font-sans text-white">
+            {/* Left: Count & Select All */}
+            <div className="flex items-center gap-2.5 sm:gap-3">
+              <div className="flex items-center gap-1.5 font-mono">
+                <span className="px-2 py-0.5 rounded-full bg-[#3ecf8e]/20 text-[#3ecf8e] border border-[#3ecf8e]/30 font-semibold text-[11px]">
+                  {selectedIds.size}
+                </span>
+                <span className="text-[#9ca3af] hidden sm:inline text-xs font-sans">selected</span>
+              </div>
 
-          {/* Job Rows */}
-          <div>
-            {displayedJobs.map((job) => (
-              <CompactJobRow
-                key={job.id}
-                job={job}
-                isSaved={savedIds.has(job.id)}
-                isArchived={archivedIds.has(job.id)}
-                onToggleSave={handleToggleSave}
-                onArchive={handleArchive}
-                onUnarchive={handleUnarchive}
-                onDelete={handleDelete}
-                onViewFullModal={handleOpenModal}
-              />
-            ))}
+              <div className="h-3.5 w-px bg-[#333]" />
+
+              <button
+                type="button"
+                onClick={handleSelectAll}
+                className="text-[#9ca3af] hover:text-white transition-colors font-medium text-xs"
+              >
+                {selectedIds.size === displayedJobs.length && displayedJobs.length > 0
+                  ? 'Deselect All'
+                  : 'Select All'}
+              </button>
+            </div>
+
+            {/* Right: Actions (Save, Archive/Registered, Delete, Cancel) */}
+            <div className="flex items-center gap-1.5 sm:gap-2">
+              <button
+                type="button"
+                disabled={selectedIds.size === 0}
+                onClick={handleBatchSave}
+                className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg bg-[#222222] hover:bg-[#3ecf8e]/20 border border-[#333] hover:border-[#3ecf8e]/40 text-[#d1d5db] hover:text-[#3ecf8e] transition-all disabled:opacity-40 disabled:cursor-not-allowed font-medium text-xs"
+              >
+                <Bookmark className="w-3.5 h-3.5 text-[#3ecf8e]" />
+                <span className="hidden sm:inline">Save</span>
+              </button>
+
+              <button
+                type="button"
+                disabled={selectedIds.size === 0}
+                onClick={handleBatchArchiveOrRegister}
+                className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg bg-[#222222] hover:bg-amber-500/20 border border-[#333] hover:border-amber-500/40 text-[#d1d5db] hover:text-amber-400 transition-all disabled:opacity-40 disabled:cursor-not-allowed font-medium text-xs"
+              >
+                {activeTab === 'archived' ? (
+                  <>
+                    <Undo className="w-3.5 h-3.5 text-amber-400" />
+                    <span>Registered</span>
+                  </>
+                ) : (
+                  <>
+                    <Archive className="w-3.5 h-3.5 text-amber-400" />
+                    <span>Archive</span>
+                  </>
+                )}
+              </button>
+
+              <button
+                type="button"
+                disabled={selectedIds.size === 0}
+                onClick={handleBatchDelete}
+                className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 text-rose-300 transition-all disabled:opacity-40 disabled:cursor-not-allowed font-medium text-xs"
+              >
+                <Trash className="w-3.5 h-3.5 text-rose-400" />
+                <span className="hidden sm:inline">Delete</span>
+              </button>
+
+              <div className="h-3.5 w-px bg-[#333] mx-0.5" />
+
+              <button
+                type="button"
+                onClick={handleCancelSelectMode}
+                title="Cancel multi-selection"
+                className="p-1.5 rounded-lg hover:bg-[#282828] text-[#9ca3af] hover:text-white transition-colors"
+              >
+                <Xmark className="w-4 h-4" />
+              </button>
+            </div>
           </div>
         </div>
       )}
+
+      {/* Full-Width Unboxed Table List View Matching Overview Section */}
+      {!isLoading && paginatedJobs.length > 0 && (
+        <div className="-mx-4 sm:mx-0 border-y sm:border sm:rounded-lg border-[#262626] divide-y divide-[#262626] overflow-hidden">
+          {/* Job Rows */}
+          {paginatedJobs.map((job) => (
+            <CompactJobRow
+              key={job.id}
+              job={job}
+              isSaved={savedIds.has(job.id)}
+              isArchived={archivedIds.has(job.id)}
+              isExpanded={expandedJobId === job.id}
+              onToggleExpand={(id) =>
+                setExpandedJobId((prev) => (prev === id ? null : id))
+              }
+              isSelectMode={isSelectMode}
+              isSelected={selectedIds.has(job.id)}
+              onToggleSelect={handleToggleSelectJob}
+              onLongPress={handleStartSelectMode}
+              onToggleSave={handleToggleSave}
+              onArchive={handleArchive}
+              onUnarchive={handleUnarchive}
+              onDelete={handleDeleteRequest}
+              onViewFullModal={handleOpenModal}
+            />
+          ))}
+        </div>
+      )}
+
+      {/* Bottom Pagination Controls */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between gap-4 pt-4 border-t border-[#262626] text-xs font-sans text-[#9ca3af]">
+          <span>
+            Page <strong className="font-mono text-white">{currentPage}</strong> of{' '}
+            <strong className="font-mono text-white">{totalPages}</strong>
+          </span>
+
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={() => handlePageChange(currentPage - 1)}
+              disabled={currentPage === 1 || isLoading}
+              aria-label="Previous Page"
+              className="flex items-center gap-1 px-2.5 py-1.5 rounded bg-[#181818] border border-[#262626] hover:border-[#383838] disabled:opacity-30 disabled:cursor-not-allowed text-white transition-colors"
+            >
+              <NavArrowLeft className="w-3.5 h-3.5" />
+              <span>Previous</span>
+            </button>
+            <span className="font-mono px-2 text-white bg-[#181818] py-1 rounded border border-[#262626]">
+              {currentPage} / {totalPages}
+            </span>
+            <button
+              type="button"
+              onClick={() => handlePageChange(currentPage + 1)}
+              disabled={currentPage >= totalPages || isLoading}
+              aria-label="Next Page"
+              className="flex items-center gap-1 px-2.5 py-1.5 rounded bg-[#181818] border border-[#262626] hover:border-[#383838] disabled:opacity-30 disabled:cursor-not-allowed text-white transition-colors"
+            >
+              <span>Next</span>
+              <NavArrowRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      <DeleteConfirmModal
+        isOpen={deleteModalState.isOpen}
+        count={deleteModalState.jobIds.length}
+        isDeleting={deleteModalState.isDeleting}
+        onConfirm={handleConfirmDelete}
+        onCancel={handleCancelDelete}
+      />
 
       {/* Full Description Inspection Modal */}
       <JobDescriptionModal

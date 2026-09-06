@@ -2,7 +2,6 @@
 
 import React, { useState, useRef } from 'react';
 import {
-  NavArrowDown,
   NavArrowRight,
   OpenNewWindow,
   Bookmark,
@@ -24,6 +23,12 @@ interface CompactJobRowProps {
   job: UnifiedJobItem;
   isSaved: boolean;
   isArchived: boolean;
+  isExpanded?: boolean;
+  onToggleExpand?: (id: string) => void;
+  isSelectMode?: boolean;
+  isSelected?: boolean;
+  onToggleSelect?: (id: string) => void;
+  onLongPress?: (id: string) => void;
   onToggleSave: (id: string) => void;
   onArchive: (id: string) => void;
   onUnarchive?: (id: string) => void;
@@ -72,19 +77,57 @@ export function CompactJobRow({
   job,
   isSaved,
   isArchived,
+  isExpanded: controlledIsExpanded,
+  onToggleExpand,
+  isSelectMode = false,
+  isSelected = false,
+  onToggleSelect,
+  onLongPress,
   onToggleSave,
   onArchive,
   onUnarchive,
   onDelete,
   onViewFullModal,
 }: CompactJobRowProps) {
-  const [isExpanded, setIsExpanded] = useState<boolean>(false);
+  const [internalIsExpanded, setInternalIsExpanded] = useState<boolean>(false);
+  const isExpanded = controlledIsExpanded !== undefined ? controlledIsExpanded : internalIsExpanded;
+
+  const toggleExpansion = () => {
+    if (onToggleExpand) {
+      onToggleExpand(job.id);
+    } else {
+      setInternalIsExpanded((prev) => !prev);
+    }
+  };
   const [swipeOffset, setSwipeOffset] = useState<number>(0);
   const [isSwiping, setIsSwiping] = useState<boolean>(false);
 
   const touchStartX = useRef<number>(0);
   const touchStartY = useRef<number>(0);
   const isHorizontalSwipe = useRef<boolean | null>(null);
+  const longPressTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const isLongPressTriggeredRef = useRef<boolean>(false);
+
+  const clearLongPressTimer = () => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+  };
+
+  const startLongPress = () => {
+    isLongPressTriggeredRef.current = false;
+    clearLongPressTimer();
+    longPressTimerRef.current = setTimeout(() => {
+      isLongPressTriggeredRef.current = true;
+      if (typeof window !== 'undefined' && window.navigator && window.navigator.vibrate) {
+        window.navigator.vibrate(50);
+      }
+      if (onLongPress) {
+        onLongPress(job.id);
+      }
+    }, 500);
+  };
 
   const sourceMeta = SOURCE_CONFIG[job.source] || {
     label: job.source,
@@ -100,15 +143,23 @@ export function CompactJobRow({
 
   // Touch Handlers for mobile swipe gestures
   const handleTouchStart = (e: React.TouchEvent) => {
+    if (isSelectMode || isExpanded) return;
     touchStartX.current = e.touches[0].clientX;
     touchStartY.current = e.touches[0].clientY;
     isHorizontalSwipe.current = null;
     setIsSwiping(true);
+    startLongPress();
   };
 
   const handleTouchMove = (e: React.TouchEvent) => {
+    if (isSelectMode || isExpanded) return;
     const deltaX = e.touches[0].clientX - touchStartX.current;
     const deltaY = e.touches[0].clientY - touchStartY.current;
+
+    // If movement is detected, cancel long press
+    if (Math.abs(deltaX) > 10 || Math.abs(deltaY) > 10) {
+      clearLongPressTimer();
+    }
 
     // Detect if movement is primarily horizontal or vertical scroll
     if (isHorizontalSwipe.current === null) {
@@ -125,8 +176,21 @@ export function CompactJobRow({
   };
 
   const handleTouchEnd = () => {
+    clearLongPressTimer();
+    if (isSelectMode || isExpanded) {
+      setIsSwiping(false);
+      setSwipeOffset(0);
+      isHorizontalSwipe.current = null;
+      return;
+    }
     setIsSwiping(false);
     const threshold = 70;
+
+    if (isLongPressTriggeredRef.current) {
+      setSwipeOffset(0);
+      isHorizontalSwipe.current = null;
+      return;
+    }
 
     if (swipeOffset > threshold) {
       // Swiped Right -> Archive
@@ -145,13 +209,53 @@ export function CompactJobRow({
     isHorizontalSwipe.current = null;
   };
 
-  const handleRowClick = (e: React.MouseEvent) => {
-    // Avoid toggling expansion when clicking external links or buttons
+  // Mouse Pointer handlers for desktop click-and-hold
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (isSelectMode || isExpanded) return;
     const target = e.target as HTMLElement;
-    if (target.closest('button') || target.closest('a')) {
+    if (target.closest('button') || target.closest('a') || target.closest('input')) {
       return;
     }
-    setIsExpanded((prev) => !prev);
+    // Only primary mouse button
+    if (e.button === 0) {
+      startLongPress();
+    }
+  };
+
+  const handleMouseUp = () => {
+    if (isSelectMode) return;
+    clearLongPressTimer();
+  };
+
+  const handleMouseLeave = () => {
+    if (isSelectMode) return;
+    clearLongPressTimer();
+  };
+
+  const handleRowClick = (e: React.MouseEvent) => {
+    // If selection mode is active, directly toggle selection and don't do anything else
+    if (isSelectMode) {
+      e.preventDefault();
+      e.stopPropagation();
+      if (onToggleSelect) {
+        onToggleSelect(job.id);
+      }
+      return;
+    }
+
+    // Avoid toggling expansion when clicking external links or buttons
+    const target = e.target as HTMLElement;
+    if (target.closest('button') || target.closest('a') || target.closest('input')) {
+      return;
+    }
+
+    // If click was the release of a long press that just triggered, don't expand
+    if (isLongPressTriggeredRef.current) {
+      isLongPressTriggeredRef.current = false;
+      return;
+    }
+
+    toggleExpansion();
   };
 
   return (
@@ -183,6 +287,21 @@ export function CompactJobRow({
 
       {/* Main Row Content Surface */}
       <div
+        role="button"
+        tabIndex={0}
+        aria-expanded={isExpanded}
+        aria-label={`${isExpanded ? 'Collapse' : 'Expand'} details for ${job.title} at ${job.company_name}`}
+        onKeyDown={(e) => {
+          if (e.target !== e.currentTarget) return;
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            if (isSelectMode) {
+              if (onToggleSelect) onToggleSelect(job.id);
+            } else {
+              toggleExpansion();
+            }
+          }
+        }}
         style={{
           transform: `translateX(${swipeOffset}px)`,
           transition: isSwiping ? 'none' : 'transform 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
@@ -190,26 +309,54 @@ export function CompactJobRow({
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
+        onMouseDown={handleMouseDown}
+        onMouseUp={handleMouseUp}
+        onMouseLeave={handleMouseLeave}
         onClick={handleRowClick}
         className={cn(
-          'relative bg-[#131313] hover:bg-[#181818]/80 cursor-pointer transition-colors px-3 sm:px-4 py-3',
-          isExpanded && 'bg-[#181818]'
+          'relative bg-[#131313] hover:bg-[#181818]/80 cursor-pointer transition-colors px-3 sm:px-4 py-3 select-none outline-none focus:outline-none focus-visible:ring-1 focus-visible:ring-[#3ecf8e] focus-visible:ring-inset',
+          isExpanded && 'bg-[#181818]',
+          isSelected && 'bg-[#3ecf8e]/10 hover:bg-[#3ecf8e]/15 border-l-2 border-l-[#3ecf8e]'
         )}
       >
         <div className="flex items-center justify-between gap-3">
+          {/* Checkbox for Select Mode */}
+          {isSelectMode && (
+            <div className="flex items-center justify-center shrink-0 pr-1 pointer-events-none">
+              <div
+                className={cn(
+                  'w-4 h-4 rounded border flex items-center justify-center transition-all',
+                  isSelected
+                    ? 'bg-[#3ecf8e] border-[#3ecf8e] text-black'
+                    : 'border-[#444] bg-[#1a1a1a]'
+                )}
+              >
+                {isSelected && (
+                  <svg className="w-3 h-3 stroke-current stroke-[3] fill-none" viewBox="0 0 24 24">
+                    <polyline points="20 6 9 17 4 12" />
+                  </svg>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* Left Column: Expand indicator, Title & Company */}
           <div className="flex items-center gap-2.5 min-w-0 flex-1">
-            <button
-              type="button"
-              aria-label={isExpanded ? 'Collapse job details' : 'Expand job details'}
-              className="text-[#6b7280] group-hover:text-white transition-colors shrink-0"
-            >
-              {isExpanded ? (
-                <NavArrowDown className="w-4 h-4 text-[#3ecf8e]" />
-              ) : (
-                <NavArrowRight className="w-4 h-4" />
-              )}
-            </button>
+            {!isSelectMode && (
+              <span
+                aria-hidden="true"
+                className="shrink-0 flex items-center justify-center p-0.5 pointer-events-none select-none"
+              >
+                <NavArrowRight
+                  className={cn(
+                    'w-4 h-4 transition-transform duration-200 ease-out',
+                    isExpanded
+                      ? 'rotate-90 text-[#3ecf8e]'
+                      : 'text-[#6b7280] group-hover:text-white'
+                  )}
+                />
+              </span>
+            )}
 
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2 flex-wrap">
@@ -280,7 +427,7 @@ export function CompactJobRow({
                 }}
                 title={isSaved ? 'Remove from Saved' : 'Save Job'}
                 className={cn(
-                  'p-1.5 rounded-lg border transition-colors',
+                  'p-1.5 rounded-lg border transition-colors outline-none focus:outline-none focus-visible:ring-1 focus-visible:ring-[#3ecf8e]',
                   isSaved
                     ? 'bg-[#3ecf8e]/15 border-[#3ecf8e]/40 text-[#3ecf8e]'
                     : 'bg-transparent border-transparent text-[#6b7280] hover:text-white hover:border-[#383838]'
@@ -305,7 +452,7 @@ export function CompactJobRow({
                 }}
                 title={isArchived ? 'Restore to Active' : 'Archive Job'}
                 className={cn(
-                  'p-1.5 rounded-lg border transition-colors',
+                  'p-1.5 rounded-lg border transition-colors outline-none focus:outline-none focus-visible:ring-1 focus-visible:ring-[#3ecf8e]',
                   isArchived
                     ? 'bg-amber-500/15 border-amber-500/40 text-amber-400'
                     : 'bg-transparent border-transparent text-[#6b7280] hover:text-white hover:border-[#383838]'
@@ -325,7 +472,7 @@ export function CompactJobRow({
                   onDelete(job.id);
                 }}
                 title="Hide / Delete Job"
-                className="p-1.5 rounded-lg border border-transparent text-[#6b7280] hover:text-rose-400 hover:border-rose-500/30 transition-colors"
+                className="p-1.5 rounded-lg border border-transparent text-[#6b7280] hover:text-rose-400 hover:border-rose-500/30 transition-colors outline-none focus:outline-none focus-visible:ring-1 focus-visible:ring-rose-500"
               >
                 <Trash className="w-3.5 h-3.5" />
               </button>
@@ -335,116 +482,136 @@ export function CompactJobRow({
       </div>
 
       {/* Inline Dropdown Expansion Drawer */}
-      {isExpanded && (
-        <div className="bg-[#161616] border-t border-[#262626] px-4 sm:px-6 py-4 space-y-4 animate-in fade-in-50 duration-150">
-          {/* Tag Badges */}
-          <div className="flex items-center gap-2 flex-wrap text-[11px] font-sans">
-            {job.is_remote && (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-[#202020] border border-[#2e2e2e] text-[#d1d5db]">
-                <Globe className="w-3 h-3 text-[#3ecf8e]" />
-                <span>Remote setting</span>
-              </span>
+      <div
+        className={cn(
+          'grid transition-[grid-template-rows] duration-200 ease-out',
+          isExpanded ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'
+        )}
+      >
+        <div className="overflow-hidden">
+          <div
+            className={cn(
+              'bg-[#161616] border-t border-[#262626] px-4 sm:px-6 py-4 space-y-4 transition-opacity duration-200 ease-out select-text',
+              isExpanded ? 'opacity-100' : 'opacity-0'
             )}
+          >
+            {/* Tag Badges */}
+            <div className="flex items-center gap-2 flex-wrap text-[11px] font-sans">
+              {job.is_remote && (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-[#202020] border border-[#2e2e2e] text-[#d1d5db]">
+                  <Globe className="w-3 h-3 text-[#3ecf8e]" />
+                  <span>Remote setting</span>
+                </span>
+              )}
 
-            {job.easy_apply_available && (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-amber-500/10 border border-amber-500/20 text-amber-300">
-                <Flash className="w-3 h-3 text-amber-400" />
-                <span>Direct Easy Apply</span>
+              {job.easy_apply_available && (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-amber-500/10 border border-amber-500/20 text-amber-300">
+                  <Flash className="w-3 h-3 text-amber-400" />
+                  <span>Direct Easy Apply</span>
+                </span>
+              )}
+
+              <span className="px-2 py-0.5 rounded bg-[#202020] border border-[#2e2e2e] text-[#9ca3af]">
+                Source: <span className="text-white">{job.source}</span>
               </span>
-            )}
-
-            <span className="px-2 py-0.5 rounded bg-[#202020] border border-[#2e2e2e] text-[#9ca3af]">
-              Source: <span className="text-white">{job.source}</span>
-            </span>
-
-            <span className="px-2 py-0.5 rounded bg-[#202020] border border-[#2e2e2e] text-[#9ca3af]">
-              Method: <span className="font-mono text-white">{job.salary_extraction_method}</span>
-            </span>
-          </div>
-
-          {/* Job Description Excerpt */}
-          <div className="space-y-1.5">
-            <span className="text-xs font-semibold text-white">Job Description Overview</span>
-            <div className="text-xs text-[#9ca3af] leading-relaxed line-clamp-4 bg-[#111111] p-3 rounded-lg border border-[#222222]">
-              {job.description_text || 'No full description text was provided in the raw scrape record.'}
-            </div>
-          </div>
-
-          {/* Action Row & Provenance */}
-          <div className="flex items-center justify-between gap-3 pt-2 border-t border-[#262626] flex-wrap">
-            <div className="text-[11px] text-[#6b7280]">
-              Ref ID: <span className="font-mono text-[#9ca3af]">{job.external_id || job.id.slice(0, 8)}</span>
             </div>
 
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => onViewFullModal(job)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#202020] hover:bg-[#282828] border border-[#2c2c2c] text-xs font-sans text-white transition-colors"
-              >
-                <Eye className="w-3.5 h-3.5 text-[#3ecf8e]" />
-                <span>Inspect Full Text</span>
-              </button>
+            {/* Job Description Excerpt */}
+            <div className="space-y-1.5">
+              <span className="text-xs font-semibold text-white">Job Description Overview</span>
+              <div className="text-xs text-[#9ca3af] leading-relaxed line-clamp-4 bg-[#111111] p-3 rounded-lg border border-[#222222]">
+                {job.description_text || 'No full description text was provided in the raw scrape record.'}
+              </div>
+            </div>
 
-              <button
-                type="button"
-                onClick={() => onToggleSave(job.id)}
-                className={cn(
-                  'flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-sans transition-colors',
-                  isSaved
-                    ? 'bg-[#3ecf8e]/15 border-[#3ecf8e]/40 text-[#3ecf8e]'
-                    : 'bg-[#202020] border-[#2c2c2c] text-[#9ca3af] hover:text-white'
-                )}
+            {/* Action Row & Provenance */}
+            <div className="flex items-center justify-between gap-3 pt-2 border-t border-[#262626]">
+              <div
+                className="text-[11px] text-[#6b7280] min-w-0 flex-1 truncate"
+                title={`Ref ID: ${job.external_id || job.id}`}
               >
-                {isSaved ? (
-                  <>
-                    <BookmarkSolid className="w-3.5 h-3.5" />
-                    <span>Saved</span>
-                  </>
-                ) : (
-                  <>
-                    <Bookmark className="w-3.5 h-3.5" />
-                    <span>Save</span>
-                  </>
-                )}
-              </button>
+                Ref ID: <span className="font-mono text-[#9ca3af]">{job.external_id || job.id.slice(0, 8)}</span>
+              </div>
 
-              <button
-                type="button"
-                onClick={() => (isArchived && onUnarchive ? onUnarchive(job.id) : onArchive(job.id))}
-                className={cn(
-                  'flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-sans transition-colors',
-                  isArchived
-                    ? 'bg-amber-500/15 border-amber-500/40 text-amber-400'
-                    : 'bg-[#202020] border-[#2c2c2c] text-[#9ca3af] hover:text-white'
-                )}
-              >
-                <Archive className="w-3.5 h-3.5" />
-                <span>{isArchived ? 'Restore' : 'Archive'}</span>
-              </button>
+              <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+                {/* 1. Inspect Full Text (Sky Blue) */}
+                <button
+                  type="button"
+                  onClick={() => onViewFullModal(job)}
+                  title="Inspect Full Text"
+                  aria-label="Inspect Full Text"
+                  className="w-10 h-10 rounded-lg bg-sky-500/10 hover:bg-sky-500/20 border border-sky-500/25 hover:border-sky-500/40 flex items-center justify-center text-sky-400 transition-colors shrink-0 outline-none focus:outline-none focus-visible:ring-1 focus-visible:ring-sky-400"
+                >
+                  <Eye className="w-4 h-4" />
+                </button>
 
-              <button
-                type="button"
-                onClick={() => onDelete(job.id)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#202020] hover:bg-rose-500/10 border border-[#2c2c2c] hover:border-rose-500/30 text-xs font-sans text-[#9ca3af] hover:text-rose-400 transition-colors"
-              >
-                <Trash className="w-3.5 h-3.5" />
-                <span>Hide</span>
-              </button>
+                {/* 2. Save / Unsave (Mint Emerald) */}
+                <button
+                  type="button"
+                  onClick={() => onToggleSave(job.id)}
+                  title={isSaved ? 'Remove from Saved' : 'Save Job'}
+                  aria-label={isSaved ? 'Remove from Saved' : 'Save Job'}
+                  className={cn(
+                    'w-10 h-10 rounded-lg border flex items-center justify-center transition-colors shrink-0 outline-none focus:outline-none focus-visible:ring-1 focus-visible:ring-[#3ecf8e]',
+                    isSaved
+                      ? 'bg-[#3ecf8e]/25 border-[#3ecf8e]/50 text-[#3ecf8e]'
+                      : 'bg-[#3ecf8e]/10 hover:bg-[#3ecf8e]/20 border-[#3ecf8e]/25 hover:border-[#3ecf8e]/40 text-[#3ecf8e]'
+                  )}
+                >
+                  {isSaved ? (
+                    <BookmarkSolid className="w-4 h-4" />
+                  ) : (
+                    <Bookmark className="w-4 h-4" />
+                  )}
+                </button>
 
-              <a
-                href={job.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-[#3ecf8e] hover:bg-[#3ecf8e]/90 text-xs font-sans font-semibold text-[#131313] transition-all shrink-0"
-              >
-                <span>Apply</span>
-                <OpenNewWindow className="w-3.5 h-3.5" />
-              </a>
+                {/* 3. Archive / Restore (Amber Orange) */}
+                <button
+                  type="button"
+                  onClick={() => (isArchived && onUnarchive ? onUnarchive(job.id) : onArchive(job.id))}
+                  title={isArchived ? 'Restore to Active' : 'Archive Job'}
+                  aria-label={isArchived ? 'Restore to Active' : 'Archive Job'}
+                  className={cn(
+                    'w-10 h-10 rounded-lg border flex items-center justify-center transition-colors shrink-0 outline-none focus:outline-none focus-visible:ring-1 focus-visible:ring-amber-500',
+                    isArchived
+                      ? 'bg-amber-500/25 border-amber-500/50 text-amber-300'
+                      : 'bg-amber-500/10 hover:bg-amber-500/20 border-amber-500/25 hover:border-amber-500/40 text-amber-400'
+                  )}
+                >
+                  {isArchived ? (
+                    <Undo className="w-4 h-4" />
+                  ) : (
+                    <Archive className="w-4 h-4" />
+                  )}
+                </button>
+
+                {/* 4. Hide / Delete (Rose Red) */}
+                <button
+                  type="button"
+                  onClick={() => onDelete(job.id)}
+                  title="Hide / Delete Job"
+                  aria-label="Hide / Delete Job"
+                  className="w-10 h-10 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/25 hover:border-rose-500/40 flex items-center justify-center text-rose-400 hover:text-rose-300 transition-colors shrink-0 outline-none focus:outline-none focus-visible:ring-1 focus-visible:ring-rose-500"
+                >
+                  <Trash className="w-4 h-4" />
+                </button>
+
+                {/* 5. Apply (Solid Mint Emerald) */}
+                <a
+                  href={job.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  title="Apply / Open Application Link"
+                  aria-label="Apply / Open Application Link"
+                  className="w-10 h-10 rounded-lg bg-[#3ecf8e] hover:bg-[#3ecf8e]/90 flex items-center justify-center text-[#131313] transition-all shrink-0 outline-none focus:outline-none focus-visible:ring-1 focus-visible:ring-[#3ecf8e]"
+                >
+                  <OpenNewWindow className="w-4 h-4" />
+                </a>
+              </div>
             </div>
           </div>
         </div>
-      )}
+      </div>
     </div>
   );
 }

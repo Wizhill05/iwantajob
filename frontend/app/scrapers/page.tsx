@@ -132,7 +132,7 @@ function ScrapersContent() {
       {/* Results Section */}
       <div className="space-y-4 pt-2">
         {/* Results Header Bar */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-xl bg-[#181818] border border-[#262626]">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 -mx-4 sm:mx-0 border-y sm:border sm:rounded-lg bg-[#181818] border-[#262626]">
           <div className="flex items-center gap-3">
             <h2 className="text-sm font-semibold font-heading text-white">
               Extraction Output
@@ -159,12 +159,12 @@ function ScrapersContent() {
           </div>
 
           {/* View Mode Switcher */}
-          <div className="flex items-center gap-1.5 p-1 rounded-lg bg-[#131313] border border-[#262626]">
+          <div className="flex items-center gap-1.5 p-1 rounded-md bg-[#131313] border border-[#262626]">
             <button
               type="button"
               onClick={() => setViewMode('cards')}
               className={cn(
-                'flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-sans transition-all',
+                'flex items-center gap-1.5 px-3 py-1 rounded text-xs font-sans transition-all',
                 viewMode === 'cards'
                   ? 'bg-[#202020] text-white border border-[#262626] shadow-sm'
                   : 'text-[#9ca3af] hover:text-white'
@@ -181,7 +181,7 @@ function ScrapersContent() {
               type="button"
               onClick={() => setViewMode('json')}
               className={cn(
-                'flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-sans transition-all',
+                'flex items-center gap-1.5 px-3 py-1 rounded text-xs font-sans transition-all',
                 viewMode === 'json'
                   ? 'bg-[#202020] text-white border border-[#262626] shadow-sm'
                   : 'text-[#9ca3af] hover:text-white'
@@ -195,7 +195,7 @@ function ScrapersContent() {
 
         {/* Error Notification */}
         {errorMessage && (
-          <div className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/30 text-xs font-sans text-rose-300 flex items-start gap-3">
+          <div className="p-4 -mx-4 sm:mx-0 border-y sm:border sm:rounded-lg bg-rose-500/10 border-rose-500/30 text-xs font-sans text-rose-300 flex items-start gap-3">
             <WarningTriangle className="w-4 h-4 text-rose-400 flex-shrink-0 mt-0.5" />
             <div>
               <div className="font-semibold text-rose-200">Scrape Error Occurred</div>
@@ -207,31 +207,33 @@ function ScrapersContent() {
         {/* Loading Skeletons */}
         {isLoading && (
           <div className="space-y-3">
-            <div className="p-4 rounded-xl bg-[#181818] border border-[#262626] text-center font-sans text-xs text-[#9ca3af] flex items-center justify-center gap-2">
+            <div className="p-4 -mx-4 sm:mx-0 border-y sm:border sm:rounded-lg bg-[#181818] border border-[#262626] text-center font-sans text-xs text-[#9ca3af] flex items-center justify-center gap-2">
               <RefreshDouble className="w-4 h-4 text-[#3ecf8e] animate-spin" />
               <span>Querying upstream gateway and processing responses...</span>
             </div>
-            {[1, 2, 3].map((n) => (
-              <div
-                key={n}
-                className="rounded-xl bg-[#181818] border border-[#262626] p-5 animate-pulse space-y-3"
-              >
-                <div className="flex items-center justify-between">
-                  <div className="h-4 w-48 bg-[#262626] rounded" />
-                  <div className="h-4 w-16 bg-[#262626] rounded" />
+            <div className="-mx-4 sm:mx-0 border-y sm:border sm:rounded-lg border-[#262626] divide-y divide-[#262626]">
+              {[1, 2, 3].map((n) => (
+                <div
+                  key={n}
+                  className="bg-[#181818] p-4 animate-pulse space-y-3"
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="h-4 w-48 bg-[#262626] rounded" />
+                    <div className="h-4 w-16 bg-[#262626] rounded" />
+                  </div>
+                  <div className="h-3 w-32 bg-[#262626] rounded" />
+                  <div className="h-3 w-full bg-[#262626] rounded" />
                 </div>
-                <div className="h-3 w-32 bg-[#262626] rounded" />
-                <div className="h-3 w-full bg-[#262626] rounded" />
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
         )}
 
         {/* Empty State */}
         {!isLoading && executionState.items.length === 0 && !errorMessage && (
-          <div className="p-10 rounded-xl bg-[#181818] border border-[#262626] text-center space-y-3">
-            <div className="w-12 h-12 rounded-xl bg-[#202020] border border-[#262626] flex items-center justify-center mx-auto text-[#3ecf8e]">
-              <Cpu className="w-6 h-6" />
+          <div className="p-8 -mx-4 sm:mx-0 border-y sm:border sm:rounded-lg bg-[#181818] border-[#262626] text-center space-y-3">
+            <div className="w-10 h-10 rounded-lg bg-[#202020] border border-[#262626] flex items-center justify-center mx-auto text-[#3ecf8e]">
+              <Cpu className="w-5 h-5" />
             </div>
             <h3 className="text-sm font-semibold font-heading text-white">
               No Scraper Run Yet
@@ -246,7 +248,7 @@ function ScrapersContent() {
         {!isLoading && executionState.items.length > 0 && (
           <div>
             {viewMode === 'cards' ? (
-              <div className="space-y-3">
+              <div className="-mx-4 sm:mx-0 border-y sm:border sm:rounded-lg border-[#262626] divide-y divide-[#262626] overflow-hidden">
                 {executionState.items.map((job, idx) => (
                   <ScrapedJobCard key={`${job.external_id}-${idx}`} job={job} index={idx} />
                 ))}

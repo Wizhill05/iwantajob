@@ -107,7 +107,7 @@ export function JobsFilterBar({
             value={filters.searchQuery || ''}
             onChange={(e) => updateField('searchQuery', e.target.value)}
             placeholder="Search role, skills, or company..."
-            className="w-full pl-9 pr-3 py-2 text-xs font-sans rounded-xl bg-[#181818] border border-[#262626] text-white placeholder-[#6b7280] focus:outline-none focus:border-[#3ecf8e] transition-colors"
+            className="w-full pl-9 pr-3 py-2 text-xs font-sans rounded-lg bg-[#181818] border border-[#262626] text-white placeholder-[#6b7280] focus:outline-none focus:border-[#3ecf8e] transition-colors"
           />
           {filters.searchQuery && (
             <button
@@ -125,7 +125,7 @@ export function JobsFilterBar({
           type="button"
           onClick={() => setIsOpen((prev) => !prev)}
           className={cn(
-            'flex items-center gap-1.5 px-3 py-2 rounded-xl border text-xs font-sans font-medium transition-all shrink-0',
+            'flex items-center gap-1.5 px-3 py-2 rounded-lg border text-xs font-sans font-medium transition-all shrink-0',
             isOpen
               ? 'bg-[#3ecf8e]/15 border-[#3ecf8e]/40 text-[#3ecf8e]'
               : activeCount > 0
@@ -165,7 +165,7 @@ export function JobsFilterBar({
 
       {/* Expandable Filters Section */}
       {isOpen && (
-        <div className="bg-[#181818] border border-[#262626] rounded-xl p-4 sm:p-5 space-y-4 animate-in fade-in-50 slide-in-from-top-2 duration-150">
+        <div className="bg-[#181818] -mx-4 sm:mx-0 border-y sm:border border-[#262626] sm:rounded-lg p-3.5 sm:p-4 space-y-4 animate-in fade-in-50 slide-in-from-top-2 duration-150">
           {/* Header Row in Expanded Section */}
           <div className="flex items-center justify-between pb-3 border-b border-[#262626]">
             <div className="flex items-center gap-2">

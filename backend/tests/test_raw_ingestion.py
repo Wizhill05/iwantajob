@@ -39,6 +39,21 @@ async def test_save_raw_indeed():
         assert job.easy_apply_available is True
         assert job.company_name == "TestCorp"
 
+    # Test fallback when company_name is None
+    data_none_company = dict(data)
+    data_none_company["external_id"] = "test_jk_none_company"
+    data_none_company["company_name"] = None
+    data_none_company["title"] = None
+    await save_raw_indeed_job(data_none_company)
+    async with async_session_maker() as session:
+        res = await session.execute(
+            select(RawIndeedJob).where(RawIndeedJob.external_id == "test_jk_none_company")
+        )
+        job = res.scalar_one_or_none()
+        assert job is not None
+        assert job.company_name == "Unknown"
+        assert job.title == "Unknown"
+
 @pytest.mark.asyncio
 async def test_save_raw_linkedin():
     await init_db()

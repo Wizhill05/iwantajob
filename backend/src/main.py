@@ -1,20 +1,26 @@
 import logging
 from pathlib import Path
 from typing import Annotated
-from fastapi import FastAPI, Query, status
+from fastapi import FastAPI, Query, status, Body
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse
-from sqlalchemy import select, and_
+from sqlalchemy import select, and_, delete, text
 
 from src.core.database import init_db, async_session_maker
-from src.models.db_entities import UnifiedJob
+from src.models.db_entities import (
+    UnifiedJob,
+    RawIndeedJob,
+    RawLinkedInJob,
+    RawWellfoundJob,
+)
 from src.services.parser_service import ParserService
 from src.services.raw_ingestion import (
     save_raw_indeed_job,
     save_raw_linkedin_job,
     save_raw_wellfound_job,
 )
+from src.services.db_deduplication import check_jobs_exist_in_db
 
 from src.clients.indeed import (
     IndeedClient,
@@ -286,7 +292,8 @@ async def scrape_indeed(
                 jk = job_d.get("key") or t_key
                 if not jk:
                     continue
-                emp = job_d.get("employer") or {}
+                emp = job_d.get("employer")
+                emp_name = (emp.get("name") if isinstance(emp, dict) else None) or "Unknown"
                 loc_d = job_d.get("location") or {}
                 loc_short = (loc_d.get("formatted") or {}).get("short") or clean_where
                 city_val = loc_d.get("city")
@@ -301,8 +308,8 @@ async def scrape_indeed(
                 await save_raw_indeed_job({
                     "external_id": jk,
                     "tracking_key": t_key,
-                    "title": job_d.get("title", ""),
-                    "company_name": emp.get("name", "Unknown"),
+                    "title": job_d.get("title") or "Unknown",
+                    "company_name": emp_name,
                     "location_raw": loc_short,
                     "location_city": city_val,
                     "location_country": ctry_val,
@@ -316,6 +323,15 @@ async def scrape_indeed(
                     "date_published": None,
                     "raw_payload": res_item,
                 })
+
+        # Check in DB to mark is_in_db on returned items
+        descriptors = [
+            {"source": "indeed", "external_id": it.external_id, "url": it.url}
+            for it in items
+        ]
+        found_in_db = await check_jobs_exist_in_db(descriptors)
+        for it in items:
+            it.is_in_db = ("indeed", it.external_id) in found_in_db
 
         return JobSearchResponse(
             query=clean_what,
@@ -479,7 +495,6 @@ async def scrape_wellfound(
                     "posted_at": j.posted_at,
                     "raw_payload": {"external_id": j.external_id, "title": j.title},
                 })
-            return jobs
         else:
             jobs = await wellfound_client.search_jobs(
                 role=role,
@@ -489,7 +504,16 @@ async def scrape_wellfound(
                 max_age_days=max_age_days,
                 include_all_company_jobs=include_all_company_jobs,
             )
-            return jobs
+
+        # Check DB status for all jobs returned
+        descriptors = [
+            {"source": "wellfound", "external_id": j.external_id, "url": j.url}
+            for j in jobs
+        ]
+        found_in_db = await check_jobs_exist_in_db(descriptors)
+        for j in jobs:
+            j.is_in_db = ("wellfound", j.external_id) in found_in_db
+        return jobs
     except Exception as exc:
         logger.error(f"Error executing Wellfound scrape: {exc}", exc_info=True)
         return JSONResponse(
@@ -662,6 +686,15 @@ async def scrape_linkedin(
                     "posted_at": j.posted_at,
                     "raw_payload": {"external_id": j.external_id, "title": j.title, "url": j.url},
                 })
+
+        # Check DB status for all jobs returned
+        descriptors = [
+            {"source": "linkedin", "external_id": j.external_id, "url": j.url}
+            for j in jobs
+        ]
+        found_in_db = await check_jobs_exist_in_db(descriptors)
+        for j in jobs:
+            j.is_in_db = ("linkedin", j.external_id) in found_in_db
         return jobs
     except Exception as exc:
         logger.error(f"Error executing LinkedIn scrape: {exc}", exc_info=True)
@@ -689,39 +722,36 @@ async def get_parsing_status():
 
 @app.post(
     "/api/parse/indeed",
-    summary="Manually Trigger Parsing for Indeed Raw Jobs",
+    summary="Trigger Gemini LLM Parsing for Indeed Raw Jobs",
     tags=["Indeed"],
 )
 async def parse_indeed(
     batch_size: Annotated[int, Query(ge=1, le=500, description="Max raw jobs to parse in this run")] = 50,
-    use_llm: Annotated[bool, Query(description="Whether to use LLM fallback for experience/salary")] = False,
 ):
-    """Parses unparsed raw Indeed records into clean unified_jobs records."""
-    return await ParserService.parse_indeed_jobs(batch_size=batch_size, use_llm=use_llm)
+    """Parses unparsed raw Indeed records into clean unified_jobs records using Gemini LLM."""
+    return await ParserService.parse_indeed_jobs(batch_size=batch_size)
 
 @app.post(
     "/api/parse/linkedin",
-    summary="Manually Trigger Parsing for LinkedIn Raw Jobs",
+    summary="Trigger Gemini LLM Parsing for LinkedIn Raw Jobs",
     tags=["LinkedIn"],
 )
 async def parse_linkedin(
     batch_size: Annotated[int, Query(ge=1, le=500, description="Max raw jobs to parse in this run")] = 50,
-    use_llm: Annotated[bool, Query(description="Whether to use LLM fallback for experience/salary")] = False,
 ):
-    """Parses unparsed raw LinkedIn records into clean unified_jobs records."""
-    return await ParserService.parse_linkedin_jobs(batch_size=batch_size, use_llm=use_llm)
+    """Parses unparsed raw LinkedIn records into clean unified_jobs records using Gemini LLM."""
+    return await ParserService.parse_linkedin_jobs(batch_size=batch_size)
 
 @app.post(
     "/api/parse/wellfound",
-    summary="Manually Trigger Parsing for Wellfound Raw Jobs",
+    summary="Trigger Gemini LLM Parsing for Wellfound Raw Jobs",
     tags=["Wellfound"],
 )
 async def parse_wellfound(
     batch_size: Annotated[int, Query(ge=1, le=500, description="Max raw jobs to parse in this run")] = 50,
-    use_llm: Annotated[bool, Query(description="Whether to use LLM fallback for experience/salary")] = False,
 ):
-    """Parses unparsed raw Wellfound records into clean unified_jobs records."""
-    return await ParserService.parse_wellfound_jobs(batch_size=batch_size, use_llm=use_llm)
+    """Parses unparsed raw Wellfound records into clean unified_jobs records using Gemini LLM."""
+    return await ParserService.parse_wellfound_jobs(batch_size=batch_size)
 
 @app.get(
     "/api/jobs/unified",
@@ -780,14 +810,61 @@ async def get_unified_jobs(
                 "salary_max_inr_year": j.salary_max_inr_year,
                 "salary_raw": j.salary_raw,
                 "salary_currency_raw": j.salary_currency_raw,
-                "salary_extraction_method": j.salary_extraction_method,
                 "experience_min_years": j.experience_min_years,
                 "experience_max_years": j.experience_max_years,
                 "is_fresher_friendly": j.is_fresher_friendly,
-                "experience_extraction_method": j.experience_extraction_method,
                 "description_text": j.description_text,
                 "posted_at": j.posted_at,
                 "parsed_at": j.parsed_at,
             }
             for j in jobs
         ]
+
+@app.delete(
+    "/api/jobs/unified",
+    summary="Delete jobs permanently from unified_jobs",
+    tags=["System"],
+)
+async def delete_unified_jobs(
+    job_ids: list[str] = Body(..., embed=True, description="List of UnifiedJob UUID strings to delete")
+):
+    """
+    Permanently delete rows from unified_jobs by their IDs.
+    """
+    if not job_ids:
+        return {"deleted_count": 0}
+
+    import uuid
+    parsed_uuids = []
+    for jid in job_ids:
+        try:
+            parsed_uuids.append(uuid.UUID(jid))
+        except ValueError:
+            continue
+
+    if not parsed_uuids:
+        return {"deleted_count": 0}
+
+    async with async_session_maker() as session:
+        stmt = delete(UnifiedJob).where(UnifiedJob.id.in_(parsed_uuids))
+        res = await session.execute(stmt)
+        await session.commit()
+        return {"deleted_count": res.rowcount}
+
+@app.post(
+    "/api/db/reset",
+    summary="Reset and wipe the database entirely from scratch",
+    tags=["System"],
+)
+async def reset_database():
+    """
+    Completely truncate all raw staging tables and unified_jobs.
+    """
+    async with async_session_maker() as session:
+        await session.execute(delete(UnifiedJob))
+        await session.execute(delete(RawIndeedJob))
+        await session.execute(delete(RawLinkedInJob))
+        await session.execute(delete(RawWellfoundJob))
+        await session.commit()
+        return {"status": "success", "message": "All raw and unified job tables have been reset to 0."}
+

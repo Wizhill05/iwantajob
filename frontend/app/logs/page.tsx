@@ -85,7 +85,9 @@ export default function SystemLogsPage() {
             Bronze Raw / Silver Unified
           </span>
         </div>
-        <DbStatsTable key={refreshKey} autoRefreshInterval={autoPollInterval} />
+        <div className="-mx-4 sm:mx-0">
+          <DbStatsTable key={refreshKey} autoRefreshInterval={autoPollInterval} />
+        </div>
       </section>
 
       {/* Section 2: Active Background Tasks */}
@@ -101,7 +103,9 @@ export default function SystemLogsPage() {
             Concurrent Scrapers &amp; Parsers
           </span>
         </div>
-        <ActiveProcessesList />
+        <div className="-mx-4 sm:mx-0">
+          <ActiveProcessesList />
+        </div>
       </section>
 
       {/* Section 3: Live Monospace Terminal View */}
@@ -117,7 +121,9 @@ export default function SystemLogsPage() {
             Streaming Output &amp; Structured Diagnostics
           </span>
         </div>
-        <LogsTerminalView />
+        <div className="-mx-4 sm:mx-0">
+          <LogsTerminalView />
+        </div>
       </section>
       </div>
     </div>

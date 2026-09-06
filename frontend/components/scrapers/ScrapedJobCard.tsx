@@ -50,7 +50,7 @@ export function ScrapedJobCard({ job, index }: ScrapedJobCardProps) {
     : 'J';
 
   return (
-    <div className="rounded-xl bg-[#181818] border border-[#262626] hover:border-[#383838] transition-all p-4 md:p-5 shadow-sm space-y-3.5">
+    <div className="bg-[#181818] hover:bg-[#1c1c1c] transition-all p-3.5 sm:p-4 shadow-none space-y-3">
       {/* Top Header Row */}
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-start gap-3 min-w-0">
@@ -60,30 +60,35 @@ export function ScrapedJobCard({ job, index }: ScrapedJobCardProps) {
               src={job.company_logo_url}
               alt={job.company_name}
               onError={() => setLogoError(true)}
-              className="w-10 h-10 rounded-lg object-contain bg-[#202020] border border-[#262626] p-1 flex-shrink-0"
+              className="w-9 h-9 rounded-md object-contain bg-[#202020] border border-[#262626] p-1 flex-shrink-0"
             />
           ) : (
-            <div className="w-10 h-10 rounded-lg bg-[#202020] border border-[#262626] flex items-center justify-center flex-shrink-0 text-sm font-sans font-semibold text-[#3ecf8e]">
-              {initialLetter || <Building className="w-5 h-5 text-[#9ca3af]" />}
+            <div className="w-9 h-9 rounded-md bg-[#202020] border border-[#262626] flex items-center justify-center flex-shrink-0 text-sm font-sans font-semibold text-[#3ecf8e]">
+              {initialLetter || <Building className="w-4 h-4 text-[#9ca3af]" />}
             </div>
           )}
 
           {/* Title & Company */}
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2 flex-wrap">
-              <h4 className="text-sm md:text-base font-semibold text-white font-heading truncate leading-snug">
+              <h4 className="text-xs sm:text-sm font-semibold text-white font-heading truncate leading-snug">
                 {job.title}
               </h4>
               <span
                 className={cn(
-                  'px-2 py-0.5 text-[10px] font-sans font-medium rounded-full border',
+                  'px-1.5 py-0.2 text-[9px] font-sans font-medium rounded border',
                   sourceConfig.badgeClass
                 )}
               >
                 {sourceConfig.label}
               </span>
+              {job.is_in_db && (
+                <span className="px-1.5 py-0.2 text-[9px] font-sans font-medium rounded border bg-blue-500/10 border-blue-500/30 text-blue-400">
+                  In DB
+                </span>
+              )}
             </div>
-            <p className="text-xs text-[#9ca3af] font-medium truncate mt-0.5 font-sans">
+            <p className="text-[11px] text-[#9ca3af] font-medium truncate mt-0.5 font-sans">
               {job.company_name || 'Confidential Employer'}
             </p>
           </div>
@@ -94,7 +99,7 @@ export function ScrapedJobCard({ job, index }: ScrapedJobCardProps) {
           href={job.url}
           target="_blank"
           rel="noopener noreferrer"
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#202020] hover:bg-[#262626] border border-[#262626] hover:border-[#383838] text-xs font-sans font-medium text-[#3ecf8e] transition-all flex-shrink-0"
+          className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-[#202020] hover:bg-[#262626] border border-[#262626] hover:border-[#383838] text-xs font-sans font-medium text-[#3ecf8e] transition-all flex-shrink-0"
         >
           <span>Apply</span>
           <OpenNewWindow className="w-3.5 h-3.5" />

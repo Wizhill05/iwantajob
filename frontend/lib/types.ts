@@ -26,6 +26,7 @@ export interface JobItem {
   company_logo_url?: string | null;
   company_website?: string | null;
   easy_apply_available?: boolean;
+  is_in_db?: boolean;
   attributes?: Array<{ key?: string; label?: string }> | Record<string, any>[];
   raw_payload?: Record<string, any>;
 }
@@ -58,11 +59,9 @@ export interface UnifiedJobItem {
   salary_max_inr_year?: number | null;
   salary_raw?: string | null;
   salary_currency_raw?: string | null;
-  salary_extraction_method: 'native' | 'regex' | 'llm' | 'none';
   experience_min_years?: number | null;
   experience_max_years?: number | null;
   is_fresher_friendly: boolean;
-  experience_extraction_method: 'native' | 'regex' | 'llm' | 'none';
   description_text: string;
   posted_at?: string | null;
   parsed_at: string;

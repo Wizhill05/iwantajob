@@ -42,28 +42,6 @@ const SOURCE_CONFIG = {
   },
 };
 
-const EXTRACTION_METHOD_CONFIG: Record<
-  string,
-  { label: string; badgeClass: string }
-> = {
-  native: {
-    label: 'native',
-    badgeClass: 'text-[#3ecf8e] bg-[#3ecf8e]/10 border-[#3ecf8e]/25',
-  },
-  regex: {
-    label: 'regex',
-    badgeClass: 'text-cyan-400 bg-cyan-500/10 border-cyan-500/25',
-  },
-  llm: {
-    label: 'llm',
-    badgeClass: 'text-purple-400 bg-purple-500/10 border-purple-500/25',
-  },
-  none: {
-    label: 'none',
-    badgeClass: 'text-[#6b7280] bg-[#262626] border-[#383838]',
-  },
-};
-
 export function JobDescriptionModal({
   job,
   isOpen,
@@ -102,14 +80,6 @@ export function JobDescriptionModal({
     label: job.source,
     badgeClass: 'text-gray-400 bg-gray-500/10 border-gray-500/25',
   };
-
-  const salaryMethodConfig =
-    EXTRACTION_METHOD_CONFIG[job.salary_extraction_method] ||
-    EXTRACTION_METHOD_CONFIG.none;
-
-  const expMethodConfig =
-    EXTRACTION_METHOD_CONFIG[job.experience_extraction_method] ||
-    EXTRACTION_METHOD_CONFIG.none;
 
   const salaryFormatted = formatSalaryLPA(
     job.salary_min_inr_year,
@@ -157,11 +127,11 @@ export function JobDescriptionModal({
                 src={job.company_logo_url}
                 alt={job.company_name}
                 onError={() => setLogoError(true)}
-                className="w-12 h-12 rounded-xl object-contain bg-[#202020] border border-[#262626] p-1 flex-shrink-0"
+                className="w-10 h-10 rounded-lg object-contain bg-[#202020] border border-[#262626] p-1 flex-shrink-0"
               />
             ) : (
-              <div className="w-12 h-12 rounded-xl bg-[#202020] border border-[#262626] flex items-center justify-center flex-shrink-0 text-base font-sans font-bold text-[#3ecf8e]">
-                {initialLetter || <Building className="w-6 h-6 text-[#9ca3af]" />}
+              <div className="w-10 h-10 rounded-lg bg-[#202020] border border-[#262626] flex items-center justify-center flex-shrink-0 text-base font-sans font-bold text-[#3ecf8e]">
+                {initialLetter || <Building className="w-5 h-5 text-[#9ca3af]" />}
               </div>
             )}
 
@@ -231,19 +201,14 @@ export function JobDescriptionModal({
           {/* Key Normalized Metrics Grid */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {/* Compensation Box */}
-            <div className="p-3 rounded-xl bg-[#141414] border border-[#262626] space-y-2">
+            <div className="p-3 rounded-lg bg-[#141414] border border-[#262626] space-y-2">
               <div className="flex items-center justify-between text-xs font-sans text-[#9ca3af]">
                 <div className="flex items-center gap-1.5">
                   <Coins className="w-4 h-4 text-[#3ecf8e]" />
                   <span>Annual Compensation</span>
                 </div>
-                <span
-                  className={cn(
-                    'px-1.5 py-0.2 rounded text-[10px] font-sans font-medium border',
-                    salaryMethodConfig.badgeClass
-                  )}
-                >
-                  {salaryMethodConfig.label}
+                <span className="px-1.5 py-0.2 rounded text-[10px] font-sans font-medium border text-purple-400 bg-purple-500/10 border-purple-500/25">
+                  Gemini LLM
                 </span>
               </div>
               <div className="text-base font-mono font-bold text-white">
@@ -257,19 +222,14 @@ export function JobDescriptionModal({
             </div>
 
             {/* Experience Box */}
-            <div className="p-3 rounded-xl bg-[#141414] border border-[#262626] space-y-2">
+            <div className="p-3 rounded-lg bg-[#141414] border border-[#262626] space-y-2">
               <div className="flex items-center justify-between text-xs font-sans text-[#9ca3af]">
                 <div className="flex items-center gap-1.5">
                   <GraduationCap className="w-4 h-4 text-[#3ecf8e]" />
                   <span>Experience Required</span>
                 </div>
-                <span
-                  className={cn(
-                    'px-1.5 py-0.2 rounded text-[10px] font-sans font-medium border',
-                    expMethodConfig.badgeClass
-                  )}
-                >
-                  {expMethodConfig.label}
+                <span className="px-1.5 py-0.2 rounded text-[10px] font-sans font-medium border text-purple-400 bg-purple-500/10 border-purple-500/25">
+                  Gemini LLM
                 </span>
               </div>
               <div className="text-base font-sans font-bold text-[#3ecf8e]">
@@ -288,7 +248,7 @@ export function JobDescriptionModal({
           </div>
 
           {/* Staging & Provenance Metadata Accordion / Card */}
-          <div className="rounded-xl bg-[#141414] border border-[#262626] p-4 space-y-3 font-sans text-xs">
+          <div className="rounded-lg bg-[#141414] border border-[#262626] p-4 space-y-3 font-sans text-xs">
             <div className="flex items-center justify-between border-b border-[#262626] pb-2 text-[11px] text-[#9ca3af]">
               <div className="flex items-center gap-1.5 text-[#3ecf8e] font-semibold">
                 <Database className="w-3.5 h-3.5" />
@@ -368,7 +328,7 @@ export function JobDescriptionModal({
               </button>
             </div>
 
-            <div className="rounded-xl bg-[#141414] border border-[#262626] p-4 md:p-5 max-h-[380px] overflow-y-auto">
+            <div className="rounded-lg bg-[#141414] border border-[#262626] p-4 md:p-5 max-h-[380px] overflow-y-auto">
               <div className="whitespace-pre-wrap font-sans text-xs md:text-sm text-[#d1d5db] leading-relaxed select-text">
                 {job.description_text || (
                   <span className="italic text-[#6b7280]">

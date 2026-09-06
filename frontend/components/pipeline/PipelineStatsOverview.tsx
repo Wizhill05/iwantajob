@@ -1,17 +1,14 @@
 'use client';
 
 import React from 'react';
-import { Card, Metric, Text, ProgressBar, Badge } from '@tremor/react';
+import Link from 'next/link';
+import { Card } from '@tremor/react';
 import {
   Database,
   CheckCircle,
-  RefreshDouble,
-  GraduationCap,
-  Cpu,
-  Spark,
-  Coins,
-  ShieldCheck,
-  Code,
+  Clock,
+  Suitcase,
+  NavArrowRight,
 } from 'iconoir-react';
 import type { ParsingStatus, UnifiedJobItem } from '@/lib/types';
 import { cn } from '@/lib/utils';
@@ -32,55 +29,18 @@ export function PipelineStatsOverview({
   const wellfoundRaw = status?.wellfound?.total_raw || 0;
   const totalRaw = indeedRaw + linkedinRaw + wellfoundRaw;
   const totalClean = status?.unified_total || 0;
-
-  const promotionYield = totalRaw > 0 ? Math.min(100, (totalClean / totalRaw) * 100) : 0;
   const unparsedBacklog = Math.max(0, totalRaw - totalClean);
-
-  // Compute stats from available sample of unified jobs
-  const sampleCount = unifiedJobs.length;
-  const fresherCount = unifiedJobs.filter((j) => j.is_fresher_friendly).length;
-  const fresherPct = sampleCount > 0 ? Math.round((fresherCount / sampleCount) * 100) : 0;
-
-  // Extraction methods breakdown
-  const salaryMethods = {
-    native: unifiedJobs.filter((j) => j.salary_extraction_method === 'native').length,
-    regex: unifiedJobs.filter((j) => j.salary_extraction_method === 'regex').length,
-    llm: unifiedJobs.filter((j) => j.salary_extraction_method === 'llm').length,
-    none: unifiedJobs.filter((j) => j.salary_extraction_method === 'none').length,
-  };
-
-  const experienceMethods = {
-    native: unifiedJobs.filter((j) => j.experience_extraction_method === 'native').length,
-    regex: unifiedJobs.filter((j) => j.experience_extraction_method === 'regex').length,
-    llm: unifiedJobs.filter((j) => j.experience_extraction_method === 'llm').length,
-    none: unifiedJobs.filter((j) => j.experience_extraction_method === 'none').length,
-  };
-
-  const deterministicCount =
-    salaryMethods.native +
-    salaryMethods.regex +
-    experienceMethods.native +
-    experienceMethods.regex;
-  const totalExtractionOps = (sampleCount * 2) || 1;
-  const deterministicYieldPct = Math.min(
-    100,
-    Math.round((deterministicCount / totalExtractionOps) * 100)
-  );
 
   if (isLoading && !status) {
     return (
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {[1, 2, 3, 4].map((i) => (
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        {[1, 2, 3].map((i) => (
           <div
             key={i}
-            className="h-36 rounded-xl bg-[#181818] border border-[#262626] p-5 animate-pulse flex flex-col justify-between"
+            className="h-20 rounded-xl bg-[#181818] border border-[#262626] p-4 animate-pulse flex flex-col justify-between"
           >
-            <div className="flex items-center justify-between">
-              <div className="h-3 w-28 bg-[#262626] rounded"></div>
-              <div className="h-5 w-5 bg-[#262626] rounded"></div>
-            </div>
-            <div className="h-7 w-20 bg-[#262626] rounded"></div>
-            <div className="h-2 w-full bg-[#262626] rounded"></div>
+            <div className="h-3 w-24 bg-[#262626] rounded"></div>
+            <div className="h-6 w-16 bg-[#262626] rounded"></div>
           </div>
         ))}
       </div>
@@ -88,149 +48,100 @@ export function PipelineStatsOverview({
   }
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-      {/* 1. Raw vs Clean Records */}
-      <Card className="bg-[#181818] border-[#262626] rounded-xl p-5 shadow-sm hover:border-[#383838] transition-all flex flex-col justify-between">
-        <div>
-          <div className="flex items-center justify-between text-xs font-sans text-[#9ca3af]">
-            <span>Staging vs Clean</span>
-            <Database className="w-4 h-4 text-[#9ca3af]" />
-          </div>
-          <div className="mt-2 flex items-baseline gap-2">
-            <Metric className="text-2xl font-mono font-semibold text-white">
-              {totalRaw.toLocaleString()}
-            </Metric>
-            <span className="text-xs font-sans text-[#9ca3af]">raw</span>
-            <span className="text-xs text-[#6b7280]">/</span>
-            <Metric className="text-2xl font-mono font-semibold text-[#3ecf8e]">
-              {totalClean.toLocaleString()}
-            </Metric>
-            <span className="text-xs font-sans text-[#3ecf8e]">clean</span>
-          </div>
+    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+      {/* 1. Total Staging Raw */}
+      <Card className="bg-[#181818] border-[#262626] rounded-xl p-3.5 sm:p-4 shadow-sm hover:border-[#383838] transition-all flex flex-col justify-between">
+        <div className="flex items-center justify-between text-xs font-sans text-[#9ca3af]">
+          <span>Raw Staged Jobs</span>
+          <Database className="w-4 h-4 text-amber-400/80" />
         </div>
-
-        <div className="mt-4 pt-3 border-t border-[#262626] space-y-1.5 text-[11px] font-sans">
-          <div className="flex items-center justify-between text-[#9ca3af]">
-            <span>Indeed GraphQL:</span>
-            <span className="text-white font-mono">{indeedRaw}</span>
-          </div>
-          <div className="flex items-center justify-between text-[#9ca3af]">
-            <span>LinkedIn Guest:</span>
-            <span className="text-white font-mono">{linkedinRaw}</span>
-          </div>
-          <div className="flex items-center justify-between text-[#9ca3af]">
-            <span>Wellfound SSR:</span>
-            <span className="text-white font-mono">{wellfoundRaw}</span>
-          </div>
+        <div className="mt-1.5 flex items-baseline justify-between">
+          <span className="text-2xl font-mono font-bold text-white">
+            {totalRaw.toLocaleString()}
+          </span>
+          <span className="text-[11px] font-mono text-[#6b7280]">
+            3 scrapers
+          </span>
+        </div>
+        <div className="mt-2 pt-2 border-t border-[#262626] flex items-center justify-between text-[10px] font-mono text-[#9ca3af]">
+          <span>Ind: <strong className="text-white">{indeedRaw}</strong></span>
+          <span>•</span>
+          <span>In: <strong className="text-white">{linkedinRaw}</strong></span>
+          <span>•</span>
+          <span>Wf: <strong className="text-white">{wellfoundRaw}</strong></span>
         </div>
       </Card>
 
-      {/* 2. Overall Promotion Yield */}
-      <Card className="bg-[#181818] border-[#262626] rounded-xl p-5 shadow-sm hover:border-[#383838] transition-all flex flex-col justify-between">
-        <div>
-          <div className="flex items-center justify-between text-xs font-sans text-[#9ca3af]">
-            <span>Promotion Yield</span>
-            <RefreshDouble className="w-4 h-4 text-[#3ecf8e]" />
-          </div>
-          <div className="mt-2 flex items-baseline justify-between">
-            <Metric className="text-2xl font-mono font-semibold text-[#3ecf8e]">
-              {promotionYield.toFixed(1)}%
-            </Metric>
-            <span className="text-xs font-mono text-[#9ca3af]">
-              {totalClean} of {totalRaw}
-            </span>
-          </div>
-          <div className="mt-2.5">
-            <ProgressBar
-              value={promotionYield}
-              color="emerald"
-              className="h-1.5 [&>div]:bg-[#262626] [&>div>div]:bg-[#3ecf8e]"
-            />
-          </div>
+      {/* 2. Unified Clean */}
+      <Card className="bg-[#181818] border-[#262626] rounded-xl p-3.5 sm:p-4 shadow-sm hover:border-[#383838] transition-all flex flex-col justify-between">
+        <div className="flex items-center justify-between text-xs font-sans text-[#9ca3af]">
+          <span>Clean Unified DB</span>
+          <CheckCircle className="w-4 h-4 text-[#3ecf8e]" />
         </div>
+        <div className="mt-1.5 flex items-baseline justify-between">
+          <span className="text-2xl font-mono font-bold text-[#3ecf8e]">
+            {totalClean.toLocaleString()}
+          </span>
+          <Link
+            href="/jobs"
+            className="text-[11px] font-sans text-[#3ecf8e] hover:underline flex items-center gap-0.5"
+          >
+            <span>View Jobs</span>
+            <NavArrowRight className="w-3 h-3" />
+          </Link>
+        </div>
+        <div className="mt-2 pt-2 border-t border-[#262626] flex items-center justify-between text-[10px] font-sans text-[#9ca3af]">
+          <span>Standardized & deduplicated</span>
+          <span className="font-mono text-white">
+            {totalRaw > 0 ? `${Math.round((totalClean / totalRaw) * 100)}%` : '0%'} parsed
+          </span>
+        </div>
+      </Card>
 
-        <div className="mt-4 pt-3 border-t border-[#262626] flex items-center justify-between text-[11px] font-sans">
-          <span className="text-[#9ca3af]">Remaining backlog:</span>
+      {/* 3. Pending Backlog */}
+      <Card
+        className={cn(
+          'border rounded-xl p-3.5 sm:p-4 shadow-sm transition-all flex flex-col justify-between',
+          unparsedBacklog > 0
+            ? 'bg-amber-500/5 border-amber-500/20'
+            : 'bg-[#181818] border-[#262626]'
+        )}
+      >
+        <div className="flex items-center justify-between text-xs font-sans text-[#9ca3af]">
+          <span>Pending Backlog</span>
+          <Clock
+            className={cn(
+              'w-4 h-4',
+              unparsedBacklog > 0 ? 'text-amber-400' : 'text-[#3ecf8e]'
+            )}
+          />
+        </div>
+        <div className="mt-1.5 flex items-baseline justify-between">
           <span
             className={cn(
-              'px-1.5 py-0.2 rounded border text-[10px] font-sans',
+              'text-2xl font-mono font-bold',
+              unparsedBacklog > 0 ? 'text-amber-400' : 'text-[#3ecf8e]'
+            )}
+          >
+            {unparsedBacklog.toLocaleString()}
+          </span>
+          <span
+            className={cn(
+              'text-[11px] font-sans px-2 py-0.5 rounded border',
               unparsedBacklog > 0
-                ? 'bg-amber-500/10 text-amber-400 border-amber-500/20'
+                ? 'bg-amber-500/10 text-amber-300 border-amber-500/30'
                 : 'bg-[#3ecf8e]/10 text-[#3ecf8e] border-[#3ecf8e]/20'
             )}
           >
-            <span className="font-mono">{unparsedBacklog}</span> unparsed
+            {unparsedBacklog > 0 ? 'Needs Parsing' : 'All Up to Date'}
           </span>
         </div>
-      </Card>
-
-      {/* 3. Fresher Conversion & Detection */}
-      <Card className="bg-[#181818] border-[#262626] rounded-xl p-5 shadow-sm hover:border-[#383838] transition-all flex flex-col justify-between">
-        <div>
-          <div className="flex items-center justify-between text-xs font-sans text-[#9ca3af]">
-            <span>Fresher Detection</span>
-            <GraduationCap className="w-4 h-4 text-[#3ecf8e]" />
-          </div>
-          <div className="mt-2 flex items-baseline justify-between">
-            <Metric className="text-2xl font-mono font-semibold text-white">
-              {sampleCount > 0 ? `${fresherPct}%` : 'N/A'}
-            </Metric>
-            <span className="text-xs font-sans text-[#3ecf8e]">
-              <span className="font-mono">{fresherCount}</span> roles
-            </span>
-          </div>
-          <div className="mt-2.5">
-            <ProgressBar
-              value={fresherPct}
-              color="emerald"
-              className="h-1.5 [&>div]:bg-[#262626] [&>div>div]:bg-[#3ecf8e]"
-            />
-          </div>
-        </div>
-
-        <div className="mt-4 pt-3 border-t border-[#262626] flex items-center justify-between text-[11px] font-sans text-[#9ca3af]">
-          <span>Criteria:</span>
-          <span className="text-white text-[10px] px-1.5 py-0.5 rounded bg-[#202020] border border-[#262626]">
-            &le; 1 yr / Interns
-          </span>
-        </div>
-      </Card>
-
-      {/* 4. Normalization Method Distribution */}
-      <Card className="bg-[#181818] border-[#262626] rounded-xl p-5 shadow-sm hover:border-[#383838] transition-all flex flex-col justify-between">
-        <div>
-          <div className="flex items-center justify-between text-xs font-sans text-[#9ca3af]">
-            <span>Method Distribution</span>
-            <Cpu className="w-4 h-4 text-purple-400" />
-          </div>
-          <div className="mt-2 flex items-baseline justify-between">
-            <Metric className="text-2xl font-mono font-semibold text-white">
-              {sampleCount > 0 ? `${deterministicYieldPct}%` : '100%'}
-            </Metric>
-            <span className="text-xs font-sans text-[#3ecf8e]">Deterministic</span>
-          </div>
-          <div className="mt-2.5">
-            <ProgressBar
-              value={deterministicYieldPct}
-              color="emerald"
-              className="h-1.5 [&>div]:bg-[#262626] [&>div>div]:bg-[#3ecf8e]"
-            />
-          </div>
-        </div>
-
-        <div className="mt-4 pt-3 border-t border-[#262626] grid grid-cols-3 gap-1 text-center text-[10px] font-sans">
-          <div className="p-1 rounded bg-[#141414] border border-[#262626]">
-            <span className="text-[#9ca3af] block">Native</span>
-            <span className="text-white font-semibold font-mono">{salaryMethods.native + experienceMethods.native}</span>
-          </div>
-          <div className="p-1 rounded bg-[#141414] border border-[#262626]">
-            <span className="text-[#9ca3af] block">Regex</span>
-            <span className="text-[#3ecf8e] font-semibold font-mono">{salaryMethods.regex + experienceMethods.regex}</span>
-          </div>
-          <div className="p-1 rounded bg-[#141414] border border-[#262626]">
-            <span className="text-purple-400 block">LLM</span>
-            <span className="text-purple-300 font-semibold font-mono">{salaryMethods.llm + experienceMethods.llm}</span>
-          </div>
+        <div className="mt-2 pt-2 border-t border-[#262626] flex items-center justify-between text-[10px] font-mono text-[#9ca3af]">
+          <span>Ind: {status?.indeed?.unparsed || 0}</span>
+          <span>•</span>
+          <span>Wf: {status?.wellfound?.unparsed || 0}</span>
+          <span>•</span>
+          <span>In: {status?.linkedin?.unparsed || 0}</span>
         </div>
       </Card>
     </div>

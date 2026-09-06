@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useState, useRef } from 'react';
+import { createPortal } from 'react-dom';
 
 interface PageHeroProps {
   title?: string;
@@ -20,7 +21,12 @@ function seededRandom(seed: number) {
 
 export function PageHero({ title = 'iwantajob' }: PageHeroProps) {
   const [scrollProgress, setScrollProgress] = useState(0);
+  const [mounted, setMounted] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // Scroll effect tracking
   useEffect(() => {
@@ -39,8 +45,9 @@ export function PageHero({ title = 'iwantajob' }: PageHeroProps) {
     };
   }, []);
 
-  // Generate randomized green noise dots with gradient density (dense at 0%, 0 at 15% of viewport)
+  // Generate randomized green noise dots with gradient density across 100% full viewport width
   useEffect(() => {
+    if (!mounted) return;
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
@@ -52,7 +59,7 @@ export function PageHero({ title = 'iwantajob' }: PageHeroProps) {
       const width = window.innerWidth;
       const height = window.innerHeight;
 
-      // Set internal canvas resolution to match display
+      // Set internal canvas resolution to match display exactly
       canvas.width = width;
       canvas.height = height;
 
@@ -100,7 +107,7 @@ export function PageHero({ title = 'iwantajob' }: PageHeroProps) {
       window.removeEventListener('resize', handleResize);
       cancelAnimationFrame(animationFrameId);
     };
-  }, []);
+  }, [mounted]);
 
   // Opacity smoothly drops from 1 to 0
   const opacity = Math.max(0, 1 - scrollProgress * 1.25);
@@ -109,29 +116,41 @@ export function PageHero({ title = 'iwantajob' }: PageHeroProps) {
   const translateY = (-scrollProgress * 20).toFixed(1);
 
   return (
-    <div
-      className="sticky top-0 z-0 w-full h-[28vh] min-h-[190px] max-h-[250px] overflow-hidden flex flex-col items-center justify-center text-center pointer-events-none select-none transition-transform"
-      style={{
-        opacity,
-        filter: `blur(${blurAmount}px)`,
-        transform: `translate3d(0, ${translateY}px, 0)`,
-        willChange: 'opacity, filter, transform',
-      }}
-    >
-      {/* Green Noise Dots Canvas (Top gradient down to 15%) */}
-      <canvas
-        ref={canvasRef}
-        className="fixed inset-0 pointer-events-none z-0"
-        aria-hidden="true"
-      />
+    <>
+      {/* Full-width canvas mounted directly to document body to spread dots 100% edge-to-edge */}
+      {mounted &&
+        createPortal(
+          <canvas
+            ref={canvasRef}
+            className="fixed inset-0 pointer-events-none z-0"
+            style={{
+              opacity,
+              filter: `blur(${blurAmount}px)`,
+              willChange: 'opacity, filter',
+            }}
+            aria-hidden="true"
+          />,
+          document.body
+        )}
 
-      {/* Centered Dynamic Heading */}
-      <div className="relative z-10 px-4">
-        <h1 className="text-3xl sm:text-4xl md:text-5xl font-black font-heading tracking-tight bg-gradient-to-r from-white via-[#3ecf8e] to-[#e5e7eb] bg-clip-text text-transparent animate-shimmer">
-          {title}
-        </h1>
+      {/* Hero container covering ~30% viewport height with dynamic shimmer heading */}
+      <div
+        className="sticky top-0 z-0 w-full h-[28vh] min-h-[190px] max-h-[250px] overflow-hidden flex flex-col items-center justify-center text-center pointer-events-none select-none transition-transform"
+        style={{
+          opacity,
+          filter: `blur(${blurAmount}px)`,
+          transform: `translate3d(0, ${translateY}px, 0)`,
+          willChange: 'opacity, filter, transform',
+        }}
+      >
+        {/* Centered Dynamic Heading */}
+        <div className="relative z-10 px-4">
+          <h1 className="text-3xl sm:text-4xl md:text-5xl font-black font-heading tracking-tight bg-gradient-to-r from-white via-[#3ecf8e] to-[#e5e7eb] bg-clip-text text-transparent animate-shimmer">
+            {title}
+          </h1>
+        </div>
       </div>
-    </div>
+    </>
   );
 }
 

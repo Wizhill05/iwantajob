@@ -180,21 +180,17 @@ class ApiClient {
   }
 
   /**
-   * Trigger manual normalization and parsing for a specific provider.
+   * Trigger Gemini LLM normalization and parsing for a specific provider.
    */
   async triggerParse(
     source: 'indeed' | 'linkedin' | 'wellfound',
     options: {
       batchSize?: number;
-      useLlm?: boolean;
     } = {}
   ): Promise<ParseResult> {
     const searchParams = new URLSearchParams();
     if (options.batchSize !== undefined) {
       searchParams.set('batch_size', String(options.batchSize));
-    }
-    if (options.useLlm !== undefined) {
-      searchParams.set('use_llm', String(options.useLlm));
     }
 
     const qs = searchParams.toString();
@@ -228,6 +224,25 @@ class ApiClient {
 
     const qs = searchParams.toString();
     return this.request<UnifiedJobItem[]>(`/api/jobs/unified${qs ? `?${qs}` : ''}`);
+  }
+
+  /**
+   * Permanently delete jobs from database by their IDs.
+   */
+  async deleteUnifiedJobs(jobIds: string[]): Promise<{ deleted_count: number }> {
+    return this.request<{ deleted_count: number }>('/api/jobs/unified', {
+      method: 'DELETE',
+      body: JSON.stringify({ job_ids: jobIds }),
+    });
+  }
+
+  /**
+   * Reset database completely to 0.
+   */
+  async resetDatabase(): Promise<{ status: string; message: string }> {
+    return this.request<{ status: string; message: string }>('/api/db/reset', {
+      method: 'POST',
+    });
   }
 }
 

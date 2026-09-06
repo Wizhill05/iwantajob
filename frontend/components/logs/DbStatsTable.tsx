@@ -169,7 +169,7 @@ export function DbStatsTable({ onRefresh, autoRefreshInterval }: DbStatsTablePro
       {/* System Environment Diagnostic Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
         {/* Card 1: PostgreSQL Host */}
-        <div className="bg-[#181818] border border-[#262626] rounded-xl p-4 shadow-sm">
+        <div className="bg-[#181818] border border-[#262626] rounded-lg p-3.5 shadow-sm">
           <div className="flex items-center justify-between">
             <span className="text-[11px] font-sans text-[#9ca3af]">
               PostgreSQL Host
@@ -187,7 +187,7 @@ export function DbStatsTable({ onRefresh, autoRefreshInterval }: DbStatsTablePro
         </div>
 
         {/* Card 2: Backend API & Latency */}
-        <div className="bg-[#181818] border border-[#262626] rounded-xl p-4 shadow-sm">
+        <div className="bg-[#181818] border border-[#262626] rounded-lg p-3.5 shadow-sm">
           <div className="flex items-center justify-between">
             <span className="text-[11px] font-sans text-[#9ca3af]">
               Backend API
@@ -222,7 +222,7 @@ export function DbStatsTable({ onRefresh, autoRefreshInterval }: DbStatsTablePro
         </div>
 
         {/* Card 3: Bronze Staging Inventory */}
-        <div className="bg-[#181818] border border-[#262626] rounded-xl p-4 shadow-sm">
+        <div className="bg-[#181818] border border-[#262626] rounded-lg p-3.5 shadow-sm">
           <div className="flex items-center justify-between">
             <span className="text-[11px] font-sans text-[#9ca3af]">
               Bronze Tier Records
@@ -249,7 +249,7 @@ export function DbStatsTable({ onRefresh, autoRefreshInterval }: DbStatsTablePro
         </div>
 
         {/* Card 4: Silver Clean Target */}
-        <div className="bg-[#181818] border border-[#262626] rounded-xl p-4 shadow-sm">
+        <div className="bg-[#181818] border border-[#262626] rounded-lg p-3.5 shadow-sm">
           <div className="flex items-center justify-between">
             <span className="text-[11px] font-sans text-[#9ca3af]">
               Silver Clean Store
@@ -270,7 +270,7 @@ export function DbStatsTable({ onRefresh, autoRefreshInterval }: DbStatsTablePro
       </div>
 
       {/* Main Database Tables Breakdown Card */}
-      <Card className="bg-[#181818] border-[#262626] rounded-xl p-5 shadow-sm">
+      <Card className="bg-[#181818] border-[#262626] rounded-lg p-4 sm:p-5 shadow-sm">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-[#262626]">
           <div className="flex items-center gap-2.5">

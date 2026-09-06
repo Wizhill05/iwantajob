@@ -92,7 +92,7 @@ export function IndeedTester({
   };
 
   return (
-    <div className="rounded-xl bg-[#181818] border border-[#262626] p-5 space-y-5">
+    <div className="-mx-4 sm:mx-0 border-y sm:border sm:rounded-lg bg-[#181818] border-[#262626] p-4 sm:p-5 space-y-4">
       {/* Top Banner / Engine Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-[#262626]">
         <div>
