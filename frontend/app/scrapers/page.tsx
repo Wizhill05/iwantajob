@@ -243,8 +243,14 @@ export default function ScrapersPage() {
   return (
     <Suspense
       fallback={
-        <div className="p-8 rounded-xl bg-[#181818] border border-[#262626] text-center font-mono text-xs text-[#9ca3af]">
-          Loading Scraper Testing Lab...
+        <div className="relative max-w-7xl mx-auto pb-16">
+          <PageHero title="Scrapers" />
+          <div className="relative z-10 -mt-8 pt-4 space-y-6 bg-[#131313] min-h-[60vh] flex items-center justify-center">
+            <div className="p-8 rounded-xl bg-[#181818] border border-[#262626] text-center font-mono text-xs text-[#9ca3af] flex items-center gap-2">
+              <RefreshDouble className="w-4 h-4 text-[#3ecf8e] animate-spin" />
+              <span>Loading Scraper Testing Lab...</span>
+            </div>
+          </div>
         </div>
       }
     >
