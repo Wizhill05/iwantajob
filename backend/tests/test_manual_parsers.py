@@ -80,3 +80,33 @@ async def test_manual_parsers_and_status():
         assert found_fresher is not None
         assert found_fresher["salary_min_inr_year"] == 1000000
         assert found_fresher["easy_apply_available"] is True
+        assert found_fresher["is_saved"] is False
+        assert found_fresher["is_archived"] is False
+
+        fresher_id = found_fresher["id"]
+
+        # 5. Test PATCH /api/jobs/unified/{job_id}/triage (save job)
+        save_resp = await client.patch(f"/api/jobs/unified/{fresher_id}/triage", json={"is_saved": True})
+        assert save_resp.status_code == 200
+        assert save_resp.json()["is_saved"] is True
+        assert save_resp.json()["is_archived"] is False
+
+        # Verify in query with filter is_saved=true
+        saved_resp = await client.get("/api/jobs/unified?is_saved=true")
+        assert saved_resp.status_code == 200
+        assert any(j["id"] == fresher_id for j in saved_resp.json())
+
+        # 6. Test Archive overrides saved
+        arch_resp = await client.patch(f"/api/jobs/unified/{fresher_id}/triage", json={"is_archived": True})
+        assert arch_resp.status_code == 200
+        assert arch_resp.json()["is_archived"] is True
+        assert arch_resp.json()["is_saved"] is False
+
+        # 7. Test Batch Triage Update
+        batch_resp = await client.patch("/api/jobs/unified/triage", json={"job_ids": [fresher_id], "is_saved": True})
+        assert batch_resp.status_code == 200
+        assert batch_resp.json()["updated_count"] == 1
+
+        # Check that it's saved again
+        check_resp = await client.get(f"/api/jobs/unified?is_saved=true")
+        assert any(j["id"] == fresher_id for j in check_resp.json())

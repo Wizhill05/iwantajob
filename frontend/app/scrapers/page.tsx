@@ -51,6 +51,14 @@ function ScrapersContent() {
 
   const handleTabChange = (tab: ScraperTabKey) => {
     setActiveTab(tab);
+    setExecutionState({
+      items: [],
+      rawPayload: null,
+      latencyMs: null,
+      provider: null,
+      timestamp: null,
+    });
+    setErrorMessage(null);
     router.replace(`/scrapers?tab=${tab}`, { scroll: false });
   };
 
@@ -105,6 +113,9 @@ function ScrapersContent() {
             }
             onError={handleError}
             onLoadingChange={setIsLoading}
+            viewMode={viewMode}
+            onViewModeChange={setViewMode}
+            resultsCount={executionState.items.length}
           />
         )}
 
@@ -115,6 +126,9 @@ function ScrapersContent() {
             }
             onError={handleError}
             onLoadingChange={setIsLoading}
+            viewMode={viewMode}
+            onViewModeChange={setViewMode}
+            resultsCount={executionState.items.length}
           />
         )}
 
@@ -125,77 +139,33 @@ function ScrapersContent() {
             }
             onError={handleError}
             onLoadingChange={setIsLoading}
+            viewMode={viewMode}
+            onViewModeChange={setViewMode}
+            resultsCount={executionState.items.length}
           />
         )}
       </div>
 
       {/* Results Section */}
-      <div className="space-y-4 pt-2">
-        {/* Results Header Bar */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 -mx-4 sm:mx-0 border-y sm:border sm:rounded-lg bg-[#181818] border-[#262626]">
-          <div className="flex items-center gap-3">
-            <h2 className="text-sm font-semibold font-heading text-white">
-              Extraction Output
-            </h2>
-
-            {executionState.provider && (
-              <span className="px-2 py-0.5 text-[10px] font-sans rounded bg-[#202020] border border-[#262626] text-[#9ca3af]">
-                {executionState.provider}
-              </span>
-            )}
-
-            {executionState.latencyMs !== null && (
-              <span className="flex items-center gap-1 text-[11px] font-sans text-[#3ecf8e]">
-                <Timer className="w-3.5 h-3.5" />
-                <span className="font-mono">{executionState.latencyMs}ms</span>
-              </span>
-            )}
-
-            {executionState.timestamp && (
-              <span className="text-[10px] font-mono text-[#6b7280]">
-                {executionState.timestamp}
-              </span>
-            )}
-          </div>
-
-          {/* View Mode Switcher */}
-          <div className="flex items-center gap-1.5 p-1 rounded-md bg-[#131313] border border-[#262626]">
-            <button
-              type="button"
-              onClick={() => setViewMode('cards')}
-              className={cn(
-                'flex items-center gap-1.5 px-3 py-1 rounded text-xs font-sans transition-all',
-                viewMode === 'cards'
-                  ? 'bg-[#202020] text-white border border-[#262626] shadow-sm'
-                  : 'text-[#9ca3af] hover:text-white'
+      <div className="space-y-4 pt-1">
+        {/* Extracted stats display when items exist */}
+        {executionState.items.length > 0 && (
+          <div className="flex items-center justify-between gap-3 text-xs font-sans px-1">
+            <div className="flex items-center gap-2 text-[11px] text-[#9ca3af]">
+              <span>Extracted {executionState.items.length} roles</span>
+              {executionState.latencyMs !== null && (
+                <>
+                  <span>•</span>
+                  <span className="font-mono text-[#3ecf8e]">{executionState.latencyMs}ms</span>
+                </>
               )}
-            >
-              <Page className="w-3.5 h-3.5" />
-              <span>Job Cards</span>
-              <span className="text-[10px] font-mono text-[#3ecf8e]">
-                ({executionState.items.length})
-              </span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setViewMode('json')}
-              className={cn(
-                'flex items-center gap-1.5 px-3 py-1 rounded text-xs font-sans transition-all',
-                viewMode === 'json'
-                  ? 'bg-[#202020] text-white border border-[#262626] shadow-sm'
-                  : 'text-[#9ca3af] hover:text-white'
-              )}
-            >
-              <Code className="w-3.5 h-3.5" />
-              <span>Raw JSON</span>
-            </button>
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Error Notification */}
         {errorMessage && (
-          <div className="p-4 -mx-4 sm:mx-0 border-y sm:border sm:rounded-lg bg-rose-500/10 border-rose-500/30 text-xs font-sans text-rose-300 flex items-start gap-3">
+          <div className="p-4 -mx-4 sm:mx-0 border-y sm:border border-rose-500/30 sm:rounded-2xl bg-rose-500/10 text-xs font-sans text-rose-300 flex items-start gap-3">
             <WarningTriangle className="w-4 h-4 text-rose-400 flex-shrink-0 mt-0.5" />
             <div>
               <div className="font-semibold text-rose-200">Scrape Error Occurred</div>
@@ -207,11 +177,11 @@ function ScrapersContent() {
         {/* Loading Skeletons */}
         {isLoading && (
           <div className="space-y-3">
-            <div className="p-4 -mx-4 sm:mx-0 border-y sm:border sm:rounded-lg bg-[#181818] border border-[#262626] text-center font-sans text-xs text-[#9ca3af] flex items-center justify-center gap-2">
+            <div className="p-4 -mx-4 sm:mx-0 border-y sm:border border-[#262626] sm:rounded-2xl bg-[#181818] text-center font-sans text-xs text-[#9ca3af] flex items-center justify-center gap-2">
               <RefreshDouble className="w-4 h-4 text-[#3ecf8e] animate-spin" />
               <span>Querying upstream gateway and processing responses...</span>
             </div>
-            <div className="-mx-4 sm:mx-0 border-y sm:border sm:rounded-lg border-[#262626] divide-y divide-[#262626]">
+            <div className="-mx-4 sm:mx-0 border-y sm:border border-[#262626] sm:rounded-2xl overflow-hidden divide-y divide-[#262626]">
               {[1, 2, 3].map((n) => (
                 <div
                   key={n}
@@ -231,15 +201,15 @@ function ScrapersContent() {
 
         {/* Empty State */}
         {!isLoading && executionState.items.length === 0 && !errorMessage && (
-          <div className="p-8 -mx-4 sm:mx-0 border-y sm:border sm:rounded-lg bg-[#181818] border-[#262626] text-center space-y-3">
-            <div className="w-10 h-10 rounded-lg bg-[#202020] border border-[#262626] flex items-center justify-center mx-auto text-[#3ecf8e]">
+          <div className="p-8 -mx-4 sm:mx-0 border-y sm:border border-[#262626] sm:rounded-2xl bg-[#181818] text-center space-y-3">
+            <div className="w-10 h-10 rounded-full bg-[#202020] border border-[#262626] flex items-center justify-center mx-auto text-[#3ecf8e]">
               <Cpu className="w-5 h-5" />
             </div>
             <h3 className="text-sm font-semibold font-heading text-white">
               No Scraper Run Yet
             </h3>
             <p className="text-xs text-[#9ca3af] max-w-md mx-auto leading-relaxed">
-              Configure parameters in the console above and click &quot;Run Scraper&quot; to test real-time extraction, benchmark upstream latency, and preview parsed job cards.
+              Configure parameters above and click &quot;Run Scraper&quot; to test real-time extraction and preview parsed job cards.
             </p>
           </div>
         )}
@@ -248,16 +218,18 @@ function ScrapersContent() {
         {!isLoading && executionState.items.length > 0 && (
           <div>
             {viewMode === 'cards' ? (
-              <div className="-mx-4 sm:mx-0 border-y sm:border sm:rounded-lg border-[#262626] divide-y divide-[#262626] overflow-hidden">
+              <div className="-mx-4 sm:mx-0 border-y sm:border border-[#262626] sm:rounded-2xl divide-y divide-[#262626] overflow-hidden">
                 {executionState.items.map((job, idx) => (
                   <ScrapedJobCard key={`${job.external_id}-${idx}`} job={job} index={idx} />
                 ))}
               </div>
             ) : (
-              <RawJsonViewer
-                data={executionState.rawPayload}
-                title={`${executionState.provider || 'Scraper'} Raw JSON Response`}
-              />
+              <div className="-mx-4 sm:mx-0 border-y sm:border border-[#262626] sm:rounded-2xl overflow-hidden">
+                <RawJsonViewer
+                  data={executionState.rawPayload}
+                  title={`${executionState.provider || 'Scraper'} Raw JSON Response`}
+                />
+              </div>
             )}
           </div>
         )}

@@ -42,3 +42,50 @@ async def test_live_llm_job_parser_monthly_heuristic():
     assert res["salary_max_inr_year"] == 600000
     assert res["is_fresher_friendly"] is True
     assert res["experience_min_years"] == 0
+
+def test_llm_parser_empty_result_fallback():
+    # Ensure fallback regex returns proper keys without KeyError
+    res = LLMJobParser._empty_result(
+        salary_raw="15 - 25 LPA",
+        title="Software Engineer",
+        description="Looking for 3-5 years experience.",
+    )
+    assert res["salary_min_inr_year"] == 1500000
+    assert res["salary_max_inr_year"] == 2500000
+    assert res["salary_currency_raw"] == "INR"
+    assert res["experience_min_years"] == 3
+    assert res["experience_max_years"] == 5
+    assert res["is_fresher_friendly"] is False
+
+@pytest.mark.asyncio
+async def test_live_llm_job_parser_batch():
+    jobs_input = [
+        {
+            "id": "job_test_1",
+            "title": "Junior Python Trainee",
+            "salary_raw": "₹25,000 - ₹40,000/month",
+            "description": "Fresher friendly. 0-1 years of experience in Python or Django.",
+        },
+        {
+            "id": "job_test_2",
+            "title": "Lead Software Engineer",
+            "salary_raw": "30 - 45 LPA",
+            "description": "Requires minimum 7 years of hands-on experience building backend systems.",
+        },
+    ]
+
+    results = await LLMJobParser.parse_jobs_batch(jobs_input)
+    assert len(results) == 2
+    assert "job_test_1" in results
+    assert "job_test_2" in results
+
+    j1 = results["job_test_1"]
+    assert j1["is_fresher_friendly"] is True
+    assert j1["salary_min_inr_year"] == 300000
+    assert j1["salary_max_inr_year"] == 480000
+
+    j2 = results["job_test_2"]
+    assert j2["is_fresher_friendly"] is False
+    assert j2["experience_min_years"] >= 7
+    assert j2["salary_min_inr_year"] == 3000000
+    assert j2["salary_max_inr_year"] == 4500000

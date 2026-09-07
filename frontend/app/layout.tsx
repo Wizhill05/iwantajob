@@ -4,6 +4,7 @@ import './globals.css';
 import { ActivityProvider } from '@/context/ActivityContext';
 import { DesktopSidebar } from '@/components/layout/DesktopSidebar';
 import { MobileBottomNav } from '@/components/layout/MobileBottomNav';
+import { PageFooter } from '@/components/layout/PageFooter';
 
 const inter = Inter({
   subsets: ['latin'],
@@ -26,6 +27,11 @@ const robotoMono = Roboto_Mono({
 export const metadata: Metadata = {
   title: 'Job Ingestion & Parsing Platform',
   description: 'Autonomous Job Discovery & Aggregation Platform Cockpit',
+  icons: {
+    icon: '/icon.svg',
+    shortcut: '/icon.svg',
+    apple: '/icon.svg',
+  },
 };
 
 export default function RootLayout({
@@ -46,11 +52,11 @@ export default function RootLayout({
 
             {/* Main Content Area without Top Header */}
             <div className="flex-1 lg:pl-64 flex flex-col min-h-screen min-w-0">
-              <main className="flex-1 px-4 lg:px-8 max-w-7xl w-full mx-auto">
-                {children}
+              <main className="flex-1 px-4 lg:px-8 max-w-7xl w-full mx-auto flex flex-col justify-between">
+                <div>{children}</div>
 
-                {/* 30% Vertical Height Empty Clearance Spacer */}
-                <div className="h-[30vh] w-full pointer-events-none" aria-hidden="true" />
+                {/* 30% Vertical Height Clearance Spacer with Gradient Dots Footer & GitHub Star */}
+                <PageFooter />
               </main>
             </div>
 
@@ -68,3 +74,4 @@ export default function RootLayout({
     </html>
   );
 }
+

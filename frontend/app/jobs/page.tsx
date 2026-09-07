@@ -186,6 +186,45 @@ function JobsExplorerContent() {
       try {
         const result = await api.getUnifiedJobs(params);
         setJobs(result);
+
+        // Derive saved and archived sets directly from database results
+        const dbSaved = new Set<string>();
+        const dbArchived = new Set<string>();
+        result.forEach((j) => {
+          if (j.is_saved) dbSaved.add(j.id);
+          if (j.is_archived) dbArchived.add(j.id);
+        });
+
+        // Sync any legacy localStorage items that are not yet saved/archived in DB
+        const localSaved = triageStorage.getSavedIds();
+        const localArchived = triageStorage.getArchivedIds();
+        const pendingSaveToDb: string[] = [];
+        const pendingArchiveToDb: string[] = [];
+
+        localSaved.forEach((id) => {
+          if (!dbSaved.has(id)) {
+            pendingSaveToDb.push(id);
+            dbSaved.add(id);
+          }
+        });
+        localArchived.forEach((id) => {
+          if (!dbArchived.has(id)) {
+            pendingArchiveToDb.push(id);
+            dbArchived.add(id);
+          }
+        });
+
+        if (pendingSaveToDb.length > 0) {
+          api.batchUpdateJobTriage(pendingSaveToDb, { is_saved: true }).catch(() => {});
+        }
+        if (pendingArchiveToDb.length > 0) {
+          api.batchUpdateJobTriage(pendingArchiveToDb, { is_archived: true }).catch(() => {});
+        }
+
+        setSavedIds(dbSaved);
+        setArchivedIds(dbArchived);
+        triageStorage.saveMany(Array.from(dbSaved));
+        triageStorage.archiveMany(Array.from(dbArchived));
       } catch (err: any) {
         setError(
           err?.message ||
@@ -263,21 +302,85 @@ function JobsExplorerContent() {
   };
 
   // Triage Action Handlers
-  const handleToggleSave = (jobId: string) => {
+  const handleToggleSave = async (jobId: string) => {
+    const isCurrentlySaved = savedIds.has(jobId);
+    const nextSaved = !isCurrentlySaved;
+
+    // Optimistic UI updates
     triageStorage.toggleSave(jobId);
-    setSavedIds(triageStorage.getSavedIds());
-    setArchivedIds(triageStorage.getArchivedIds());
+    setSavedIds((prev) => {
+      const next = new Set(prev);
+      if (nextSaved) next.add(jobId);
+      else next.delete(jobId);
+      return next;
+    });
+    if (nextSaved) {
+      setArchivedIds((prev) => {
+        const next = new Set(prev);
+        next.delete(jobId);
+        return next;
+      });
+    }
+    setJobs((prev) =>
+      prev.map((j) =>
+        j.id === jobId
+          ? { ...j, is_saved: nextSaved, is_archived: nextSaved ? false : j.is_archived }
+          : j
+      )
+    );
+
+    // Persist to DB
+    try {
+      await api.updateJobTriage(jobId, {
+        is_saved: nextSaved,
+        is_archived: nextSaved ? false : undefined,
+      });
+    } catch (err) {
+      console.error('Failed to update saved state in DB', err);
+    }
   };
 
-  const handleArchive = (jobId: string) => {
+  const handleArchive = async (jobId: string) => {
+    // Optimistic UI updates
     triageStorage.archive(jobId);
-    setArchivedIds(triageStorage.getArchivedIds());
-    setSavedIds(triageStorage.getSavedIds());
+    setArchivedIds((prev) => new Set(prev).add(jobId));
+    setSavedIds((prev) => {
+      const next = new Set(prev);
+      next.delete(jobId);
+      return next;
+    });
+    setJobs((prev) =>
+      prev.map((j) =>
+        j.id === jobId ? { ...j, is_archived: true, is_saved: false } : j
+      )
+    );
+
+    // Persist to DB
+    try {
+      await api.updateJobTriage(jobId, { is_archived: true, is_saved: false });
+    } catch (err) {
+      console.error('Failed to update archived state in DB', err);
+    }
   };
 
-  const handleUnarchive = (jobId: string) => {
+  const handleUnarchive = async (jobId: string) => {
+    // Optimistic UI updates
     triageStorage.unarchive(jobId);
-    setArchivedIds(triageStorage.getArchivedIds());
+    setArchivedIds((prev) => {
+      const next = new Set(prev);
+      next.delete(jobId);
+      return next;
+    });
+    setJobs((prev) =>
+      prev.map((j) => (j.id === jobId ? { ...j, is_archived: false } : j))
+    );
+
+    // Persist to DB
+    try {
+      await api.updateJobTriage(jobId, { is_archived: false });
+    } catch (err) {
+      console.error('Failed to unarchive state in DB', err);
+    }
   };
 
   // Prompt Delete Confirmation Modal (single or batch)
@@ -368,24 +471,84 @@ function JobsExplorerContent() {
     setSelectedIds(new Set());
   };
 
-  const handleBatchSave = () => {
+  const handleBatchSave = async () => {
     const ids = Array.from(selectedIds);
+    if (ids.length === 0) return;
+
     triageStorage.saveMany(ids);
-    setSavedIds(triageStorage.getSavedIds());
-    setArchivedIds(triageStorage.getArchivedIds());
+    setSavedIds((prev) => {
+      const next = new Set(prev);
+      ids.forEach((id) => next.add(id));
+      return next;
+    });
+    setArchivedIds((prev) => {
+      const next = new Set(prev);
+      ids.forEach((id) => next.delete(id));
+      return next;
+    });
+    setJobs((prev) =>
+      prev.map((j) =>
+        ids.includes(j.id) ? { ...j, is_saved: true, is_archived: false } : j
+      )
+    );
     handleCancelSelectMode();
+
+    // Persist to DB
+    try {
+      await api.batchUpdateJobTriage(ids, { is_saved: true, is_archived: false });
+    } catch (err) {
+      console.error('Failed to batch save jobs in DB', err);
+    }
   };
 
-  const handleBatchArchiveOrRegister = () => {
+  const handleBatchArchiveOrRegister = async () => {
     const ids = Array.from(selectedIds);
+    if (ids.length === 0) return;
+
     if (activeTab === 'archived') {
       triageStorage.unarchiveMany(ids);
+      setArchivedIds((prev) => {
+        const next = new Set(prev);
+        ids.forEach((id) => next.delete(id));
+        return next;
+      });
+      setJobs((prev) =>
+        prev.map((j) => (ids.includes(j.id) ? { ...j, is_archived: false } : j))
+      );
+      handleCancelSelectMode();
+
+      // Persist to DB
+      try {
+        await api.batchUpdateJobTriage(ids, { is_archived: false });
+      } catch (err) {
+        console.error('Failed to batch unarchive jobs in DB', err);
+      }
     } else {
       triageStorage.archiveMany(ids);
+      setArchivedIds((prev) => {
+        const next = new Set(prev);
+        ids.forEach((id) => next.add(id));
+        return next;
+      });
+      setSavedIds((prev) => {
+        const next = new Set(prev);
+        ids.forEach((id) => next.delete(id));
+        return next;
+      });
+      setJobs((prev) =>
+        prev.map((j) =>
+          ids.includes(j.id) ? { ...j, is_archived: true, is_saved: false } : j
+        )
+      );
+      handleCancelSelectMode();
+
+      // Persist to DB
+      try {
+        await api.batchUpdateJobTriage(ids, { is_archived: true, is_saved: false });
+      } catch (err) {
+        console.error('Failed to batch archive jobs in DB', err);
+      }
     }
-    setArchivedIds(triageStorage.getArchivedIds());
-    setSavedIds(triageStorage.getSavedIds());
-    handleCancelSelectMode();
   };
 
   const handleBatchDelete = () => {

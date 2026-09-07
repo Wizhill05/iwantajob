@@ -45,6 +45,39 @@ export function formatSalaryLPA(
 }
 
 /**
+ * Formats annual INR compensation into a single simplified average number in LPA.
+ * e.g. (1200000, 1800000) -> "₹15 LPA", (1500000, null) -> "₹15+ LPA", (null, 2000000) -> "Up to ₹20 LPA"
+ */
+export function formatSalaryAverageLPA(
+  minInr?: number | null,
+  maxInr?: number | null
+): string {
+  if ((minInr == null && maxInr == null) || (!minInr && !maxInr)) {
+    return 'Not disclosed';
+  }
+
+  const toLPA = (val: number): string => {
+    const lpa = val / 100000;
+    return Number.isInteger(lpa) ? `${lpa}` : `${lpa.toFixed(1)}`;
+  };
+
+  if (minInr && maxInr) {
+    const avg = (minInr + maxInr) / 2;
+    return `₹${toLPA(avg)} LPA`;
+  }
+
+  if (minInr) {
+    return `₹${toLPA(minInr)}+ LPA`;
+  }
+
+  if (maxInr) {
+    return `Up to ₹${toLPA(maxInr)} LPA`;
+  }
+
+  return 'Not disclosed';
+}
+
+/**
  * Formats ISO or parseable timestamp into clean relative human-readable time.
  * e.g. "2h ago", "3d ago", "Just now"
  */

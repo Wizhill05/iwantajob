@@ -135,7 +135,7 @@ export function PageHero({ title = 'iwantajob' }: PageHeroProps) {
 
       {/* Hero container covering ~30% viewport height with dynamic shimmer heading */}
       <div
-        className="sticky top-0 z-0 w-full h-[28vh] min-h-[190px] max-h-[250px] overflow-hidden flex flex-col items-center justify-center text-center pointer-events-none select-none transition-transform"
+        className="sticky top-0 z-0 w-full h-[28vh] min-h-[190px] max-h-[250px] flex flex-col items-center justify-center text-center pointer-events-none select-none transition-transform"
         style={{
           opacity,
           filter: `blur(${blurAmount}px)`,
@@ -144,8 +144,8 @@ export function PageHero({ title = 'iwantajob' }: PageHeroProps) {
         }}
       >
         {/* Centered Dynamic Heading */}
-        <div className="relative z-10 px-4">
-          <h1 className="text-3xl sm:text-4xl md:text-5xl font-black font-heading tracking-tight bg-gradient-to-r from-white via-[#3ecf8e] to-[#e5e7eb] bg-clip-text text-transparent animate-shimmer">
+        <div className="relative z-10 px-4 py-3">
+          <h1 className="text-3xl sm:text-4xl md:text-5xl font-black font-heading tracking-tight leading-normal md:leading-relaxed pb-1 bg-gradient-to-r from-white via-[#3ecf8e] to-[#e5e7eb] bg-clip-text text-transparent animate-shimmer">
             {title}
           </h1>
         </div>

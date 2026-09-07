@@ -17,7 +17,7 @@ import {
   Undo,
 } from 'iconoir-react';
 import type { UnifiedJobItem } from '@/lib/types';
-import { cn, formatSalaryLPA, formatRelativeTime } from '@/lib/utils';
+import { cn, formatSalaryLPA, formatSalaryAverageLPA, formatRelativeTime } from '@/lib/utils';
 
 interface CompactJobRowProps {
   job: UnifiedJobItem;
@@ -35,21 +35,6 @@ interface CompactJobRowProps {
   onDelete: (id: string) => void;
   onViewFullModal: (job: UnifiedJobItem) => void;
 }
-
-const SOURCE_CONFIG = {
-  indeed: {
-    label: 'Indeed',
-    badgeClass: 'text-sky-400 bg-sky-500/10 border-sky-500/30',
-  },
-  linkedin: {
-    label: 'LinkedIn',
-    badgeClass: 'text-blue-400 bg-blue-500/10 border-blue-500/30',
-  },
-  wellfound: {
-    label: 'Wellfound',
-    badgeClass: 'text-rose-400 bg-rose-500/10 border-rose-500/30',
-  },
-};
 
 function formatExperience(job: UnifiedJobItem): string {
   if (job.is_fresher_friendly || job.experience_min_years === 0) {
@@ -129,12 +114,11 @@ export function CompactJobRow({
     }, 500);
   };
 
-  const sourceMeta = SOURCE_CONFIG[job.source] || {
-    label: job.source,
-    badgeClass: 'text-gray-400 bg-gray-500/10 border-gray-500/25',
-  };
-
-  const salaryDisplay = formatSalaryLPA(
+  const salaryDisplay = formatSalaryAverageLPA(
+    job.salary_min_inr_year,
+    job.salary_max_inr_year
+  );
+  const salaryRangeFull = formatSalaryLPA(
     job.salary_min_inr_year,
     job.salary_max_inr_year
   );
@@ -395,7 +379,7 @@ export function CompactJobRow({
             </div>
           </div>
 
-          {/* Right Column: Compensation, Experience badge, Source, Actions */}
+          {/* Right Column: Compensation, Experience badge, Actions */}
           <div className="flex items-center gap-2.5 shrink-0">
             <div className="text-right flex flex-col items-end">
               <span className="font-mono text-xs sm:text-sm font-semibold text-[#3ecf8e]">
@@ -405,14 +389,6 @@ export function CompactJobRow({
               <div className="flex items-center gap-1.5 mt-0.5">
                 <span className="text-[10px] text-[#9ca3af] font-sans">
                   {expDisplay}
-                </span>
-                <span
-                  className={cn(
-                    'px-1.5 py-0.2 text-[9px] font-sans font-medium rounded border',
-                    sourceMeta.badgeClass
-                  )}
-                >
-                  {sourceMeta.label}
                 </span>
               </div>
             </div>
@@ -497,6 +473,13 @@ export function CompactJobRow({
           >
             {/* Tag Badges */}
             <div className="flex items-center gap-2 flex-wrap text-[11px] font-sans">
+              {salaryRangeFull !== 'Not disclosed' && (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-[#202020] border border-[#2e2e2e] text-[#d1d5db]">
+                  <span className="text-[#6b7280]">Comp Range:</span>
+                  <span className="font-mono text-white font-medium">{salaryRangeFull}</span>
+                </span>
+              )}
+
               {job.is_remote && (
                 <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-[#202020] border border-[#2e2e2e] text-[#d1d5db]">
                   <Globe className="w-3 h-3 text-[#3ecf8e]" />
@@ -512,7 +495,7 @@ export function CompactJobRow({
               )}
 
               <span className="px-2 py-0.5 rounded bg-[#202020] border border-[#2e2e2e] text-[#9ca3af]">
-                Source: <span className="text-white">{job.source}</span>
+                Source: <span className="text-white capitalize">{job.source}</span>
               </span>
             </div>
 

@@ -94,16 +94,19 @@ export function ScrapedJobCard({ job, index }: ScrapedJobCardProps) {
           </div>
         </div>
 
-        {/* Action Button: Apply / View Job */}
-        <a
-          href={job.url}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-[#202020] hover:bg-[#262626] border border-[#262626] hover:border-[#383838] text-xs font-sans font-medium text-[#3ecf8e] transition-all flex-shrink-0"
-        >
-          <span>Apply</span>
-          <OpenNewWindow className="w-3.5 h-3.5" />
-        </a>
+        {/* View Canonical Job Link */}
+        {job.url && (
+          <a
+            href={job.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            title="Open listing in new tab"
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-[#202020] hover:bg-[#262626] border border-[#262626] hover:border-[#383838] text-xs font-sans font-medium text-[#9ca3af] hover:text-white transition-all flex-shrink-0"
+          >
+            <span>View</span>
+            <OpenNewWindow className="w-3.5 h-3.5" />
+          </a>
+        )}
       </div>
 
       {/* Metadata Badges / Tags Row */}
@@ -128,14 +131,6 @@ export function ScrapedJobCard({ job, index }: ScrapedJobCardProps) {
           <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-[#3ecf8e]/10 border border-[#3ecf8e]/30 text-[11px] font-sans text-[#3ecf8e]">
             <Globe className="w-3 h-3" />
             <span>Remote</span>
-          </span>
-        )}
-
-        {/* Easy Apply */}
-        {job.easy_apply_available && (
-          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-[#3ecf8e]/10 border border-[#3ecf8e]/30 text-[11px] font-sans text-[#3ecf8e]">
-            <Check className="w-3 h-3" />
-            <span>Easy Apply</span>
           </span>
         )}
 

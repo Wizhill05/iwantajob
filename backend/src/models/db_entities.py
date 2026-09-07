@@ -113,6 +113,10 @@ class UnifiedJob(Base):
     experience_max_years = Column(Integer, nullable=True, index=True)
     is_fresher_friendly = Column(Boolean, default=False, nullable=False, index=True)
 
+    # Triage State (Saved & Archived)
+    is_saved = Column(Boolean, default=False, nullable=False, index=True)
+    is_archived = Column(Boolean, default=False, nullable=False, index=True)
+
     description_text = Column(Text, nullable=False)
     posted_at = Column(DateTime(timezone=True), nullable=True, index=True)
     parsed_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)

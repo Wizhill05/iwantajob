@@ -1,11 +1,12 @@
 import logging
 from pathlib import Path
 from typing import Annotated
-from fastapi import FastAPI, Query, status, Body
+from fastapi import FastAPI, Query, status, Body, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse
-from sqlalchemy import select, and_, delete, text
+from pydantic import BaseModel
+from sqlalchemy import select, and_, delete, text, update
 
 from src.core.database import init_db, async_session_maker
 from src.models.db_entities import (
@@ -727,9 +728,10 @@ async def get_parsing_status():
 )
 async def parse_indeed(
     batch_size: Annotated[int, Query(ge=1, le=500, description="Max raw jobs to parse in this run")] = 50,
+    use_llm: Annotated[bool, Query(description="Whether to use Gemini LLM batch parsing")] = True,
 ):
-    """Parses unparsed raw Indeed records into clean unified_jobs records using Gemini LLM."""
-    return await ParserService.parse_indeed_jobs(batch_size=batch_size)
+    """Parses unparsed raw Indeed records into clean unified_jobs records using Gemini LLM in batches of 25."""
+    return await ParserService.parse_indeed_jobs(batch_size=batch_size, use_llm=use_llm)
 
 @app.post(
     "/api/parse/linkedin",
@@ -738,9 +740,10 @@ async def parse_indeed(
 )
 async def parse_linkedin(
     batch_size: Annotated[int, Query(ge=1, le=500, description="Max raw jobs to parse in this run")] = 50,
+    use_llm: Annotated[bool, Query(description="Whether to use Gemini LLM batch parsing")] = True,
 ):
-    """Parses unparsed raw LinkedIn records into clean unified_jobs records using Gemini LLM."""
-    return await ParserService.parse_linkedin_jobs(batch_size=batch_size)
+    """Parses unparsed raw LinkedIn records into clean unified_jobs records using Gemini LLM in batches of 25."""
+    return await ParserService.parse_linkedin_jobs(batch_size=batch_size, use_llm=use_llm)
 
 @app.post(
     "/api/parse/wellfound",
@@ -749,9 +752,19 @@ async def parse_linkedin(
 )
 async def parse_wellfound(
     batch_size: Annotated[int, Query(ge=1, le=500, description="Max raw jobs to parse in this run")] = 50,
+    use_llm: Annotated[bool, Query(description="Whether to use Gemini LLM batch parsing")] = True,
 ):
-    """Parses unparsed raw Wellfound records into clean unified_jobs records using Gemini LLM."""
-    return await ParserService.parse_wellfound_jobs(batch_size=batch_size)
+    """Parses unparsed raw Wellfound records into clean unified_jobs records using Gemini LLM in batches of 25."""
+    return await ParserService.parse_wellfound_jobs(batch_size=batch_size, use_llm=use_llm)
+
+class JobTriageUpdateRequest(BaseModel):
+    is_saved: bool | None = None
+    is_archived: bool | None = None
+
+class BatchJobTriageUpdateRequest(BaseModel):
+    job_ids: list[str]
+    is_saved: bool | None = None
+    is_archived: bool | None = None
 
 @app.get(
     "/api/jobs/unified",
@@ -764,6 +777,8 @@ async def get_unified_jobs(
     is_fresher_friendly: Annotated[bool | None, Query(description="Filter strictly for freshers (min_years <= 1)")] = None,
     easy_apply_available: Annotated[bool | None, Query(description="Filter for direct Indeed/easy apply jobs")] = None,
     min_salary_inr: Annotated[int | None, Query(description="Minimum annual salary in INR")] = None,
+    is_saved: Annotated[bool | None, Query(description="Filter by saved triage status")] = None,
+    is_archived: Annotated[bool | None, Query(description="Filter by archived triage status")] = None,
     limit: Annotated[int, Query(ge=1, le=200)] = 50,
     offset: Annotated[int, Query(ge=0)] = 0,
 ):
@@ -782,6 +797,10 @@ async def get_unified_jobs(
             conditions.append(UnifiedJob.easy_apply_available == easy_apply_available)
         if min_salary_inr is not None:
             conditions.append(UnifiedJob.salary_min_inr_year >= min_salary_inr)
+        if is_saved is not None:
+            conditions.append(UnifiedJob.is_saved == is_saved)
+        if is_archived is not None:
+            conditions.append(UnifiedJob.is_archived == is_archived)
 
         stmt = select(UnifiedJob)
         if conditions:
@@ -813,12 +832,112 @@ async def get_unified_jobs(
                 "experience_min_years": j.experience_min_years,
                 "experience_max_years": j.experience_max_years,
                 "is_fresher_friendly": j.is_fresher_friendly,
+                "is_saved": j.is_saved,
+                "is_archived": j.is_archived,
                 "description_text": j.description_text,
                 "posted_at": j.posted_at,
                 "parsed_at": j.parsed_at,
             }
             for j in jobs
         ]
+
+@app.patch(
+    "/api/jobs/unified/triage",
+    summary="Batch update saved or archived triage state for multiple unified jobs",
+    tags=["System"],
+)
+async def batch_update_unified_jobs_triage(
+    payload: BatchJobTriageUpdateRequest,
+):
+    """
+    Batch update is_saved and is_archived columns in unified_jobs.
+    """
+    if not payload.job_ids:
+        return {"updated_count": 0}
+
+    import uuid
+    parsed_uuids = []
+    for jid in payload.job_ids:
+        try:
+            parsed_uuids.append(uuid.UUID(jid))
+        except ValueError:
+            continue
+
+    if not parsed_uuids:
+        return {"updated_count": 0}
+
+    values_to_update = {}
+    if payload.is_saved is not None:
+        values_to_update["is_saved"] = payload.is_saved
+        if payload.is_saved:
+            values_to_update["is_archived"] = False
+    if payload.is_archived is not None:
+        values_to_update["is_archived"] = payload.is_archived
+        if payload.is_archived:
+            values_to_update["is_saved"] = False
+
+    if not values_to_update:
+        return {"updated_count": 0, "message": "No changes requested"}
+
+    async with async_session_maker() as session:
+        stmt = (
+            update(UnifiedJob)
+            .where(UnifiedJob.id.in_(parsed_uuids))
+            .values(**values_to_update)
+        )
+        res = await session.execute(stmt)
+        await session.commit()
+        return {"updated_count": res.rowcount}
+
+@app.patch(
+    "/api/jobs/unified/{job_id}/triage",
+    summary="Update saved or archived triage state for a single unified job",
+    tags=["System"],
+)
+async def update_unified_job_triage(
+    job_id: str,
+    payload: JobTriageUpdateRequest,
+):
+    """
+    Update is_saved and is_archived columns in unified_jobs for a specific job.
+    """
+    import uuid
+    try:
+        jid = uuid.UUID(job_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid job UUID")
+
+    values_to_update = {}
+    if payload.is_saved is not None:
+        values_to_update["is_saved"] = payload.is_saved
+        if payload.is_saved:
+            values_to_update["is_archived"] = False
+    if payload.is_archived is not None:
+        values_to_update["is_archived"] = payload.is_archived
+        if payload.is_archived:
+            values_to_update["is_saved"] = False
+
+    if not values_to_update:
+        return {"updated": False, "message": "No changes requested"}
+
+    async with async_session_maker() as session:
+        stmt = (
+            update(UnifiedJob)
+            .where(UnifiedJob.id == jid)
+            .values(**values_to_update)
+            .returning(UnifiedJob.id, UnifiedJob.is_saved, UnifiedJob.is_archived)
+        )
+        res = await session.execute(stmt)
+        row = res.first()
+        if not row:
+            raise HTTPException(status_code=404, detail="Job not found")
+        await session.commit()
+        return {
+            "updated": True,
+            "id": str(row[0]),
+            "is_saved": row[1],
+            "is_archived": row[2],
+        }
 
 @app.delete(
     "/api/jobs/unified",

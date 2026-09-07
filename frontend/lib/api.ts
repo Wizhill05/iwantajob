@@ -215,6 +215,12 @@ class ApiClient {
     if (params.min_salary_inr !== undefined) {
       searchParams.set('min_salary_inr', String(params.min_salary_inr));
     }
+    if (params.is_saved !== undefined) {
+      searchParams.set('is_saved', String(params.is_saved));
+    }
+    if (params.is_archived !== undefined) {
+      searchParams.set('is_archived', String(params.is_archived));
+    }
     if (params.limit !== undefined) {
       searchParams.set('limit', String(params.limit));
     }
@@ -224,6 +230,32 @@ class ApiClient {
 
     const qs = searchParams.toString();
     return this.request<UnifiedJobItem[]>(`/api/jobs/unified${qs ? `?${qs}` : ''}`);
+  }
+
+  /**
+   * Update saved/archived triage state for a single job in DB.
+   */
+  async updateJobTriage(
+    jobId: string,
+    payload: { is_saved?: boolean; is_archived?: boolean }
+  ): Promise<{ updated: boolean; id: string; is_saved: boolean; is_archived: boolean }> {
+    return this.request(`/api/jobs/unified/${jobId}/triage`, {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  /**
+   * Batch update saved/archived triage state for multiple jobs in DB.
+   */
+  async batchUpdateJobTriage(
+    jobIds: string[],
+    payload: { is_saved?: boolean; is_archived?: boolean }
+  ): Promise<{ updated_count: number }> {
+    return this.request('/api/jobs/unified/triage', {
+      method: 'PATCH',
+      body: JSON.stringify({ job_ids: jobIds, ...payload }),
+    });
   }
 
   /**

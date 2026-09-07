@@ -16,27 +16,12 @@ import {
   CheckCircle,
 } from 'iconoir-react';
 import type { UnifiedJobItem } from '@/lib/types';
-import { cn, formatSalaryLPA, formatRelativeTime, truncate } from '@/lib/utils';
+import { cn, formatSalaryAverageLPA, formatRelativeTime, truncate } from '@/lib/utils';
 
 interface CleanJobCardProps {
   job: UnifiedJobItem;
   onViewDetails: (job: UnifiedJobItem) => void;
 }
-
-const SOURCE_CONFIG = {
-  indeed: {
-    label: 'Indeed',
-    badgeClass: 'text-sky-400 bg-sky-500/10 border-sky-500/30',
-  },
-  linkedin: {
-    label: 'LinkedIn',
-    badgeClass: 'text-blue-400 bg-blue-500/10 border-blue-500/30',
-  },
-  wellfound: {
-    label: 'Wellfound',
-    badgeClass: 'text-rose-400 bg-rose-500/10 border-rose-500/30',
-  },
-};
 
 function formatExperience(job: UnifiedJobItem): string {
   if (job.is_fresher_friendly || job.experience_min_years === 0) {
@@ -67,12 +52,7 @@ function formatExperience(job: UnifiedJobItem): string {
 export function CleanJobCard({ job, onViewDetails }: CleanJobCardProps) {
   const [logoError, setLogoError] = useState(false);
 
-  const sourceConfig = SOURCE_CONFIG[job.source] || {
-    label: job.source,
-    badgeClass: 'text-gray-400 bg-gray-500/10 border-gray-500/25',
-  };
-
-  const salaryText = formatSalaryLPA(
+  const salaryText = formatSalaryAverageLPA(
     job.salary_min_inr_year,
     job.salary_max_inr_year
   );
@@ -110,14 +90,6 @@ export function CleanJobCard({ job, onViewDetails }: CleanJobCardProps) {
                 <h4 className="text-sm md:text-base font-semibold text-white font-heading truncate leading-snug group-hover:text-[#3ecf8e] transition-colors">
                   {job.title}
                 </h4>
-                <span
-                  className={cn(
-                    'px-2 py-0.5 text-[10px] font-sans font-medium rounded-full border',
-                    sourceConfig.badgeClass
-                  )}
-                >
-                  {sourceConfig.label}
-                </span>
               </div>
               <p className="text-xs text-[#9ca3af] font-medium truncate mt-0.5 font-sans">
                 {job.company_name || 'Confidential Employer'}

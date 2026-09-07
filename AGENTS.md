@@ -166,6 +166,8 @@ Central table containing only parsed, clean, and normalized job postings. Unpars
 | **`experience_max_years`** | `INTEGER`| NULLABLE | Maximum experience in years |
 | **`is_fresher_friendly`** | `BOOLEAN`| DEFAULT FALSE | **TRUE if role is tailored for freshers or requires <= 1 year** |
 | `experience_extraction_method` | `TEXT` | NOT NULL | Method used: `'native'`, `'regex'`, `'llm'`, or `'none'` |
+| **`is_saved`** | `BOOLEAN`| DEFAULT FALSE | **TRUE if role is saved / bookmarked by user** |
+| **`is_archived`** | `BOOLEAN`| DEFAULT FALSE | **TRUE if role is archived / hidden from active by user** |
 | `description_text` | `TEXT` | NOT NULL | Sanitized description body |
 | `posted_at` | `TIMESTAMPTZ` | NULLABLE | UTC posting timestamp |
 | `parsed_at` | `TIMESTAMPTZ` | DEFAULT NOW() | Timestamp when record was promoted to unified |

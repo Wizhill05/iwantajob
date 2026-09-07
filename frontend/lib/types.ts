@@ -62,6 +62,8 @@ export interface UnifiedJobItem {
   experience_min_years?: number | null;
   experience_max_years?: number | null;
   is_fresher_friendly: boolean;
+  is_saved?: boolean;
+  is_archived?: boolean;
   description_text: string;
   posted_at?: string | null;
   parsed_at: string;
@@ -131,6 +133,8 @@ export interface UnifiedJobsQueryParams {
   is_fresher_friendly?: boolean;
   easy_apply_available?: boolean;
   min_salary_inr?: number;
+  is_saved?: boolean;
+  is_archived?: boolean;
   limit?: number;
   offset?: number;
 }
