@@ -795,21 +795,26 @@ async def get_unified_jobs(
         if experience_level:
             exp_lvl = experience_level.strip().lower()
             if exp_lvl == "fresher":
-                # Fresher: is_fresher_friendly IS TRUE OR min_years <= 2 OR min_years IS NULL
+                # Purely fresher: must NOT require experience (> 0 years).
+                # Only 0 years, explicit fresher tags, or unspecified.
                 conditions.append(
-                    or_(
-                        UnifiedJob.is_fresher_friendly == True,
-                        UnifiedJob.experience_min_years == 0,
-                        UnifiedJob.experience_min_years <= 2,
-                        UnifiedJob.experience_min_years.is_(None),
+                    and_(
+                        or_(
+                            UnifiedJob.experience_min_years == 0,
+                            UnifiedJob.is_fresher_friendly == True,
+                            UnifiedJob.experience_min_years.is_(None),
+                        ),
+                        or_(
+                            UnifiedJob.experience_min_years.is_(None),
+                            UnifiedJob.experience_min_years == 0,
+                        ),
                     )
                 )
             elif exp_lvl == "experienced":
-                # Experienced: min_years > 0 OR min_years IS NULL
+                # Experienced: requires experience (> 0 years) OR unspecified
                 conditions.append(
                     or_(
                         UnifiedJob.experience_min_years > 0,
-                        and_(UnifiedJob.is_fresher_friendly == False, UnifiedJob.experience_min_years.is_(None)),
                         UnifiedJob.experience_min_years.is_(None),
                     )
                 )

@@ -591,24 +591,23 @@ function JobsExplorerContent() {
       {/* Main Content Starting After Half Viewport with Pull-Up Overlay */}
       <div className="relative z-10 -mt-8 pt-4 space-y-4 bg-[#131313] min-h-[60vh]">
         {/* Swappable Top Control Slot: Filter Bar OR Multi-Selection Bar (prevents layout shift) */}
-        <div className="min-h-[42px] relative">
+        <div className="relative">
           {isSelectMode ? (
-            <div className="w-full bg-[#1a1a1a] border border-[#333] shadow-2xl rounded-xl p-2 sm:px-4 sm:py-2.5 flex flex-wrap sm:flex-nowrap items-center justify-between gap-2.5 text-xs font-sans text-white animate-in fade-in zoom-in-95 duration-150">
+            <div className="h-[37px] w-full bg-[#181818] border border-[#333] shadow-lg rounded-lg px-2 flex items-center justify-between gap-1 text-xs font-sans text-white">
               {/* Left: Count & Select All */}
-              <div className="flex items-center gap-2 sm:gap-3">
-                <div className="flex items-center gap-1.5 font-mono">
-                  <span className="min-w-[28px] h-7 px-2 rounded-lg bg-[#3ecf8e]/20 text-[#3ecf8e] border border-[#3ecf8e]/40 font-bold text-xs flex items-center justify-center">
+              <div className="flex items-center gap-1.5 shrink-0">
+                <div className="flex items-center gap-1 font-mono">
+                  <span className="min-w-[22px] h-6 px-1.5 rounded bg-[#3ecf8e]/20 text-[#3ecf8e] border border-[#3ecf8e]/40 font-bold text-[11px] flex items-center justify-center">
                     {selectedIds.size}
                   </span>
-                  <span className="text-[#9ca3af] text-xs font-sans">selected</span>
                 </div>
 
-                <div className="h-5 w-px bg-[#333]" />
+                <div className="h-4 w-px bg-[#333]" />
 
                 <button
                   type="button"
                   onClick={handleSelectAll}
-                  className="px-2.5 py-1.5 rounded-lg bg-[#222] hover:bg-[#2a2a2a] border border-[#333] text-white hover:text-[#3ecf8e] transition-colors font-medium text-xs active:scale-95"
+                  className="px-2 py-1 rounded bg-[#202020] hover:bg-[#282828] border border-[#333] text-white hover:text-[#3ecf8e] transition-colors font-medium text-[11px] active:scale-95 whitespace-nowrap"
                 >
                   {selectedIds.size === displayedJobs.length && displayedJobs.length > 0
                     ? 'Deselect All'
@@ -617,32 +616,34 @@ function JobsExplorerContent() {
               </div>
 
               {/* Right: Actions (Save, Archive/Registered, Delete, Cancel) */}
-              <div className="flex items-center gap-2 ml-auto">
+              <div className="flex items-center gap-1 shrink-0 ml-auto">
                 <button
                   type="button"
                   disabled={selectedIds.size === 0}
                   onClick={handleBatchSave}
-                  className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[#222] hover:bg-[#3ecf8e]/20 border border-[#333] hover:border-[#3ecf8e]/50 text-white hover:text-[#3ecf8e] transition-all disabled:opacity-40 disabled:cursor-not-allowed font-medium text-xs active:scale-95 min-h-[38px]"
+                  title="Save selected"
+                  className="flex items-center gap-1 px-2.5 py-1 rounded bg-[#202020] hover:bg-[#3ecf8e]/20 border border-[#333] hover:border-[#3ecf8e]/50 text-white hover:text-[#3ecf8e] transition-all disabled:opacity-40 disabled:cursor-not-allowed font-medium text-[11px] active:scale-95 h-7"
                 >
-                  <Bookmark className="w-4 h-4 text-[#3ecf8e]" />
-                  <span className="font-medium">Save</span>
+                  <Bookmark className="w-3.5 h-3.5 text-[#3ecf8e]" />
+                  <span>Save</span>
                 </button>
 
                 <button
                   type="button"
                   disabled={selectedIds.size === 0}
                   onClick={handleBatchArchiveOrRegister}
-                  className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[#222] hover:bg-amber-500/20 border border-[#333] hover:border-amber-500/50 text-white hover:text-amber-400 transition-all disabled:opacity-40 disabled:cursor-not-allowed font-medium text-xs active:scale-95 min-h-[38px]"
+                  title={activeTab === 'archived' ? 'Unarchive selected' : 'Archive selected'}
+                  className="flex items-center gap-1 px-2.5 py-1 rounded bg-[#202020] hover:bg-amber-500/20 border border-[#333] hover:border-amber-500/50 text-white hover:text-amber-400 transition-all disabled:opacity-40 disabled:cursor-not-allowed font-medium text-[11px] active:scale-95 h-7"
                 >
                   {activeTab === 'archived' ? (
                     <>
-                      <Undo className="w-4 h-4 text-amber-400" />
-                      <span className="font-medium">Unarchive</span>
+                      <Undo className="w-3.5 h-3.5 text-amber-400" />
+                      <span>Unarchive</span>
                     </>
                   ) : (
                     <>
-                      <Archive className="w-4 h-4 text-amber-400" />
-                      <span className="font-medium">Archive</span>
+                      <Archive className="w-3.5 h-3.5 text-amber-400" />
+                      <span>Archive</span>
                     </>
                   )}
                 </button>
@@ -651,22 +652,23 @@ function JobsExplorerContent() {
                   type="button"
                   disabled={selectedIds.size === 0}
                   onClick={handleBatchDelete}
-                  className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-rose-500/15 hover:bg-rose-500/25 border border-rose-500/40 text-rose-300 transition-all disabled:opacity-40 disabled:cursor-not-allowed font-medium text-xs active:scale-95 min-h-[38px]"
+                  title="Delete selected"
+                  className="flex items-center gap-1 px-2.5 py-1 rounded bg-rose-500/15 hover:bg-rose-500/25 border border-rose-500/40 text-rose-300 transition-all disabled:opacity-40 disabled:cursor-not-allowed font-medium text-[11px] active:scale-95 h-7"
                 >
-                  <Trash className="w-4 h-4 text-rose-400" />
-                  <span className="font-medium">Delete</span>
+                  <Trash className="w-3.5 h-3.5 text-rose-400" />
+                  <span>Delete</span>
                 </button>
 
-                <div className="h-5 w-px bg-[#333] mx-0.5" />
+                <div className="h-4 w-px bg-[#333]" />
 
                 <button
                   type="button"
                   onClick={handleCancelSelectMode}
                   title="Cancel selection mode"
                   aria-label="Cancel selection mode"
-                  className="p-2 rounded-xl bg-[#222] hover:bg-[#2d2d2d] border border-[#333] text-[#9ca3af] hover:text-white transition-colors active:scale-95 min-h-[38px] min-w-[38px] flex items-center justify-center"
+                  className="p-1 rounded hover:bg-[#282828] text-[#9ca3af] hover:text-white transition-colors active:scale-95 h-7 w-7 flex items-center justify-center"
                 >
-                  <Xmark className="w-5 h-5" />
+                  <Xmark className="w-4 h-4" />
                 </button>
               </div>
             </div>
