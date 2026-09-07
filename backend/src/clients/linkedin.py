@@ -222,6 +222,8 @@ class LinkedInClient:
         work_type: str | None = None,
         seniority: str | None = None,
         fetch_descriptions: bool = True,
+        persist: bool = False,
+        **kwargs: Any,
     ) -> list[JobItem]:
         url = build_linkedin_search_url(
             keywords=keywords,
@@ -243,10 +245,32 @@ class LinkedInClient:
                 f"LinkedIn anomaly detected: response size {len(html_content)} bytes but parsed 0 jobs. DOM classes may have changed."
             )
 
-        jobs = jobs[:limit]
-
         if fetch_descriptions and jobs:
-            await self._enrich_descriptions(jobs)
+            # Respect limit
+            jobs = jobs[:limit]
+            tasks = [self._fetch_job_description(job) for job in jobs]
+            jobs = await asyncio.gather(*tasks)
+
+        if persist and jobs:
+            from src.services.raw_ingestion import save_raw_linkedin_job
+            for j in jobs:
+                await save_raw_linkedin_job({
+                    "external_id": j.external_id,
+                    "title": j.title,
+                    "company_name": j.company_name,
+                    "company_logo_url": j.company_logo_url,
+                    "company_website": j.company_website,
+                    "location_raw": j.location_raw,
+                    "city": j.city,
+                    "is_remote": j.is_remote,
+                    "is_international": j.is_international,
+                    "url": j.url,
+                    "salary_raw": j.salary_raw,
+                    "description_html": j.description_html,
+                    "description_text": j.description_text,
+                    "posted_at": j.posted_at,
+                    "raw_payload": {"external_id": j.external_id, "title": j.title, "url": j.url},
+                })
 
         return jobs
 

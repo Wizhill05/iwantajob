@@ -365,6 +365,8 @@ class IndeedClient:
         radius_unit: str = "KILOMETERS",
         cursor: str | None = None,
         return_raw: bool = False,
+        persist: bool = False,
+        **kwargs: Any,
     ) -> tuple[list[JobItem], str | None] | tuple[list[JobItem], str | None, dict[str, Any]]:
         query = build_indeed_graphql_query(
             what=what,
@@ -382,6 +384,47 @@ class IndeedClient:
         async with self._semaphore:
             data = await self._execute_with_retries(payload, headers, what, where)
             items, next_cursor = parse_graphql_response(data, fallback_where=where)
+
+            if persist and data:
+                from src.services.raw_ingestion import save_raw_indeed_job
+                raw_results = data.get("data", {}).get("jobSearch", {}).get("results", [])
+                for res_item in raw_results:
+                    job_d = res_item.get("job") or {}
+                    t_key = res_item.get("trackingKey")
+                    jk = job_d.get("key") or t_key
+                    if not jk:
+                        continue
+                    emp = job_d.get("employer")
+                    emp_name = (emp.get("name") if isinstance(emp, dict) else None) or "Unknown"
+                    loc_d = job_d.get("location") or {}
+                    loc_short = (loc_d.get("formatted") or {}).get("short") or where
+                    city_val = loc_d.get("city")
+                    ctry_val = loc_d.get("countryCode")
+                    apply_url_val = job_d.get("url") or ""
+                    easy_apply = ("indeed.com" in apply_url_val) or not apply_url_val
+                    attrs_val = job_d.get("attributes") or []
+                    desc_d = job_d.get("description") or {}
+                    desc_html_val = desc_d.get("html")
+                    desc_text_val = clean_html(desc_html_val)
+                    await save_raw_indeed_job({
+                        "external_id": jk,
+                        "tracking_key": t_key,
+                        "title": job_d.get("title") or "Unknown",
+                        "company_name": emp_name,
+                        "location_raw": loc_short,
+                        "location_city": city_val,
+                        "location_country": ctry_val,
+                        "is_remote": bool(loc_d.get("isRemote")),
+                        "apply_url": apply_url_val,
+                        "easy_apply_available": easy_apply,
+                        "attributes": attrs_val,
+                        "salary_raw": None,
+                        "description_html": desc_html_val,
+                        "description_text": desc_text_val,
+                        "date_published": None,
+                        "raw_payload": res_item,
+                    })
+
             if return_raw:
                 return items, next_cursor, data
             return items, next_cursor

@@ -420,3 +420,8 @@ class ParserService:
             "promoted_to_unified": promoted,
             "errors": errors,
         }
+
+    parse_indeed = parse_indeed_jobs
+    parse_linkedin = parse_linkedin_jobs
+    parse_wellfound = parse_wellfound_jobs
+
