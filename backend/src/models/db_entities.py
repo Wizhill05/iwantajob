@@ -124,3 +124,22 @@ class UnifiedJob(Base):
     __table_args__ = (
         UniqueConstraint("source", "external_id", name="uq_source_external_id"),
     )
+
+class CronJob(Base):
+    __tablename__ = "cron_jobs"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    name = Column(String, nullable=False)
+    provider = Column(String, nullable=False)  # 'indeed', 'linkedin', 'wellfound', or 'all'
+    hour = Column(Integer, nullable=False)
+    minute = Column(Integer, nullable=False)
+    days_of_week = Column(JSONB, default=list, nullable=False)
+    search_params = Column(JSONB, default=dict, nullable=False)
+    auto_parse = Column(Boolean, default=False, nullable=False)
+    is_enabled = Column(Boolean, default=True, nullable=False)
+    last_run_at = Column(DateTime(timezone=True), nullable=True)
+    last_status = Column(String, nullable=True)
+    last_result_summary = Column(Text, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+
