@@ -9,6 +9,7 @@ import {
   RefreshDouble,
   Suitcase,
   Terminal,
+  Clock,
 } from 'iconoir-react';
 import { useActivity } from '@/context/ActivityContext';
 import { cn } from '@/lib/utils';
@@ -24,6 +25,7 @@ const NAV_ITEMS: NavItem[] = [
   { name: 'Scrapers', href: '/scrapers', icon: Cpu },
   { name: 'Pipeline', href: '/pipeline', icon: RefreshDouble },
   { name: 'Jobs', href: '/jobs', icon: Suitcase },
+  { name: 'Cron', href: '/cron', icon: Clock },
   { name: 'Logs', href: '/logs', icon: Terminal },
 ];
 
