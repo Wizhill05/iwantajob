@@ -5,11 +5,11 @@ const nextConfig = {
     return [
       {
         source: "/api/:path*",
-        destination: "http://127.0.0.1:8020/api/:path*",
+        destination: "http://127.0.0.1:8120/api/:path*",
       },
       {
         source: "/health",
-        destination: "http://127.0.0.1:8020/health",
+        destination: "http://127.0.0.1:8120/health",
       },
     ];
   },
