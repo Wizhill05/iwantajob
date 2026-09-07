@@ -37,3 +37,23 @@ def test_classify_leaves_unmatched_active():
     job = {"title": "Accountant", "is_international": False, "experience_min_years": 0, "is_fresher_friendly": True, "city": "bengaluru", "salary_min_inr_year": None}
     action, _ = AutoTriageService.classify(job, DEFAULT_PREFS)
     assert action == "none"
+
+
+import pytest
+
+
+@pytest.mark.asyncio
+async def test_prefs_roundtrip_and_dry_run():
+    from src.core.database import init_db
+    await init_db()
+    from fastapi.testclient import TestClient
+    from src.main import app
+    c = TestClient(app)
+    r = c.get("/api/preferences")
+    assert r.status_code == 200 and r.json()["max_experience_years"] == 2
+    r = c.put("/api/preferences", json={"max_experience_years": 1})
+    assert r.json()["max_experience_years"] == 1
+    r = c.put("/api/preferences", json={"max_experience_years": 2})
+    assert r.json()["max_experience_years"] == 2
+    r = c.post("/api/jobs/auto-triage?dry_run=true&limit=5")
+    assert r.status_code == 200 and "evaluated" in r.json()
