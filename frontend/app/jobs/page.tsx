@@ -601,13 +601,12 @@ function JobsExplorerContent() {
         <div className="relative">
           {isSelectMode ? (
             <div className="flex justify-center">
-              <div className="h-[34px] w-auto max-w-full mx-auto bg-[#181818] border border-[#333] shadow-lg rounded-full pl-2.5 pr-1.5 flex items-center justify-center gap-1 text-xs font-sans text-white">
+              {/* Floating circles only — no outer pill. Row height matches the taller search bar (42px) */}
+              <div className="h-[42px] w-auto max-w-full mx-auto flex items-center justify-center gap-2 text-xs font-sans text-white">
                 {/* Count */}
-                <span className="min-w-[22px] h-6 px-1.5 rounded-full bg-[#3ecf8e]/20 text-[#3ecf8e] border border-[#3ecf8e]/40 font-mono font-bold text-[11px] flex items-center justify-center">
+                <span className="h-[42px] w-[42px] rounded-full bg-[#3ecf8e]/20 text-[#3ecf8e] border border-[#3ecf8e]/40 font-mono font-bold text-sm flex items-center justify-center shrink-0">
                   {selectedIds.size}
                 </span>
-
-                <div className="h-4 w-px bg-[#333]" />
 
                 <button
                   type="button"
@@ -622,12 +621,10 @@ function JobsExplorerContent() {
                       ? 'Deselect all'
                       : 'Select all'
                   }
-                  className="h-7 w-7 p-0 flex items-center justify-center rounded-full bg-[#202020] hover:bg-[#282828] border border-[#333] text-white hover:text-[#3ecf8e] transition-colors active:scale-95"
+                  className="h-[42px] w-[42px] p-0 flex items-center justify-center rounded-full bg-[#202020] hover:bg-[#282828] border border-[#333] text-white hover:text-[#3ecf8e] transition-colors active:scale-95 shrink-0"
                 >
-                  <Check className="w-4 h-4" />
+                  <Check className="w-5 h-5" />
                 </button>
-
-                <div className="h-4 w-px bg-[#333]" />
 
                 <button
                   type="button"
@@ -635,9 +632,9 @@ function JobsExplorerContent() {
                   onClick={handleBatchSave}
                   title="Save selected"
                   aria-label="Save selected"
-                  className="h-7 w-7 p-0 flex items-center justify-center rounded-full bg-[#202020] hover:bg-[#3ecf8e]/20 border border-[#333] hover:border-[#3ecf8e]/50 text-white hover:text-[#3ecf8e] transition-all disabled:opacity-40 disabled:cursor-not-allowed active:scale-95"
+                  className="h-[42px] w-[42px] p-0 flex items-center justify-center rounded-full bg-[#202020] hover:bg-[#3ecf8e]/20 border border-[#333] hover:border-[#3ecf8e]/50 text-white hover:text-[#3ecf8e] transition-all disabled:opacity-40 disabled:cursor-not-allowed active:scale-95 shrink-0"
                 >
-                  <Bookmark className="w-4 h-4 text-[#3ecf8e]" />
+                  <Bookmark className="w-5 h-5 text-[#3ecf8e]" />
                 </button>
 
                 <button
@@ -646,12 +643,12 @@ function JobsExplorerContent() {
                   onClick={handleBatchArchiveOrRegister}
                   title={activeTab === 'archived' ? 'Unarchive selected' : 'Archive selected'}
                   aria-label={activeTab === 'archived' ? 'Unarchive selected' : 'Archive selected'}
-                  className="h-7 w-7 p-0 flex items-center justify-center rounded-full bg-[#202020] hover:bg-amber-500/20 border border-[#333] hover:border-amber-500/50 text-white hover:text-amber-400 transition-all disabled:opacity-40 disabled:cursor-not-allowed active:scale-95"
+                  className="h-[42px] w-[42px] p-0 flex items-center justify-center rounded-full bg-[#202020] hover:bg-amber-500/20 border border-[#333] hover:border-amber-500/50 text-white hover:text-amber-400 transition-all disabled:opacity-40 disabled:cursor-not-allowed active:scale-95 shrink-0"
                 >
                   {activeTab === 'archived' ? (
-                    <Undo className="w-4 h-4 text-amber-400" />
+                    <Undo className="w-5 h-5 text-amber-400" />
                   ) : (
-                    <Archive className="w-4 h-4 text-amber-400" />
+                    <Archive className="w-5 h-5 text-amber-400" />
                   )}
                 </button>
 
@@ -661,21 +658,19 @@ function JobsExplorerContent() {
                   onClick={handleBatchDelete}
                   title="Delete selected"
                   aria-label="Delete selected"
-                  className="h-7 w-7 p-0 flex items-center justify-center rounded-full bg-rose-500/15 hover:bg-rose-500/25 border border-rose-500/40 text-rose-300 transition-all disabled:opacity-40 disabled:cursor-not-allowed active:scale-95"
+                  className="h-[42px] w-[42px] p-0 flex items-center justify-center rounded-full bg-rose-500/15 hover:bg-rose-500/25 border border-rose-500/40 text-rose-300 transition-all disabled:opacity-40 disabled:cursor-not-allowed active:scale-95 shrink-0"
                 >
-                  <Trash className="w-4 h-4 text-rose-400" />
+                  <Trash className="w-5 h-5 text-rose-400" />
                 </button>
-
-                <div className="h-4 w-px bg-[#333]" />
 
                 <button
                   type="button"
                   onClick={handleCancelSelectMode}
                   title="Cancel selection mode"
                   aria-label="Cancel selection mode"
-                  className="rounded-full hover:bg-[#282828] text-[#9ca3af] hover:text-white transition-colors active:scale-95 h-7 w-7 flex items-center justify-center"
+                  className="h-[42px] w-[42px] rounded-full bg-[#202020] hover:bg-[#282828] border border-[#333] text-[#9ca3af] hover:text-white transition-colors active:scale-95 flex items-center justify-center shrink-0"
                 >
-                  <Xmark className="w-4 h-4" />
+                  <Xmark className="w-5 h-5" />
                 </button>
               </div>
             </div>
