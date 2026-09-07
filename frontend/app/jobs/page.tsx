@@ -607,25 +607,33 @@ function JobsExplorerContent() {
                 <button
                   type="button"
                   onClick={handleSelectAll}
-                  className="px-2 py-1 rounded bg-[#202020] hover:bg-[#282828] border border-[#333] text-white hover:text-[#3ecf8e] transition-colors font-medium text-[11px] active:scale-95 whitespace-nowrap"
+                  title={
+                    selectedIds.size === displayedJobs.length && displayedJobs.length > 0
+                      ? 'Deselect all'
+                      : 'Select all'
+                  }
+                  aria-label={
+                    selectedIds.size === displayedJobs.length && displayedJobs.length > 0
+                      ? 'Deselect all'
+                      : 'Select all'
+                  }
+                  className="h-7 w-7 p-0 flex items-center justify-center rounded-md bg-[#202020] hover:bg-[#282828] border border-[#333] text-white hover:text-[#3ecf8e] transition-colors active:scale-95"
                 >
-                  {selectedIds.size === displayedJobs.length && displayedJobs.length > 0
-                    ? 'Deselect All'
-                    : 'Select All'}
+                  <Check className="w-4 h-4" />
                 </button>
               </div>
 
-              {/* Right: Actions (Save, Archive/Registered, Delete, Cancel) */}
+              {/* Right: Actions (Save, Archive/Registered, Delete, Cancel) — icon-only square buttons */}
               <div className="flex items-center gap-1 shrink-0 ml-auto">
                 <button
                   type="button"
                   disabled={selectedIds.size === 0}
                   onClick={handleBatchSave}
                   title="Save selected"
-                  className="flex items-center gap-1 px-2.5 py-1 rounded bg-[#202020] hover:bg-[#3ecf8e]/20 border border-[#333] hover:border-[#3ecf8e]/50 text-white hover:text-[#3ecf8e] transition-all disabled:opacity-40 disabled:cursor-not-allowed font-medium text-[11px] active:scale-95 h-7"
+                  aria-label="Save selected"
+                  className="h-7 w-7 p-0 flex items-center justify-center rounded-md bg-[#202020] hover:bg-[#3ecf8e]/20 border border-[#333] hover:border-[#3ecf8e]/50 text-white hover:text-[#3ecf8e] transition-all disabled:opacity-40 disabled:cursor-not-allowed active:scale-95"
                 >
-                  <Bookmark className="w-3.5 h-3.5 text-[#3ecf8e]" />
-                  <span>Save</span>
+                  <Bookmark className="w-4 h-4 text-[#3ecf8e]" />
                 </button>
 
                 <button
@@ -633,18 +641,13 @@ function JobsExplorerContent() {
                   disabled={selectedIds.size === 0}
                   onClick={handleBatchArchiveOrRegister}
                   title={activeTab === 'archived' ? 'Unarchive selected' : 'Archive selected'}
-                  className="flex items-center gap-1 px-2.5 py-1 rounded bg-[#202020] hover:bg-amber-500/20 border border-[#333] hover:border-amber-500/50 text-white hover:text-amber-400 transition-all disabled:opacity-40 disabled:cursor-not-allowed font-medium text-[11px] active:scale-95 h-7"
+                  aria-label={activeTab === 'archived' ? 'Unarchive selected' : 'Archive selected'}
+                  className="h-7 w-7 p-0 flex items-center justify-center rounded-md bg-[#202020] hover:bg-amber-500/20 border border-[#333] hover:border-amber-500/50 text-white hover:text-amber-400 transition-all disabled:opacity-40 disabled:cursor-not-allowed active:scale-95"
                 >
                   {activeTab === 'archived' ? (
-                    <>
-                      <Undo className="w-3.5 h-3.5 text-amber-400" />
-                      <span>Unarchive</span>
-                    </>
+                    <Undo className="w-4 h-4 text-amber-400" />
                   ) : (
-                    <>
-                      <Archive className="w-3.5 h-3.5 text-amber-400" />
-                      <span>Archive</span>
-                    </>
+                    <Archive className="w-4 h-4 text-amber-400" />
                   )}
                 </button>
 
@@ -653,10 +656,10 @@ function JobsExplorerContent() {
                   disabled={selectedIds.size === 0}
                   onClick={handleBatchDelete}
                   title="Delete selected"
-                  className="flex items-center gap-1 px-2.5 py-1 rounded bg-rose-500/15 hover:bg-rose-500/25 border border-rose-500/40 text-rose-300 transition-all disabled:opacity-40 disabled:cursor-not-allowed font-medium text-[11px] active:scale-95 h-7"
+                  aria-label="Delete selected"
+                  className="h-7 w-7 p-0 flex items-center justify-center rounded-md bg-rose-500/15 hover:bg-rose-500/25 border border-rose-500/40 text-rose-300 transition-all disabled:opacity-40 disabled:cursor-not-allowed active:scale-95"
                 >
-                  <Trash className="w-3.5 h-3.5 text-rose-400" />
-                  <span>Delete</span>
+                  <Trash className="w-4 h-4 text-rose-400" />
                 </button>
 
                 <div className="h-4 w-px bg-[#333]" />
