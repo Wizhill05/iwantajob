@@ -110,3 +110,10 @@ async def test_manual_parsers_and_status():
         # Check that it's saved again
         check_resp = await client.get(f"/api/jobs/unified?is_saved=true")
         assert any(j["id"] == fresher_id for j in check_resp.json())
+
+        # 8. Test reparse-unified endpoint
+        reparse_resp = await client.post("/api/parse/reparse-unified?only_missing_experience=true&use_llm=false&limit=10")
+        assert reparse_resp.status_code == 200
+        reparse_data = reparse_resp.json()
+        assert "processed" in reparse_data
+        assert "updated" in reparse_data

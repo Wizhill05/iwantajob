@@ -24,6 +24,7 @@ SAMPLE_SEARCH_HTML = """
         </h4>
         <div class="base-search-card__metadata">
           <span class="job-search-card__location">Bengaluru, Karnataka, India</span>
+          <span class="job-search-card__salary-info">₹25,00,000 - ₹35,00,000</span>
           <time class="job-search-card__listdate" datetime="2025-02-28">Feb 28, 2025</time>
         </div>
       </div>
@@ -54,6 +55,10 @@ SAMPLE_DETAIL_HTML = """
     <h1 class="topcard__title">Software Engineer</h1>
     <a class="topcard__org-name-link" href="https://www.linkedin.com/company/jpmorganchase">JPMorgan Chase & Co.</a>
     <img class="artdeco-entity-image" src="https://media.licdn.com/dms/image/v2/company-logo.png" />
+  </div>
+  <div class="compensation__salary-range">
+    <h3 class="compensation__heading">Base pay range</h3>
+    <div class="salary compensation__salary">$137,750.00/yr - $185,000.00/yr</div>
   </div>
   <div class="show-more-less-html__markup">
     <p>We are seeking a <strong>Software Engineer</strong> with strong Python and distributed systems background.</p>
@@ -99,12 +104,14 @@ def test_parse_linkedin_job_cards():
     assert job1.city == "bengaluru"
     assert job1.is_remote is False
     assert job1.is_international is False
+    assert job1.salary_raw == "₹25,00,000 - ₹35,00,000"
     assert job1.posted_at == datetime(2025, 2, 28, 0, 0, tzinfo=timezone.utc)
 
     job2 = jobs[1]
     assert job2.external_id == "4463999999"
     assert job2.title == "AI Engineer"
     assert job2.company_name == "DeepTech Labs"
+    assert job2.salary_raw is None
     assert job2.is_remote is True
     assert job2.posted_at == datetime(2025, 3, 1, 0, 0, tzinfo=timezone.utc)
 
@@ -115,6 +122,7 @@ def test_parse_linkedin_job_detail():
     assert "<p>" in detail["description_html"]
     assert detail["company_logo_url"] == "https://media.licdn.com/dms/image/v2/company-logo.png"
     assert "jpmorganchase" in detail["company_website"]
+    assert detail["salary_raw"] == "$137,750.00/yr - $185,000.00/yr"
 
 @pytest.mark.asyncio
 async def test_linkedin_client_search():

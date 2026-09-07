@@ -41,13 +41,13 @@ async def test_live_scraping_persists_raw_and_manual_parsing():
         assert st["wellfound"]["total_raw"] >= 1
 
         # 2. Trigger manual parsing for Wellfound
-        parse_wf = await client.post("/api/parse/wellfound?batch_size=5&use_llm=false")
+        parse_wf = await client.post("/api/parse/wellfound?batch_size=50&use_llm=false")
         assert parse_wf.status_code == 200
         p_data = parse_wf.json()
         assert p_data["promoted_to_unified"] >= 1
 
         # 3. Check unified jobs endpoint returns parsed records
-        uni_resp = await client.get("/api/jobs/unified?source=wellfound")
+        uni_resp = await client.get("/api/jobs/unified?source=wellfound&limit=100")
         assert uni_resp.status_code == 200
         jobs = uni_resp.json()
         assert len(jobs) >= 1

@@ -76,3 +76,28 @@ def test_experience_extractor_bracket_regex():
     assert res["max_years"] == 5
     assert res["is_fresher_friendly"] is False
     assert res["method"] == "regex"
+
+def test_experience_extractor_unicode_dashes():
+    desc = "Candidate Profile 3–5 years of relevant software, AI, or GenAI engineering experience."
+    res = ExperienceExtractor.extract(description=desc)
+    assert res["min_years"] == 3
+    assert res["max_years"] == 5
+    assert res["is_fresher_friendly"] is False
+
+def test_experience_extractor_standalone_years():
+    desc = "10 Years of experience in SoC/IP verification."
+    res = ExperienceExtractor.extract(description=desc)
+    assert res["min_years"] == 10
+    assert res["max_years"] is None
+
+def test_experience_extractor_minimum_pattern():
+    desc = "Requirements: Minimum 5 years of design experience in a relevant industry."
+    res = ExperienceExtractor.extract(description=desc)
+    assert res["min_years"] == 5
+    assert res["max_years"] is None
+
+def test_experience_extractor_plus_pattern():
+    desc = "Skills: 4+ years of experience in Windows Server support infrastructure."
+    res = ExperienceExtractor.extract(description=desc)
+    assert res["min_years"] == 4
+    assert res["max_years"] is None

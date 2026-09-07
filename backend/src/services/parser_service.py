@@ -11,11 +11,13 @@ from src.models.db_entities import (
     UnifiedJob,
 )
 from src.services.llm_parser import LLMJobParser
+from src.services.experience_extractor import ExperienceExtractor
+from src.services.pay_normalizer import PayNormalizer
 from src.utils.url_normalizer import normalize_job_url
 
 logger = logging.getLogger(__name__)
 
-LLM_BATCH_CHUNK_SIZE = 25
+LLM_BATCH_CHUNK_SIZE = 10
 
 
 class ParserService:
@@ -418,5 +420,92 @@ class ParserService:
             "source": "wellfound",
             "processed": len(raw_jobs),
             "promoted_to_unified": promoted,
+            "errors": errors,
+        }
+
+    @classmethod
+    async def reparse_unified_jobs(
+        cls,
+        only_missing_experience: bool = True,
+        use_llm: bool = True,
+        limit: int = 200,
+    ) -> dict[str, Any]:
+        """
+        Reparses existing UnifiedJob records where experience is missing.
+        Uses enhanced regex extractor and LLM fallback to backfill historical jobs.
+        """
+        async with async_session_maker() as session:
+            query = select(UnifiedJob)
+            if only_missing_experience:
+                query = query.where(
+                    (UnifiedJob.experience_min_years == None) & (UnifiedJob.is_fresher_friendly == False)
+                )
+            query = query.limit(limit)
+            jobs_to_reparse = (await session.execute(query)).scalars().all()
+
+        if not jobs_to_reparse:
+            return {"processed": 0, "updated": 0, "errors": []}
+
+        updated = 0
+        errors = []
+
+        for i in range(0, len(jobs_to_reparse), LLM_BATCH_CHUNK_SIZE):
+            chunk = jobs_to_reparse[i : i + LLM_BATCH_CHUNK_SIZE]
+            chunk_items = [
+                {
+                    "id": str(j.id),
+                    "title": j.title,
+                    "salary_raw": j.salary_raw,
+                    "description": j.description_text,
+                }
+                for j in chunk
+            ]
+
+            if use_llm:
+                parsed_map = await LLMJobParser.parse_jobs_batch(chunk_items)
+            else:
+                parsed_map = {
+                    str(j.id): LLMJobParser._empty_result(
+                        salary_raw=j.salary_raw,
+                        title=j.title,
+                        description=j.description_text,
+                    )
+                    for j in chunk
+                }
+
+            async with async_session_maker() as update_session:
+                for j in chunk:
+                    try:
+                        p = parsed_map.get(str(j.id))
+                        if not p:
+                            continue
+
+                        has_exp = p.get("experience_min_years") is not None or p.get("is_fresher_friendly")
+                        has_sal = p.get("salary_min_inr_year") is not None
+
+                        update_vals = {}
+                        if has_exp:
+                            update_vals["experience_min_years"] = p["experience_min_years"]
+                            update_vals["experience_max_years"] = p["experience_max_years"]
+                            update_vals["is_fresher_friendly"] = p["is_fresher_friendly"]
+                        if has_sal and j.salary_min_inr_year is None:
+                            update_vals["salary_min_inr_year"] = p["salary_min_inr_year"]
+                            update_vals["salary_max_inr_year"] = p["salary_max_inr_year"]
+                            update_vals["salary_currency_raw"] = p.get("salary_currency_raw") or j.salary_currency_raw
+
+                        if update_vals:
+                            await update_session.execute(
+                                update(UnifiedJob).where(UnifiedJob.id == j.id).values(**update_vals)
+                            )
+                            updated += 1
+                    except Exception as exc:
+                        logger.error(f"Error reparsing job {j.id}: {exc}")
+                        errors.append({"id": str(j.id), "error": str(exc)})
+
+                await update_session.commit()
+
+        return {
+            "processed": len(jobs_to_reparse),
+            "updated": updated,
             "errors": errors,
         }

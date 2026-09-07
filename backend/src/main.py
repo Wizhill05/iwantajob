@@ -757,6 +757,26 @@ async def parse_wellfound(
     """Parses unparsed raw Wellfound records into clean unified_jobs records using Gemini LLM in batches of 25."""
     return await ParserService.parse_wellfound_jobs(batch_size=batch_size, use_llm=use_llm)
 
+@app.post(
+    "/api/parse/reparse-unified",
+    summary="Reparse Existing Unified Jobs With Missing Experience or Salary",
+    tags=["Pipeline"],
+)
+async def reparse_unified_jobs_endpoint(
+    only_missing_experience: Annotated[bool, Query(description="Only reparse jobs where experience_min_years is null")] = True,
+    use_llm: Annotated[bool, Query(description="Whether to use Gemini LLM batch parsing with hybrid fallback")] = True,
+    limit: Annotated[int, Query(ge=1, le=500, description="Max jobs to reprocess")] = 100,
+):
+    """
+    Backfills and reparses existing unified_jobs where experience or salary was missed.
+    Uses the upgraded regex engine and Gemini LLM.
+    """
+    return await ParserService.reparse_unified_jobs(
+        only_missing_experience=only_missing_experience,
+        use_llm=use_llm,
+        limit=limit,
+    )
+
 class JobTriageUpdateRequest(BaseModel):
     is_saved: bool | None = None
     is_archived: bool | None = None

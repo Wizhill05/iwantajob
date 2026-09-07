@@ -7,13 +7,15 @@ from src.core.config import settings
 
 logger = logging.getLogger(__name__)
 
+DASH_CHARS = r"[\-\u2010-\u2015\u2212\uFF0D~]"
+
 FRESHER_KEYWORDS = [
     r"\bfreshers?\b",
     r"\brecent graduate\b",
     r"\bcollege graduate\b",
     r"\bentry[- ]level\b",
-    r"\b0[- ](?:to[- ])?1\s*(?:years?|yrs?)\b",
-    r"\b0[- ](?:to[- ])?2\s*(?:years?|yrs?)\b",
+    rf"\b0\s*(?:{DASH_CHARS}|to)\s*1\s*(?:years?|yrs?)\b",
+    rf"\b0\s*(?:{DASH_CHARS}|to)\s*2\s*(?:years?|yrs?)\b",
     r"\bno experience (?:required|needed)\b",
     r"\bintern(?:ship)?\b",
     r"\btrainee\b",
@@ -69,8 +71,7 @@ class ExperienceExtractor:
         # 3. Check Fresher keywords via regex
         for kw in FRESHER_KEYWORDS:
             if re.search(kw, desc_lower):
-                # Also try to check if there is an upper bound (e.g. 0-2 years)
-                m = re.search(r"0\s*(?:-|to)\s*([0-9]+)\s*(?:years?|yrs?)", desc_lower)
+                m = re.search(rf"0\s*(?:{DASH_CHARS}|to)\s*([0-9]+)\s*(?:years?|yrs?)", desc_lower)
                 max_y = int(m.group(1)) if m else 1
                 return {
                     "min_years": 0,
@@ -79,45 +80,78 @@ class ExperienceExtractor:
                     "method": "regex",
                 }
 
-        # 4. Standard experience range pattern in description
-        # e.g. "3 - 5 years of experience", "2+ years", "minimum 4 years"
+        # 4. Explicit experience range in description (handles unicode dashes, "to", etc.)
+        # e.g. "3 - 5 years of experience", "4 - 8 years of professional software development experience", "3–5 years"
         range_match = re.search(
-            r"([0-9]+)\s*(?:-|to)\s*([0-9]+)\s*(?:years?|yrs?)(?:\s+of\s+experience)?",
+            rf"(?:minimum\s+|at\s+least\s+)?([0-9]+)\s*(?:{DASH_CHARS}|to)\s*([0-9]+)\s*(?:years?|yrs?)(?:\s+of\s+[\w\s,/\-]+experience|\s+experience|\s+software|\s+professional)?",
             desc_lower,
         )
         if range_match:
             min_y = int(range_match.group(1))
             max_y = int(range_match.group(2))
-            return {
-                "min_years": min_y,
-                "max_years": max_y,
-                "is_fresher_friendly": min_y <= 1,
-                "method": "regex",
-            }
+            if min_y <= 25 and max_y <= 35:
+                return {
+                    "min_years": min_y,
+                    "max_years": max_y,
+                    "is_fresher_friendly": min_y <= 1,
+                    "method": "regex",
+                }
 
+        # 5. Plus experience pattern (e.g. "4+ years", "3+ years of experience")
         plus_match = re.search(
-            r"([0-9]+)\s*\+\s*(?:years?|yrs?)(?:\s+of\s+experience)?",
+            rf"([0-9]+)\s*\+\s*(?:years?|yrs?)(?:\s+of\s+[\w\s,/\-]+experience|\s+experience)?",
             desc_lower,
         )
         if plus_match:
             min_y = int(plus_match.group(1))
-            return {
-                "min_years": min_y,
-                "max_years": None,
-                "is_fresher_friendly": min_y <= 1,
-                "method": "regex",
-            }
+            # Guard against company age phrases like "for over 25+ years"
+            company_age_check = re.search(rf"(?:for|over|history of|serving)\s+(?:over\s+)?{min_y}\s*\+\s*years", desc_lower)
+            if not company_age_check and min_y <= 25:
+                return {
+                    "min_years": min_y,
+                    "max_years": None,
+                    "is_fresher_friendly": min_y <= 1,
+                    "method": "regex",
+                }
 
+        # 6. Minimum / at least pattern (e.g. "minimum 5 years", "at least 3 years")
         min_match = re.search(
-            r"(?:minimum|at least)\s*([0-9]+)\s*(?:years?|yrs?)",
+            rf"(?:minimum|at\s+least)(?:\s+of)?\s*([0-9]+)\s*(?:years?|yrs?)",
             desc_lower,
         )
         if min_match:
             min_y = int(min_match.group(1))
+            if min_y <= 25:
+                return {
+                    "min_years": min_y,
+                    "max_years": None,
+                    "is_fresher_friendly": min_y <= 1,
+                    "method": "regex",
+                }
+
+        # 7. Standalone "X years of experience" pattern (e.g. "10 Years of experience in SoC/IP verification")
+        years_of_exp_match = re.search(
+            rf"([0-9]+)\s*(?:years?|yrs?)\s+(?:of\s+)?(?:[\w\s,/\-]{{0,50}}?)?experience",
+            desc_lower,
+        )
+        if years_of_exp_match:
+            min_y = int(years_of_exp_match.group(1))
+            company_age_check = re.search(rf"(?:for|over|history of|founded)\s+(?:over\s+)?{min_y}\s*(?:years?|yrs?)", desc_lower)
+            if not company_age_check and min_y <= 25:
+                return {
+                    "min_years": min_y,
+                    "max_years": None,
+                    "is_fresher_friendly": min_y <= 1,
+                    "method": "regex",
+                }
+
+        # 8. Check for months of experience (e.g. "6 months of hands-on experience")
+        months_match = re.search(r"([0-9]+)\s*(?:months?|mos?)\s+(?:of\s+)?(?:[\w\s,/\-]{0,50}?)?experience", desc_lower)
+        if months_match:
             return {
-                "min_years": min_y,
-                "max_years": None,
-                "is_fresher_friendly": min_y <= 1,
+                "min_years": 0,
+                "max_years": 1,
+                "is_fresher_friendly": True,
                 "method": "regex",
             }
 
@@ -136,14 +170,17 @@ class ExperienceExtractor:
         if not description or len(description.strip()) < 50:
             return {"min_years": None, "max_years": None, "is_fresher_friendly": False, "method": "none"}
 
-        truncated_desc = description[:4000]
+        truncated_desc = description[:10000]
         prompt = (
-            f"Analyze this job title and description and extract years of experience required.\n"
+            f"Analyze this job title and description and extract the required professional experience in years.\n"
             f"Job Title: {title}\n"
             f"Job Description: {truncated_desc}\n\n"
             f"Respond ONLY with a valid JSON object matching this schema:\n"
             f'{{"min_years": integer or null, "max_years": integer or null, "is_fresher_friendly": boolean}}\n'
-            f"Rules: If role mentions fresher, internship, or 0-1 year, is_fresher_friendly=true and min_years=0."
+            f"Rules:\n"
+            f"- If the role welcomes freshers, recent graduates, interns, or specifies <= 1 year, set is_fresher_friendly=true and min_years=0.\n"
+            f"- Look under Qualifications, Requirements, Minimum Qualifications, and Candidate Profile for required years.\n"
+            f"- If a range is given like '3-5 years', min_years=3, max_years=5. If '4+ years', min_years=4, max_years=null."
         )
 
         if not settings.freeapi_api_key:

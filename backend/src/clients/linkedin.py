@@ -65,6 +65,55 @@ def parse_linkedin_date(date_str: str | None) -> datetime | None:
     except Exception:
         return None
 
+def extract_linkedin_salary(soup_or_tag: Any) -> str | None:
+    """
+    Extract raw salary string from LinkedIn card or job detail HTML.
+    Handles compensation sections, salary-range tags, and search card salary badges.
+    """
+    if not soup_or_tag:
+        return None
+
+    # 1. Look for explicit compensation salary container
+    sal_el = soup_or_tag.find(class_=lambda c: c and "compensation__salary" in c and "range" not in c)
+    if sal_el:
+        txt = clean_html(str(sal_el))
+        if txt:
+            return txt
+
+    # 2. Look for salary-range wrapper
+    sal_range = soup_or_tag.find(class_=lambda c: c and "compensation__salary-range" in c)
+    if sal_range:
+        inner = sal_range.find(class_=lambda c: c and "salary" in c)
+        if inner:
+            txt = clean_html(str(inner))
+            if txt:
+                return txt
+        txt = clean_html(str(sal_range))
+        txt = re.sub(r"^(?:Base\s+pay\s+range|Pay\s+range)\s*", "", txt, flags=re.IGNORECASE).strip()
+        if txt:
+            return txt
+
+    # 3. Look for search card salary info
+    card_sal = soup_or_tag.find(class_=lambda c: c and "job-search-card__salary-info" in c)
+    if card_sal:
+        txt = clean_html(str(card_sal))
+        if txt:
+            return txt
+
+    # 4. Fallback search inside compensation block
+    comp_block = soup_or_tag.find(class_=lambda c: c and "compensation" in c)
+    if comp_block:
+        text = comp_block.get_text(" ", strip=True)
+        m = re.search(
+            r"([$€£₹][\d,]+(?:\.\d+)?(?:\s*[-–—]\s*[$€£₹]?[\d,]+(?:\.\d+)?)?(?:\s*(?:/\s*(?:yr|year|mo|month|hr|hour)|per\s+(?:year|month|hour)|LPA|lacs?))?)",
+            text,
+            re.IGNORECASE,
+        )
+        if m:
+            return m.group(1).strip()
+
+    return None
+
 def parse_linkedin_job_cards(html_content: str, fallback_loc: str = "India") -> list[JobItem]:
     """Parse HTML response from seeMoreJobPostings search endpoint."""
     if not html_content:
@@ -128,6 +177,9 @@ def parse_linkedin_job_cards(html_content: str, fallback_loc: str = "India") -> 
             date_attr = date_el.get("datetime")
             posted_at = parse_linkedin_date(date_attr)
 
+        # Raw salary if present on search card
+        salary_raw = extract_linkedin_salary(card)
+
         canonical_url = f"https://www.linkedin.com/jobs/view/{job_id}"
 
         jobs.append(
@@ -140,6 +192,7 @@ def parse_linkedin_job_cards(html_content: str, fallback_loc: str = "India") -> 
                 city=city,
                 is_remote=is_remote,
                 is_international=is_intl,
+                salary_raw=salary_raw,
                 url=canonical_url,
                 description_text="",
                 description_html=None,
@@ -169,11 +222,14 @@ def parse_linkedin_job_detail(html_content: str) -> dict[str, Any]:
     comp_el = soup.find("a", class_=lambda c: c and "topcard__org-name-link" in c)
     company_website = comp_el.get("href") if comp_el else None
 
+    salary_raw = extract_linkedin_salary(soup)
+
     return {
         "description_html": desc_html if desc_html else None,
         "description_text": desc_text,
         "company_logo_url": company_logo_url,
         "company_website": company_website,
+        "salary_raw": salary_raw,
     }
 
 class LinkedInClient:
@@ -272,6 +328,8 @@ class LinkedInClient:
                         job.company_logo_url = detail["company_logo_url"]
                     if detail.get("company_website") and not job.company_website:
                         job.company_website = detail["company_website"]
+                    if detail.get("salary_raw") and not job.salary_raw:
+                        job.salary_raw = detail["salary_raw"]
                     await asyncio.sleep(0.1)  # small throttle buffer
                 except Exception as exc:
                     logger.debug(f"Could not fetch detail for LinkedIn job {job.external_id}: {exc}")

@@ -27,11 +27,16 @@ Rules for Compensation (annual INR integer):
 6. If no compensation is stated anywhere, return null for both min and max.
 
 Rules for Experience:
-1. 'experience_min_years' (integer or null) and 'experience_max_years' (integer or null).
-2. 'is_fresher_friendly' (boolean):
+1. Carefully scan the entire job description—especially Qualifications, Requirements, Minimum Qualifications, Candidate Profile, What You'll Need, Experience, and bullet points for required years of experience.
+2. Experience bounds:
+   - If an explicit range is mentioned (e.g. '3-5 years', '4 - 8 years', '3 to 5 yrs', '16–20 years'), min: 3, max: 5.
+   - If '3+ years', 'minimum 4 years', 'at least 5 years', '10 years of experience', min: 3, max: null.
+   - If degree-conditional (e.g. 'BS with 5 years or MS with 3 years'), min: 3 (take the minimum required).
+   - If months are given (e.g. '6 months of experience'), min: 0, is_fresher_friendly: true.
+3. 'is_fresher_friendly' (boolean):
    - Set to TRUE if the role welcomes freshers, recent college graduates, interns, entry-level, 'batch of 2024/2025/2026', 'no experience required', or requires <= 1 year of experience.
    - When fresher-friendly with no minimum years specified, 'experience_min_years' should be 0.
-3. If an explicit range is mentioned (e.g. '3-5 years'), min: 3, max: 5. If '3+ years', min: 3, max: null.
+4. CRITICAL: NEVER return null for experience if years or fresher status are mentioned in the text or bullet points!
 
 Output format:
 Respond ONLY with a valid JSON object matching this schema:
@@ -65,11 +70,16 @@ Rules for Compensation (annual INR integer):
 6. If no compensation is stated anywhere, return null for both min and max.
 
 Rules for Experience:
-1. 'experience_min_years' (integer or null) and 'experience_max_years' (integer or null).
-2. 'is_fresher_friendly' (boolean):
+1. Carefully scan the entire job description—especially Qualifications, Requirements, Minimum Qualifications, Candidate Profile, What You'll Need, Experience, and bullet points for required years of experience.
+2. Experience bounds:
+   - If an explicit range is mentioned (e.g. '3-5 years', '4 - 8 years', '3 to 5 yrs', '16–20 years'), min: 3, max: 5.
+   - If '3+ years', 'minimum 4 years', 'at least 5 years', '10 years of experience', min: 3, max: null.
+   - If degree-conditional (e.g. 'BS with 5 years or MS with 3 years'), min: 3 (take the minimum required).
+   - If months are given (e.g. '6 months of experience'), min: 0, is_fresher_friendly: true.
+3. 'is_fresher_friendly' (boolean):
    - Set to TRUE if the role welcomes freshers, recent college graduates, interns, entry-level, 'batch of 2024/2025/2026', 'no experience required', or requires <= 1 year of experience.
    - When fresher-friendly with no minimum years specified, 'experience_min_years' should be 0.
-3. If an explicit range is mentioned (e.g. '3-5 years'), min: 3, max: 5. If '3+ years', min: 3, max: null.
+4. CRITICAL: NEVER return null for experience if years or fresher status are mentioned in the text or bullet points!
 
 Output format:
 Respond ONLY with a JSON array where each object matches this schema:
@@ -83,6 +93,31 @@ Respond ONLY with a JSON array where each object matches this schema:
   "is_fresher_friendly": boolean
 }
 """
+
+
+def prepare_description_for_llm(desc: str, max_chars: int = 8000) -> str:
+    """
+    Intelligently preserves the job description for LLM analysis.
+    If within max_chars, returns full text. If longer, preserves the intro and
+    prioritizes the Qualifications / Requirements / Experience sections.
+    """
+    cleaned = (desc or "").strip()
+    if len(cleaned) <= max_chars:
+        return cleaned
+
+    # Search for requirement/qualification heading
+    kw_match = re.search(
+        r"(?:minimum\s+)?(?:requirements|qualifications|candidate\s+profile|what\s+you(?:'ll|\s+will)\s+need|who\s+you\s+are|what\s+we(?:'re|\s+are)\s+looking\s+for|experience|skills|profile)",
+        cleaned,
+        re.IGNORECASE,
+    )
+    if kw_match and kw_match.start() > 1000:
+        intro = cleaned[:1500]
+        req_start = kw_match.start()
+        req_body = cleaned[req_start : req_start + (max_chars - 1500)]
+        return f"{intro}\n\n... [Requirements & Qualifications] ...\n{req_body}"
+
+    return cleaned[:max_chars]
 
 
 class LLMJobParser:
@@ -103,8 +138,10 @@ class LLMJobParser:
         """
         Parses compensation and experience directly using the LLM with fallback handling.
         """
-        # Truncate description safely
-        desc_snippet = (description or "").strip()[:5000]
+        from src.services.pay_normalizer import PayNormalizer
+        from src.services.experience_extractor import ExperienceExtractor
+
+        desc_snippet = prepare_description_for_llm(description, max_chars=12000)
         attrs_str = ", ".join([str(a.get("label", a) if isinstance(a, dict) else a) for a in (attributes or [])])
 
         user_content = (
@@ -154,14 +191,36 @@ class LLMJobParser:
 
                         min_sal = parsed.get("salary_min_inr_year")
                         max_sal = parsed.get("salary_max_inr_year")
+                        currency = parsed.get("currency") or "INR"
                         min_exp = parsed.get("experience_min_years")
                         max_exp = parsed.get("experience_max_years")
                         fresher = bool(parsed.get("is_fresher_friendly", False))
 
+                        # Hybrid fallback: check regex if LLM missed experience
+                        if min_exp is None and not fresher:
+                            reg_exp = ExperienceExtractor.extract(
+                                native_min=native_min_years,
+                                native_max=native_max_years,
+                                description=description,
+                                attributes=attributes,
+                            )
+                            if reg_exp["min_years"] is not None or reg_exp["is_fresher_friendly"]:
+                                min_exp = reg_exp["min_years"]
+                                max_exp = reg_exp["max_years"]
+                                fresher = reg_exp["is_fresher_friendly"]
+
+                        # Hybrid fallback: check regex/normalizer if LLM missed salary
+                        if min_sal is None:
+                            pay_norm = PayNormalizer.normalize(raw_salary=salary_raw, description=description)
+                            if pay_norm.get("min_inr"):
+                                min_sal = pay_norm["min_inr"]
+                                max_sal = pay_norm["max_inr"]
+                                currency = pay_norm.get("currency") or currency
+
                         return {
                             "salary_min_inr_year": int(min_sal) if min_sal is not None else None,
                             "salary_max_inr_year": int(max_sal) if max_sal is not None else None,
-                            "salary_currency_raw": parsed.get("currency") or "INR",
+                            "salary_currency_raw": currency,
                             "experience_min_years": int(min_exp) if min_exp is not None else (0 if fresher else None),
                             "experience_max_years": int(max_exp) if max_exp is not None else None,
                             "is_fresher_friendly": fresher,
@@ -237,11 +296,14 @@ class LLMJobParser:
 
         # Prepare payload for LLM
         llm_input = []
+        jobs_map = {}
         for j in jobs:
             jid = str(j["id"])
+            jobs_map[jid] = j
             attrs = j.get("attributes") or []
             attrs_str = ", ".join([str(a.get("label", a) if isinstance(a, dict) else a) for a in attrs])
-            desc_snip = (j.get("description") or j.get("description_text") or "").strip()[:2000]
+            raw_desc = j.get("description") or j.get("description_text") or ""
+            desc_snip = prepare_description_for_llm(raw_desc, max_chars=8000)
             item = {
                 "id": jid,
                 "title": j.get("title", ""),
@@ -317,22 +379,51 @@ class LLMJobParser:
                 else:
                     break
 
-        # Map parsed responses by ID
+        from src.services.pay_normalizer import PayNormalizer
+        from src.services.experience_extractor import ExperienceExtractor
+
+        # Map parsed responses by ID with hybrid safety fallback
         if parsed_list:
             for item in parsed_list:
                 if not isinstance(item, dict):
                     continue
                 item_id = str(item.get("id"))
+                orig_job = jobs_map.get(item_id, {})
+                raw_desc = orig_job.get("description") or orig_job.get("description_text") or ""
+                salary_raw = orig_job.get("salary_raw")
+
                 min_sal = item.get("salary_min_inr_year")
                 max_sal = item.get("salary_max_inr_year")
+                currency = item.get("currency") or "INR"
                 min_exp = item.get("experience_min_years")
                 max_exp = item.get("experience_max_years")
                 fresher = bool(item.get("is_fresher_friendly", False))
 
+                # Hybrid fallback: check regex if LLM missed experience
+                if min_exp is None and not fresher:
+                    reg_exp = ExperienceExtractor.extract(
+                        native_min=orig_job.get("native_min_years"),
+                        native_max=orig_job.get("native_max_years"),
+                        description=raw_desc,
+                        attributes=orig_job.get("attributes"),
+                    )
+                    if reg_exp["min_years"] is not None or reg_exp["is_fresher_friendly"]:
+                        min_exp = reg_exp["min_years"]
+                        max_exp = reg_exp["max_years"]
+                        fresher = reg_exp["is_fresher_friendly"]
+
+                # Hybrid fallback: check regex/normalizer if LLM missed salary
+                if min_sal is None:
+                    pay_norm = PayNormalizer.normalize(raw_salary=salary_raw, description=raw_desc)
+                    if pay_norm.get("min_inr"):
+                        min_sal = pay_norm["min_inr"]
+                        max_sal = pay_norm["max_inr"]
+                        currency = pay_norm.get("currency") or currency
+
                 results[item_id] = {
                     "salary_min_inr_year": int(min_sal) if min_sal is not None else None,
                     "salary_max_inr_year": int(max_sal) if max_sal is not None else None,
-                    "salary_currency_raw": item.get("currency") or "INR",
+                    "salary_currency_raw": currency,
                     "experience_min_years": int(min_exp) if min_exp is not None else (0 if fresher else None),
                     "experience_max_years": int(max_exp) if max_exp is not None else None,
                     "is_fresher_friendly": fresher,
