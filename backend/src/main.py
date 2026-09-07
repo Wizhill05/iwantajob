@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel
-from sqlalchemy import select, and_, delete, text, update
+from sqlalchemy import select, and_, or_, delete, text, update
 
 from src.core.database import init_db, async_session_maker
 from src.models.db_entities import (
@@ -775,6 +775,7 @@ async def get_unified_jobs(
     source: Annotated[str | None, Query(description="Filter by source: 'indeed', 'linkedin', 'wellfound'")] = None,
     city: Annotated[str | None, Query(description="Filter by lowercase city slug")] = None,
     is_fresher_friendly: Annotated[bool | None, Query(description="Filter strictly for freshers (min_years <= 1)")] = None,
+    experience_level: Annotated[str | None, Query(description="Filter by experience level: 'all', 'fresher', 'experienced' (unspecified included in both)")] = None,
     easy_apply_available: Annotated[bool | None, Query(description="Filter for direct Indeed/easy apply jobs")] = None,
     min_salary_inr: Annotated[int | None, Query(description="Minimum annual salary in INR")] = None,
     is_saved: Annotated[bool | None, Query(description="Filter by saved triage status")] = None,
@@ -791,7 +792,28 @@ async def get_unified_jobs(
             conditions.append(UnifiedJob.source == source)
         if city:
             conditions.append(UnifiedJob.city == city.lower())
-        if is_fresher_friendly is not None:
+        if experience_level:
+            exp_lvl = experience_level.strip().lower()
+            if exp_lvl == "fresher":
+                # Fresher: is_fresher_friendly IS TRUE OR min_years <= 2 OR min_years IS NULL
+                conditions.append(
+                    or_(
+                        UnifiedJob.is_fresher_friendly == True,
+                        UnifiedJob.experience_min_years == 0,
+                        UnifiedJob.experience_min_years <= 2,
+                        UnifiedJob.experience_min_years.is_(None),
+                    )
+                )
+            elif exp_lvl == "experienced":
+                # Experienced: min_years > 0 OR min_years IS NULL
+                conditions.append(
+                    or_(
+                        UnifiedJob.experience_min_years > 0,
+                        and_(UnifiedJob.is_fresher_friendly == False, UnifiedJob.experience_min_years.is_(None)),
+                        UnifiedJob.experience_min_years.is_(None),
+                    )
+                )
+        elif is_fresher_friendly is not None:
             conditions.append(UnifiedJob.is_fresher_friendly == is_fresher_friendly)
         if easy_apply_available is not None:
             conditions.append(UnifiedJob.easy_apply_available == easy_apply_available)

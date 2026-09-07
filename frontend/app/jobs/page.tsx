@@ -46,6 +46,7 @@ function JobsExplorerContent() {
     const sourceParam = searchParams.get('source');
     const cityParam = searchParams.get('city');
     const fresherParam = searchParams.get('is_fresher_friendly');
+    const expLevelParam = searchParams.get('experience_level');
     const easyApplyParam = searchParams.get('easy_apply_available');
     const minSalaryParam = searchParams.get('min_salary_inr');
 
@@ -61,8 +62,12 @@ function JobsExplorerContent() {
     if (cityParam) {
       initial.city = cityParam;
     }
-    if (fresherParam === 'true' || fresherParam === 'false') {
-      initial.is_fresher_friendly = fresherParam;
+    if (expLevelParam === 'all' || expLevelParam === 'fresher' || expLevelParam === 'experienced') {
+      initial.experience_level = expLevelParam;
+    } else if (fresherParam === 'true') {
+      initial.experience_level = 'fresher';
+    } else if (fresherParam === 'false') {
+      initial.experience_level = 'experienced';
     }
     if (easyApplyParam === 'true' || easyApplyParam === 'false') {
       initial.easy_apply_available = easyApplyParam;
@@ -169,7 +174,9 @@ function JobsExplorerContent() {
       if (filters.city.trim() !== '') {
         params.city = filters.city.trim().toLowerCase();
       }
-      if (filters.is_fresher_friendly === 'true') {
+      if (filters.experience_level && filters.experience_level !== 'all') {
+        params.experience_level = filters.experience_level;
+      } else if (filters.is_fresher_friendly === 'true') {
         params.is_fresher_friendly = true;
       } else if (filters.is_fresher_friendly === 'false') {
         params.is_fresher_friendly = false;
@@ -459,10 +466,10 @@ function JobsExplorerContent() {
   };
 
   const handleSelectAll = () => {
-    if (selectedIds.size === paginatedJobs.length && paginatedJobs.length > 0) {
+    if (selectedIds.size === displayedJobs.length && displayedJobs.length > 0) {
       setSelectedIds(new Set());
     } else {
-      setSelectedIds(new Set(paginatedJobs.map((j) => j.id)));
+      setSelectedIds(new Set(displayedJobs.map((j) => j.id)));
     }
   };
 
@@ -583,14 +590,97 @@ function JobsExplorerContent() {
 
       {/* Main Content Starting After Half Viewport with Pull-Up Overlay */}
       <div className="relative z-10 -mt-8 pt-4 space-y-4 bg-[#131313] min-h-[60vh]">
-        {/* Collapsible Mobile/Desktop Filter Control */}
-        <JobsFilterBar
-          filters={filters}
-          onChange={setFilters}
-          onReset={handleResetFilters}
-          totalResults={displayedJobs.length}
-          isLoading={isLoading}
-        />
+        {/* Swappable Top Control Slot: Filter Bar OR Multi-Selection Bar (prevents layout shift) */}
+        <div className="min-h-[42px] relative">
+          {isSelectMode ? (
+            <div className="w-full bg-[#1a1a1a] border border-[#333] shadow-2xl rounded-xl p-2 sm:px-4 sm:py-2.5 flex flex-wrap sm:flex-nowrap items-center justify-between gap-2.5 text-xs font-sans text-white animate-in fade-in zoom-in-95 duration-150">
+              {/* Left: Count & Select All */}
+              <div className="flex items-center gap-2 sm:gap-3">
+                <div className="flex items-center gap-1.5 font-mono">
+                  <span className="min-w-[28px] h-7 px-2 rounded-lg bg-[#3ecf8e]/20 text-[#3ecf8e] border border-[#3ecf8e]/40 font-bold text-xs flex items-center justify-center">
+                    {selectedIds.size}
+                  </span>
+                  <span className="text-[#9ca3af] text-xs font-sans">selected</span>
+                </div>
+
+                <div className="h-5 w-px bg-[#333]" />
+
+                <button
+                  type="button"
+                  onClick={handleSelectAll}
+                  className="px-2.5 py-1.5 rounded-lg bg-[#222] hover:bg-[#2a2a2a] border border-[#333] text-white hover:text-[#3ecf8e] transition-colors font-medium text-xs active:scale-95"
+                >
+                  {selectedIds.size === displayedJobs.length && displayedJobs.length > 0
+                    ? 'Deselect All'
+                    : 'Select All'}
+                </button>
+              </div>
+
+              {/* Right: Actions (Save, Archive/Registered, Delete, Cancel) */}
+              <div className="flex items-center gap-2 ml-auto">
+                <button
+                  type="button"
+                  disabled={selectedIds.size === 0}
+                  onClick={handleBatchSave}
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[#222] hover:bg-[#3ecf8e]/20 border border-[#333] hover:border-[#3ecf8e]/50 text-white hover:text-[#3ecf8e] transition-all disabled:opacity-40 disabled:cursor-not-allowed font-medium text-xs active:scale-95 min-h-[38px]"
+                >
+                  <Bookmark className="w-4 h-4 text-[#3ecf8e]" />
+                  <span className="font-medium">Save</span>
+                </button>
+
+                <button
+                  type="button"
+                  disabled={selectedIds.size === 0}
+                  onClick={handleBatchArchiveOrRegister}
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[#222] hover:bg-amber-500/20 border border-[#333] hover:border-amber-500/50 text-white hover:text-amber-400 transition-all disabled:opacity-40 disabled:cursor-not-allowed font-medium text-xs active:scale-95 min-h-[38px]"
+                >
+                  {activeTab === 'archived' ? (
+                    <>
+                      <Undo className="w-4 h-4 text-amber-400" />
+                      <span className="font-medium">Unarchive</span>
+                    </>
+                  ) : (
+                    <>
+                      <Archive className="w-4 h-4 text-amber-400" />
+                      <span className="font-medium">Archive</span>
+                    </>
+                  )}
+                </button>
+
+                <button
+                  type="button"
+                  disabled={selectedIds.size === 0}
+                  onClick={handleBatchDelete}
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-rose-500/15 hover:bg-rose-500/25 border border-rose-500/40 text-rose-300 transition-all disabled:opacity-40 disabled:cursor-not-allowed font-medium text-xs active:scale-95 min-h-[38px]"
+                >
+                  <Trash className="w-4 h-4 text-rose-400" />
+                  <span className="font-medium">Delete</span>
+                </button>
+
+                <div className="h-5 w-px bg-[#333] mx-0.5" />
+
+                <button
+                  type="button"
+                  onClick={handleCancelSelectMode}
+                  title="Cancel selection mode"
+                  aria-label="Cancel selection mode"
+                  className="p-2 rounded-xl bg-[#222] hover:bg-[#2d2d2d] border border-[#333] text-[#9ca3af] hover:text-white transition-colors active:scale-95 min-h-[38px] min-w-[38px] flex items-center justify-center"
+                >
+                  <Xmark className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+          ) : (
+            /* Collapsible Mobile/Desktop Filter Control */
+            <JobsFilterBar
+              filters={filters}
+              onChange={setFilters}
+              onReset={handleResetFilters}
+              totalResults={displayedJobs.length}
+              isLoading={isLoading}
+            />
+          )}
+        </div>
 
       {/* Triage Folder Tabs: Active / Saved / Archived */}
       <div className="flex items-center justify-between gap-3 border-b border-[#262626] pb-3">
@@ -770,88 +860,6 @@ function JobsExplorerContent() {
               <RefreshDouble className="w-3.5 h-3.5" />
               <span>Run Pipeline</span>
             </Link>
-          </div>
-        </div>
-      )}
-
-      {/* Sticky Multi-Selection Action Bar at the Top */}
-      {isSelectMode && (
-        <div className="sticky top-2 z-30 animate-in fade-in slide-in-from-top-2 duration-200">
-          <div className="bg-[#181818]/95 backdrop-blur-md border border-[#333] shadow-xl rounded-lg px-3 sm:px-4 py-2 flex items-center justify-between gap-3 text-xs font-sans text-white">
-            {/* Left: Count & Select All */}
-            <div className="flex items-center gap-2.5 sm:gap-3">
-              <div className="flex items-center gap-1.5 font-mono">
-                <span className="px-2 py-0.5 rounded-full bg-[#3ecf8e]/20 text-[#3ecf8e] border border-[#3ecf8e]/30 font-semibold text-[11px]">
-                  {selectedIds.size}
-                </span>
-                <span className="text-[#9ca3af] hidden sm:inline text-xs font-sans">selected</span>
-              </div>
-
-              <div className="h-3.5 w-px bg-[#333]" />
-
-              <button
-                type="button"
-                onClick={handleSelectAll}
-                className="text-[#9ca3af] hover:text-white transition-colors font-medium text-xs"
-              >
-                {selectedIds.size === displayedJobs.length && displayedJobs.length > 0
-                  ? 'Deselect All'
-                  : 'Select All'}
-              </button>
-            </div>
-
-            {/* Right: Actions (Save, Archive/Registered, Delete, Cancel) */}
-            <div className="flex items-center gap-1.5 sm:gap-2">
-              <button
-                type="button"
-                disabled={selectedIds.size === 0}
-                onClick={handleBatchSave}
-                className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg bg-[#222222] hover:bg-[#3ecf8e]/20 border border-[#333] hover:border-[#3ecf8e]/40 text-[#d1d5db] hover:text-[#3ecf8e] transition-all disabled:opacity-40 disabled:cursor-not-allowed font-medium text-xs"
-              >
-                <Bookmark className="w-3.5 h-3.5 text-[#3ecf8e]" />
-                <span className="hidden sm:inline">Save</span>
-              </button>
-
-              <button
-                type="button"
-                disabled={selectedIds.size === 0}
-                onClick={handleBatchArchiveOrRegister}
-                className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg bg-[#222222] hover:bg-amber-500/20 border border-[#333] hover:border-amber-500/40 text-[#d1d5db] hover:text-amber-400 transition-all disabled:opacity-40 disabled:cursor-not-allowed font-medium text-xs"
-              >
-                {activeTab === 'archived' ? (
-                  <>
-                    <Undo className="w-3.5 h-3.5 text-amber-400" />
-                    <span>Registered</span>
-                  </>
-                ) : (
-                  <>
-                    <Archive className="w-3.5 h-3.5 text-amber-400" />
-                    <span>Archive</span>
-                  </>
-                )}
-              </button>
-
-              <button
-                type="button"
-                disabled={selectedIds.size === 0}
-                onClick={handleBatchDelete}
-                className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 text-rose-300 transition-all disabled:opacity-40 disabled:cursor-not-allowed font-medium text-xs"
-              >
-                <Trash className="w-3.5 h-3.5 text-rose-400" />
-                <span className="hidden sm:inline">Delete</span>
-              </button>
-
-              <div className="h-3.5 w-px bg-[#333] mx-0.5" />
-
-              <button
-                type="button"
-                onClick={handleCancelSelectMode}
-                title="Cancel multi-selection"
-                className="p-1.5 rounded-lg hover:bg-[#282828] text-[#9ca3af] hover:text-white transition-colors"
-              >
-                <Xmark className="w-4 h-4" />
-              </button>
-            </div>
           </div>
         </div>
       )}
