@@ -7,6 +7,8 @@ import type {
   ParseResult,
   UnifiedJobsQueryParams,
   HealthCheckResponse,
+  UserPreferences,
+  AutoTriageResult,
 } from './types';
 
 const API_BASE_URL =
@@ -275,6 +277,48 @@ class ApiClient {
     return this.request<{ status: string; message: string }>('/api/db/reset', {
       method: 'POST',
     });
+  }
+
+  /**
+   * Get auto-triage taste preferences (creates defaults on first call).
+   */
+  async getPreferences(): Promise<UserPreferences> {
+    return this.request<UserPreferences>('/api/preferences');
+  }
+
+  /**
+   * Partially update auto-triage taste preferences.
+   */
+  async updatePreferences(
+    payload: Partial<UserPreferences>
+  ): Promise<UserPreferences> {
+    return this.request<UserPreferences>('/api/preferences', {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  /**
+   * Classify active jobs with the strict rules engine.
+   */
+  async autoTriage(
+    params: { dry_run?: boolean; limit?: number; force?: boolean } = {}
+  ): Promise<AutoTriageResult> {
+    const searchParams = new URLSearchParams();
+    if (params.dry_run !== undefined) {
+      searchParams.set('dry_run', String(params.dry_run));
+    }
+    if (params.limit !== undefined) {
+      searchParams.set('limit', String(params.limit));
+    }
+    if (params.force !== undefined) {
+      searchParams.set('force', String(params.force));
+    }
+    const qs = searchParams.toString();
+    return this.request<AutoTriageResult>(
+      `/api/jobs/auto-triage${qs ? `?${qs}` : ''}`,
+      { method: 'POST' }
+    );
   }
 }
 
