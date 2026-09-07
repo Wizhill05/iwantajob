@@ -5,12 +5,17 @@ import {
   Clock,
   Plus,
   Refresh,
-  Spark,
   CheckCircle,
   WarningTriangle,
   Xmark,
   Trash,
-  Calendar,
+  Play,
+  EditPencil,
+  NavArrowDown,
+  Linkedin,
+  Database,
+  Building,
+  Globe,
 } from 'iconoir-react';
 import { api } from '@/lib/api';
 import type {
@@ -20,94 +25,114 @@ import type {
 } from '@/lib/types';
 import { useActivity } from '@/context/ActivityContext';
 import { PageHero } from '@/components/layout/PageHero';
-import { CronJobCard } from '@/components/cron/CronJobCard';
-import { CronModal } from '@/components/cron/CronModal';
-import { cn } from '@/lib/utils';
+import { cn, formatRelativeTime } from '@/lib/utils';
 
-const DEFAULT_PRESETS: CreateCronJobPayload[] = [
-  {
-    name: 'Morning Indeed Ingest',
-    provider: 'indeed',
-    hour: 6,
-    minute: 0,
-    days_of_week: [0, 1, 2, 3, 4],
-    search_params: { what: 'software engineer', where: 'India', limit: 25 },
-    auto_parse: true,
-    is_enabled: true,
-  },
-  {
-    name: 'Morning LinkedIn Ingest',
-    provider: 'linkedin',
-    hour: 7,
-    minute: 0,
-    days_of_week: [0, 1, 2, 3, 4],
-    search_params: { keywords: 'software engineer', location: 'India', limit: 25 },
-    auto_parse: true,
-    is_enabled: true,
-  },
-  {
-    name: 'Morning Wellfound Ingest',
-    provider: 'wellfound',
-    hour: 8,
-    minute: 0,
-    days_of_week: [0, 1, 2, 3, 4],
-    search_params: { role: 'ai-engineer', location: 'india', limit: 25 },
-    auto_parse: true,
-    is_enabled: true,
-  },
+/* ── constants ── */
+
+const PROVIDERS = [
+  { id: 'indeed' as const, label: 'Indeed', icon: Database },
+  { id: 'linkedin' as const, label: 'LinkedIn', icon: Linkedin },
+  { id: 'wellfound' as const, label: 'Wellfound', icon: Building },
+  { id: 'all' as const, label: 'All', icon: Globe },
 ];
 
-interface ToastNotice {
-  id: string;
-  type: 'success' | 'error' | 'info';
-  message: string;
+const WEEKDAYS = [
+  { i: 0, l: 'M' },
+  { i: 1, l: 'T' },
+  { i: 2, l: 'W' },
+  { i: 3, l: 'T' },
+  { i: 4, l: 'F' },
+  { i: 5, l: 'S' },
+  { i: 6, l: 'S' },
+];
+
+function fmt12(h: number, m: number) {
+  const p = h >= 12 ? 'PM' : 'AM';
+  const hh = h % 12 === 0 ? 12 : h % 12;
+  return `${hh < 10 ? '0' + hh : hh}:${m < 10 ? '0' + m : m} ${p}`;
 }
+
+function daysSummary(days: number[]): string {
+  if (!days?.length) return 'No days';
+  if (days.length === 7) return 'Every day';
+  const s = [...days].sort((a, b) => a - b);
+  if (s.length === 5 && s.every((d, i) => d === i)) return 'Weekdays';
+  if (s.length === 2 && s[0] === 5 && s[1] === 6) return 'Weekends';
+  return s.map((d) => ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][d]).join(', ');
+}
+
+function paramsSummary(p: Record<string, any>): string {
+  if (!p || !Object.keys(p).length) return '';
+  const parts: string[] = [];
+  if (p.what || p.keywords || p.role) parts.push(p.what || p.keywords || p.role);
+  if (p.where || p.location) parts.push(p.where || p.location);
+  if (p.limit) parts.push(`limit ${p.limit}`);
+  return parts.join(' · ');
+}
+
+const providerStyle: Record<string, string> = {
+  indeed: 'text-sky-400',
+  linkedin: 'text-blue-400',
+  wellfound: 'text-rose-400',
+  all: 'text-[#3ecf8e]',
+};
+
+/* ── inline form defaults ── */
+
+function emptyForm() {
+  return {
+    name: '',
+    provider: 'indeed' as 'indeed' | 'linkedin' | 'wellfound' | 'all',
+    hour: 6,
+    minute: 0,
+    days: [0, 1, 2, 3, 4] as number[],
+    what: 'software engineer',
+    where: 'India',
+    limit: 25,
+    autoParse: true,
+    enabled: true,
+  };
+}
+
+/* ── main component ── */
 
 function CronContent() {
   const { addLog } = useActivity();
 
   const [jobs, setJobs] = useState<CronJob[]>([]);
-  const [isLoading, setIsLoading] = useState<boolean>(true);
-  const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
-  // Modal & Edit State
-  const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
-  const [editingJob, setEditingJob] = useState<CronJob | null>(null);
-  const [isSaving, setIsSaving] = useState<boolean>(false);
+  // inline form
+  const [showForm, setShowForm] = useState(false);
+  const [editId, setEditId] = useState<string | null>(null);
+  const [form, setForm] = useState(emptyForm());
+  const [isSaving, setIsSaving] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
 
-  // Delete Confirmation State
-  const [jobToDelete, setJobToDelete] = useState<CronJob | null>(null);
-  const [isDeleting, setIsDeleting] = useState<boolean>(false);
+  // per-job action states
+  const [runningIds, setRunningIds] = useState<Record<string, boolean>>({});
+  const [togglingIds, setTogglingIds] = useState<Record<string, boolean>>({});
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
-  // Per-job running states
-  const [runningJobIds, setRunningJobIds] = useState<Record<string, boolean>>({});
-  const [togglingJobIds, setTogglingJobIds] = useState<Record<string, boolean>>({});
-
-  // 1-Click Presets Loading
-  const [isApplyingPresets, setIsApplyingPresets] = useState<boolean>(false);
-
-  // Toast feedback
-  const [toast, setToast] = useState<ToastNotice | null>(null);
-
-  const showToast = useCallback((type: 'success' | 'error' | 'info', message: string) => {
-    const id = Math.random().toString(36).substring(2, 9);
-    setToast({ id, type, message });
-    setTimeout(() => {
-      setToast((prev) => (prev?.id === id ? null : prev));
-    }, 4500);
+  // toast
+  const [toast, setToast] = useState<{ type: 'success' | 'error' | 'info'; msg: string } | null>(null);
+  const showToast = useCallback((type: 'success' | 'error' | 'info', msg: string) => {
+    setToast({ type, msg });
+    setTimeout(() => setToast((p) => (p?.msg === msg ? null : p)), 4000);
   }, []);
 
-  const loadJobs = useCallback(async (isSilent = false) => {
-    if (!isSilent) setIsRefreshing(true);
+  /* ── data loading ── */
+
+  const loadJobs = useCallback(async (silent = false) => {
+    if (!silent) setIsRefreshing(true);
     try {
       const data = await api.getCronJobs();
       setJobs(data);
       setLastUpdated(new Date());
-    } catch (err: any) {
-      if (!isSilent) {
-        showToast('error', err.message || 'Failed to load cron schedules.');
-      }
+    } catch (e: any) {
+      if (!silent) showToast('error', e.message || 'Failed to load schedules');
     } finally {
       setIsLoading(false);
       setIsRefreshing(false);
@@ -116,390 +141,547 @@ function CronContent() {
 
   useEffect(() => {
     loadJobs();
-
-    // Auto-poll schedules every 10 seconds for real-time status
-    const interval = setInterval(() => {
-      loadJobs(true);
-    }, 10000);
-
-    const handlePlatformRefresh = () => {
-      loadJobs();
-    };
-    window.addEventListener('platform:refresh', handlePlatformRefresh);
-
-    return () => {
-      clearInterval(interval);
-      window.removeEventListener('platform:refresh', handlePlatformRefresh);
-    };
+    const iv = setInterval(() => loadJobs(true), 10000);
+    const handler = () => loadJobs();
+    window.addEventListener('platform:refresh', handler);
+    return () => { clearInterval(iv); window.removeEventListener('platform:refresh', handler); };
   }, [loadJobs]);
 
-  // Handle Save (Create or Update)
-  const handleSaveJob = async (
-    payload: CreateCronJobPayload | UpdateCronJobPayload,
-    id?: string
-  ) => {
+  /* ── form helpers ── */
+
+  const openNew = () => {
+    setEditId(null);
+    setForm(emptyForm());
+    setFormError(null);
+    setShowForm(true);
+  };
+
+  const openEdit = (j: CronJob) => {
+    const p = j.search_params || {};
+    setEditId(j.id);
+    setForm({
+      name: j.name,
+      provider: j.provider,
+      hour: j.hour,
+      minute: j.minute,
+      days: j.days_of_week || [0, 1, 2, 3, 4],
+      what: p.what || p.keywords || p.role || '',
+      where: p.where || p.location || '',
+      limit: p.limit || 25,
+      autoParse: j.auto_parse,
+      enabled: j.is_enabled,
+    });
+    setFormError(null);
+    setShowForm(true);
+  };
+
+  const cancelForm = () => {
+    setShowForm(false);
+    setEditId(null);
+  };
+
+  const toggleDay = (d: number) => {
+    setForm((f) => ({
+      ...f,
+      days: f.days.includes(d) ? f.days.filter((x) => x !== d) : [...f.days, d].sort((a, b) => a - b),
+    }));
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setFormError(null);
+    const n = form.name.trim();
+    if (!n) { setFormError('Name is required'); return; }
+    if (!form.days.length) { setFormError('Select at least one day'); return; }
+
+    const searchParams: Record<string, any> = { limit: form.limit > 0 ? form.limit : 25 };
+    if (form.provider === 'indeed' || form.provider === 'all') {
+      searchParams.what = form.what.trim() || 'software engineer';
+      searchParams.where = form.where.trim() || 'India';
+    } else if (form.provider === 'linkedin') {
+      searchParams.keywords = form.what.trim() || 'software engineer';
+      searchParams.location = form.where.trim() || 'India';
+    } else if (form.provider === 'wellfound') {
+      searchParams.role = form.what.trim().toLowerCase().replace(/\s+/g, '-') || 'ai-engineer';
+      searchParams.location = form.where.trim().toLowerCase() || 'india';
+    }
+
+    const payload: CreateCronJobPayload = {
+      name: n,
+      provider: form.provider,
+      hour: form.hour,
+      minute: form.minute,
+      days_of_week: form.days,
+      search_params: searchParams,
+      auto_parse: form.autoParse,
+      is_enabled: form.enabled,
+    };
+
     setIsSaving(true);
     try {
-      if (id) {
-        await api.updateCronJob(id, payload);
-        addLog('INFO', 'cron', `Updated cron job schedule ${payload.name || id}`);
-        showToast('success', `Schedule "${payload.name || 'Job'}" updated successfully.`);
+      if (editId) {
+        await api.updateCronJob(editId, payload);
+        addLog('INFO', 'cron', `Updated schedule "${n}"`);
+        showToast('success', `"${n}" updated`);
       } else {
-        await api.createCronJob(payload as CreateCronJobPayload);
-        addLog('INFO', 'cron', `Created cron job schedule "${payload.name}"`);
-        showToast('success', `Schedule "${payload.name}" created successfully.`);
+        await api.createCronJob(payload);
+        addLog('INFO', 'cron', `Created schedule "${n}"`);
+        showToast('success', `"${n}" created`);
       }
-      setIsModalOpen(false);
-      setEditingJob(null);
+      cancelForm();
       await loadJobs(true);
     } catch (err: any) {
-      throw err;
+      setFormError(err.message || 'Failed to save');
     } finally {
       setIsSaving(false);
     }
   };
 
-  // Handle Toggle
+  /* ── job actions ── */
+
   const handleToggle = async (id: string) => {
-    setTogglingJobIds((prev) => ({ ...prev, [id]: true }));
+    setTogglingIds((p) => ({ ...p, [id]: true }));
     try {
-      const updated = await api.toggleCronJob(id);
-      setJobs((prev) => prev.map((j) => (j.id === id ? updated : j)));
-      addLog(
-        'INFO',
-        'cron',
-        `Cron schedule "${updated.name}" is now ${updated.is_enabled ? 'enabled' : 'paused'}`
-      );
-      showToast(
-        'info',
-        `Schedule "${updated.name}" ${updated.is_enabled ? 'activated' : 'paused'}.`
-      );
-    } catch (err: any) {
-      showToast('error', err.message || 'Failed to toggle schedule.');
+      const u = await api.toggleCronJob(id);
+      setJobs((p) => p.map((j) => (j.id === id ? u : j)));
+      showToast('info', `"${u.name}" ${u.is_enabled ? 'enabled' : 'paused'}`);
+    } catch (e: any) {
+      showToast('error', e.message || 'Toggle failed');
     } finally {
-      setTogglingJobIds((prev) => ({ ...prev, [id]: false }));
+      setTogglingIds((p) => ({ ...p, [id]: false }));
     }
   };
 
-  // Handle Run Now
-  const handleRunNow = async (id: string) => {
+  const handleRun = async (id: string) => {
     const job = jobs.find((j) => j.id === id);
-    const jobName = job?.name || 'Cron Job';
-
-    setRunningJobIds((prev) => ({ ...prev, [id]: true }));
-    addLog('INFO', 'cron', `Triggered immediate run for "${jobName}"`);
-    showToast('info', `Running "${jobName}" now...`);
-
+    setRunningIds((p) => ({ ...p, [id]: true }));
     try {
-      const result = await api.runCronJob(id);
-      addLog(
-        result.status === 'success' ? 'INFO' : 'ERROR',
-        'cron',
-        `Immediate run for "${jobName}" ${result.status}: ${result.details || result.error || 'Done'}`
-      );
-
-      if (result.status === 'success') {
-        showToast('success', `"${jobName}" executed successfully: ${result.details || 'Completed'}`);
-      } else {
-        showToast('error', `"${jobName}" run failed: ${result.error || result.details || 'Error'}`);
-      }
+      const r = await api.runCronJob(id);
+      if (r.status === 'success') showToast('success', `"${job?.name}" executed`);
+      else showToast('error', `"${job?.name}" failed: ${r.error || r.details}`);
       await loadJobs(true);
-    } catch (err: any) {
-      addLog('ERROR', 'cron', `Immediate run failed for "${jobName}": ${err.message}`);
-      showToast('error', `Failed to execute "${jobName}": ${err.message}`);
+    } catch (e: any) {
+      showToast('error', e.message);
     } finally {
-      setRunningJobIds((prev) => ({ ...prev, [id]: false }));
+      setRunningIds((p) => ({ ...p, [id]: false }));
     }
   };
 
-  // Handle Delete
-  const handleDeleteConfirm = async () => {
-    if (!jobToDelete) return;
-    setIsDeleting(true);
+  const handleDelete = async (id: string) => {
+    const job = jobs.find((j) => j.id === id);
+    if (!confirm(`Delete "${job?.name || 'this schedule'}"?`)) return;
+    setDeletingId(id);
     try {
-      await api.deleteCronJob(jobToDelete.id);
-      addLog('INFO', 'cron', `Deleted cron schedule "${jobToDelete.name}"`);
-      showToast('success', `Schedule "${jobToDelete.name}" deleted.`);
-      setJobToDelete(null);
+      await api.deleteCronJob(id);
+      showToast('success', `"${job?.name}" deleted`);
       await loadJobs(true);
-    } catch (err: any) {
-      showToast('error', err.message || 'Failed to delete cron schedule.');
+    } catch (e: any) {
+      showToast('error', e.message);
     } finally {
-      setIsDeleting(false);
+      setDeletingId(null);
     }
   };
 
-  // Handle 1-Click Presets
-  const handleApplyPresets = async () => {
-    setIsApplyingPresets(true);
-    try {
-      addLog('INFO', 'cron', 'Applying 1-Click default cron presets (Indeed, LinkedIn, Wellfound)...');
-      for (const preset of DEFAULT_PRESETS) {
-        await api.createCronJob(preset);
-      }
-      addLog('INFO', 'cron', 'Created default cron schedules for Indeed, LinkedIn, and Wellfound.');
-      showToast('success', 'Applied 3 default scraper presets (Indeed @ 6 AM, LinkedIn @ 7 AM, Wellfound @ 8 AM).');
-      await loadJobs(true);
-    } catch (err: any) {
-      showToast('error', err.message || 'Failed to apply preset schedules.');
-    } finally {
-      setIsApplyingPresets(false);
-    }
-  };
-
-  const totalCount = jobs.length;
   const activeCount = jobs.filter((j) => j.is_enabled).length;
 
   return (
-    <div className="relative max-w-7xl mx-auto pb-16 px-4 sm:px-6">
-      {/* Dynamic Page Hero */}
+    <div className="relative max-w-7xl mx-auto pb-16">
       <PageHero title="Cron Jobs" />
 
-      {/* Main Content Area */}
-      <div className="relative z-10 -mt-8 pt-4 space-y-6 min-h-[60vh]">
-        {/* Toast / Notification Banner */}
+      <div className="relative z-10 -mt-8 pt-4 space-y-0 bg-[#131313] min-h-[60vh]">
+        {/* toast */}
         {toast && (
           <div
             className={cn(
-              'fixed top-20 right-6 z-50 flex items-center gap-3 px-4 py-3 rounded-lg border shadow-xl animate-in slide-in-from-top-2 duration-200 text-xs font-sans',
+              'fixed top-20 right-6 z-50 flex items-center gap-2.5 px-4 py-2.5 rounded-lg border text-xs font-sans shadow-xl',
               toast.type === 'success' && 'bg-[#18261e] border-[#3ecf8e]/40 text-[#3ecf8e]',
               toast.type === 'error' && 'bg-[#29171c] border-rose-500/40 text-rose-300',
               toast.type === 'info' && 'bg-[#182029] border-blue-500/40 text-blue-300'
             )}
           >
-            {toast.type === 'success' && <CheckCircle className="w-4 h-4 text-[#3ecf8e]" />}
-            {toast.type === 'error' && <WarningTriangle className="w-4 h-4 text-rose-400" />}
-            {toast.type === 'info' && <Clock className="w-4 h-4 text-blue-400" />}
-            <span className="font-medium">{toast.message}</span>
-            <button
-              type="button"
-              onClick={() => setToast(null)}
-              className="p-1 hover:opacity-75 transition-opacity"
-            >
-              <Xmark className="w-3.5 h-3.5" />
+            {toast.type === 'success' && <CheckCircle className="w-3.5 h-3.5" />}
+            {toast.type === 'error' && <WarningTriangle className="w-3.5 h-3.5" />}
+            {toast.type === 'info' && <Clock className="w-3.5 h-3.5" />}
+            <span>{toast.msg}</span>
+            <button type="button" onClick={() => setToast(null)} className="p-0.5 hover:opacity-70">
+              <Xmark className="w-3 h-3" />
             </button>
           </div>
         )}
 
-        {/* Top Mini Toolbar: Direct Refresh & Last Synced */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-[#262626] gap-3">
+        {/* toolbar */}
+        <div className="flex items-center justify-between pb-3 border-b border-[#262626]">
           <div className="flex items-center gap-3">
             <span className="text-xs font-heading font-semibold text-white tracking-wide uppercase text-[11px]">
-              Autonomous Scraping Engine
+              Scheduled Scrapers
             </span>
             <span className="h-3 w-px bg-[#262626]" />
-            <div className="flex items-center gap-2 text-xs font-mono text-[#9ca3af]">
-              <span className="text-white font-bold">{activeCount}</span>
-              <span className="text-[#6b7280]">active of</span>
-              <span className="text-white font-bold">{totalCount}</span>
-              <span className="text-[#6b7280]">configured</span>
-            </div>
+            <span className="text-[11px] font-mono text-[#6b7280]">
+              <span className="text-white font-bold">{activeCount}</span> active of{' '}
+              <span className="text-white font-bold">{jobs.length}</span>
+            </span>
           </div>
 
           <div className="flex items-center gap-2">
             {lastUpdated && (
-              <span className="text-[11px] font-mono text-[#6b7280] mr-1 hidden sm:inline">
-                Synced {lastUpdated.toLocaleTimeString([], { hour12: false })}
+              <span className="text-[11px] font-mono text-[#6b7280] hidden sm:inline">
+                {lastUpdated.toLocaleTimeString([], { hour12: false })}
               </span>
             )}
-
-            {/* Manual Refresh Button */}
             <button
               type="button"
               onClick={() => loadJobs()}
               disabled={isRefreshing}
-              className="p-2 rounded-lg border border-[#262626] bg-[#181818] hover:bg-[#222222] text-[#9ca3af] hover:text-white transition-colors disabled:opacity-50"
-              title="Refresh Cron Schedules"
+              className="p-1.5 rounded-lg border border-[#262626] bg-[#181818] hover:bg-[#222] text-[#9ca3af] hover:text-white transition-colors disabled:opacity-50"
             >
-              <Refresh
-                className={cn('w-3.5 h-3.5', isRefreshing && 'animate-spin text-[#3ecf8e]')}
-              />
+              <Refresh className={cn('w-3.5 h-3.5', isRefreshing && 'animate-spin text-[#3ecf8e]')} />
             </button>
-
-            {/* 1-Click Presets Button */}
             <button
               type="button"
-              onClick={handleApplyPresets}
-              disabled={isApplyingPresets}
-              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-[#2a2a2a] bg-[#181818] hover:bg-[#222] hover:border-[#3ecf8e]/50 text-xs font-medium text-white transition-all disabled:opacity-50"
-              title="Seed 3 default schedules: Indeed 6 AM, LinkedIn 7 AM, Wellfound 8 AM"
-            >
-              {isApplyingPresets ? (
-                <Refresh className="w-3.5 h-3.5 animate-spin text-[#3ecf8e]" />
-              ) : (
-                <Spark className="w-3.5 h-3.5 text-[#3ecf8e]" />
+              onClick={showForm ? cancelForm : openNew}
+              className={cn(
+                'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold font-sans transition-all active:scale-95',
+                showForm
+                  ? 'bg-[#222] border border-[#333] text-[#9ca3af] hover:text-white'
+                  : 'bg-[#3ecf8e] hover:bg-[#34b27b] text-[#131313] shadow-md shadow-[#3ecf8e]/20'
               )}
-              <span>1-Click Presets</span>
-            </button>
-
-            {/* New Cron Job Button */}
-            <button
-              type="button"
-              onClick={() => {
-                setEditingJob(null);
-                setIsModalOpen(true);
-              }}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-[#3ecf8e] hover:bg-[#34b27b] text-[#131313] text-xs font-bold font-sans shadow-md shadow-[#3ecf8e]/20 transition-all active:scale-95"
             >
-              <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
-              <span>New Cron Job</span>
+              {showForm ? (
+                <>
+                  <Xmark className="w-3.5 h-3.5" />
+                  <span>Cancel</span>
+                </>
+              ) : (
+                <>
+                  <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
+                  <span>New Schedule</span>
+                </>
+              )}
             </button>
           </div>
         </div>
 
-        {/* Loading State */}
-        {isLoading ? (
-          <div className="py-20 flex flex-col items-center justify-center space-y-3">
-            <Refresh className="w-6 h-6 text-[#3ecf8e] animate-spin" />
-            <p className="text-xs font-mono text-[#9ca3af]">
-              Loading configured schedules...
-            </p>
-          </div>
-        ) : jobs.length === 0 ? (
-          /* Empty State */
-          <div className="p-8 sm:p-12 rounded-2xl bg-[#141414] border border-[#262626] flex flex-col items-center justify-center text-center space-y-4">
-            <div className="w-14 h-14 rounded-2xl bg-[#1f1f1f] border border-[#2d2d2d] flex items-center justify-center text-[#3ecf8e]">
-              <Calendar className="w-7 h-7" />
+        {/* ── INLINE ADD / EDIT FORM ── */}
+        {showForm && (
+          <form onSubmit={handleSubmit} className="border-b border-[#262626] py-5 space-y-4">
+            {formError && (
+              <p className="text-xs text-rose-400 font-sans">{formError}</p>
+            )}
+
+            {/* row 1: name + provider */}
+            <div className="flex flex-col sm:flex-row gap-3">
+              <div className="flex-1">
+                <label className="text-[11px] font-sans text-[#6b7280] block mb-1">Name</label>
+                <input
+                  type="text"
+                  value={form.name}
+                  onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+                  placeholder="e.g. Morning Indeed Scrape"
+                  className="w-full px-3 py-2 rounded-lg bg-[#181818] border border-[#262626] focus:border-[#3ecf8e]/60 focus:outline-none text-xs font-sans text-white placeholder-[#555]"
+                />
+              </div>
+              <div className="w-full sm:w-48">
+                <label className="text-[11px] font-sans text-[#6b7280] block mb-1">Provider</label>
+                <div className="flex gap-1">
+                  {PROVIDERS.map((p) => {
+                    const Icon = p.icon;
+                    return (
+                      <button
+                        key={p.id}
+                        type="button"
+                        onClick={() => setForm((f) => ({ ...f, provider: p.id }))}
+                        className={cn(
+                          'flex-1 flex items-center justify-center gap-1 py-2 rounded-lg border text-[11px] font-sans transition-all',
+                          form.provider === p.id
+                            ? 'border-[#3ecf8e]/50 bg-[#3ecf8e]/10 text-[#3ecf8e]'
+                            : 'border-[#262626] bg-[#181818] text-[#6b7280] hover:text-white hover:border-[#333]'
+                        )}
+                      >
+                        <Icon className="w-3 h-3" />
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
             </div>
 
-            <div className="max-w-md space-y-1.5">
-              <h3 className="text-base font-bold font-heading text-white">
-                No Automated Cron Jobs Configured
-              </h3>
-              <p className="text-xs font-sans text-[#888] leading-relaxed">
-                Automate your scraping workflow so you never have to manually hit scrape.
-                Set schedules to run daily or on select weekdays with optional auto-parsing.
-              </p>
+            {/* row 2: time + days */}
+            <div className="flex flex-col sm:flex-row gap-3 items-start">
+              <div className="flex items-center gap-2">
+                <div>
+                  <label className="text-[11px] font-sans text-[#6b7280] block mb-1">Hour</label>
+                  <input
+                    type="number"
+                    min={0}
+                    max={23}
+                    value={form.hour}
+                    onChange={(e) => setForm((f) => ({ ...f, hour: Math.min(23, Math.max(0, parseInt(e.target.value) || 0)) }))}
+                    className="w-16 px-2 py-2 rounded-lg bg-[#181818] border border-[#262626] focus:border-[#3ecf8e]/60 focus:outline-none text-xs font-mono text-white text-center"
+                  />
+                </div>
+                <span className="text-[#6b7280] font-mono text-sm mt-5">:</span>
+                <div>
+                  <label className="text-[11px] font-sans text-[#6b7280] block mb-1">Min</label>
+                  <input
+                    type="number"
+                    min={0}
+                    max={59}
+                    value={form.minute}
+                    onChange={(e) => setForm((f) => ({ ...f, minute: Math.min(59, Math.max(0, parseInt(e.target.value) || 0)) }))}
+                    className="w-16 px-2 py-2 rounded-lg bg-[#181818] border border-[#262626] focus:border-[#3ecf8e]/60 focus:outline-none text-xs font-mono text-white text-center"
+                  />
+                </div>
+                <span className="text-[11px] font-mono text-[#3ecf8e] mt-5 ml-1">
+                  {fmt12(form.hour, form.minute)}
+                </span>
+              </div>
+
+              <div className="flex-1">
+                <label className="text-[11px] font-sans text-[#6b7280] block mb-1">Active Days</label>
+                <div className="flex items-center gap-1">
+                  {WEEKDAYS.map((d) => (
+                    <button
+                      key={d.i}
+                      type="button"
+                      onClick={() => toggleDay(d.i)}
+                      className={cn(
+                        'w-8 h-8 rounded-lg text-[11px] font-mono font-bold flex items-center justify-center border transition-all',
+                        form.days.includes(d.i)
+                          ? 'bg-[#3ecf8e]/15 text-[#3ecf8e] border-[#3ecf8e]/40'
+                          : 'bg-[#181818] text-[#4b5563] border-[#262626] hover:text-[#9ca3af]'
+                      )}
+                    >
+                      {d.l}
+                    </button>
+                  ))}
+                  <span className="h-5 w-px bg-[#262626] mx-1" />
+                  <button type="button" onClick={() => setForm((f) => ({ ...f, days: [0, 1, 2, 3, 4] }))} className="text-[10px] font-sans text-[#6b7280] hover:text-[#3ecf8e] underline underline-offset-2">
+                    Wkdays
+                  </button>
+                  <button type="button" onClick={() => setForm((f) => ({ ...f, days: [0, 1, 2, 3, 4, 5, 6] }))} className="text-[10px] font-sans text-[#6b7280] hover:text-[#3ecf8e] underline underline-offset-2">
+                    All
+                  </button>
+                </div>
+              </div>
             </div>
 
-            <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
+            {/* row 3: search params */}
+            <div className="flex flex-col sm:flex-row gap-3">
+              <div className="flex-1">
+                <label className="text-[11px] font-sans text-[#6b7280] block mb-1">Keywords / Role</label>
+                <input
+                  type="text"
+                  value={form.what}
+                  onChange={(e) => setForm((f) => ({ ...f, what: e.target.value }))}
+                  placeholder="software engineer"
+                  className="w-full px-3 py-2 rounded-lg bg-[#181818] border border-[#262626] focus:border-[#3ecf8e]/60 focus:outline-none text-xs font-sans text-white placeholder-[#555]"
+                />
+              </div>
+              <div className="flex-1">
+                <label className="text-[11px] font-sans text-[#6b7280] block mb-1">Location</label>
+                <input
+                  type="text"
+                  value={form.where}
+                  onChange={(e) => setForm((f) => ({ ...f, where: e.target.value }))}
+                  placeholder="India"
+                  className="w-full px-3 py-2 rounded-lg bg-[#181818] border border-[#262626] focus:border-[#3ecf8e]/60 focus:outline-none text-xs font-sans text-white placeholder-[#555]"
+                />
+              </div>
+              <div className="w-24">
+                <label className="text-[11px] font-sans text-[#6b7280] block mb-1">Limit</label>
+                <input
+                  type="number"
+                  min={1}
+                  max={100}
+                  value={form.limit}
+                  onChange={(e) => setForm((f) => ({ ...f, limit: parseInt(e.target.value) || 25 }))}
+                  className="w-full px-3 py-2 rounded-lg bg-[#181818] border border-[#262626] focus:border-[#3ecf8e]/60 focus:outline-none text-xs font-mono text-white"
+                />
+              </div>
+            </div>
+
+            {/* row 4: toggles + submit */}
+            <div className="flex items-center justify-between pt-1">
+              <div className="flex items-center gap-5">
+                {/* auto parse toggle */}
+                <label className="flex items-center gap-2 cursor-pointer select-none">
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={form.autoParse}
+                    onClick={() => setForm((f) => ({ ...f, autoParse: !f.autoParse }))}
+                    className={cn(
+                      'relative inline-flex h-4 w-7 shrink-0 rounded-full border-2 border-transparent transition-colors',
+                      form.autoParse ? 'bg-[#3ecf8e]' : 'bg-[#2e2e2e]'
+                    )}
+                  >
+                    <span className={cn('inline-block h-3 w-3 rounded-full bg-white transition-transform', form.autoParse ? 'translate-x-3' : 'translate-x-0')} />
+                  </button>
+                  <span className="text-[11px] font-sans text-[#9ca3af]">Auto-parse</span>
+                </label>
+
+                {/* enabled toggle */}
+                <label className="flex items-center gap-2 cursor-pointer select-none">
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={form.enabled}
+                    onClick={() => setForm((f) => ({ ...f, enabled: !f.enabled }))}
+                    className={cn(
+                      'relative inline-flex h-4 w-7 shrink-0 rounded-full border-2 border-transparent transition-colors',
+                      form.enabled ? 'bg-[#3ecf8e]' : 'bg-[#2e2e2e]'
+                    )}
+                  >
+                    <span className={cn('inline-block h-3 w-3 rounded-full bg-white transition-transform', form.enabled ? 'translate-x-3' : 'translate-x-0')} />
+                  </button>
+                  <span className="text-[11px] font-sans text-[#9ca3af]">Enabled</span>
+                </label>
+              </div>
+
               <button
-                type="button"
-                onClick={handleApplyPresets}
-                disabled={isApplyingPresets}
-                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-[#1a1a1a] hover:bg-[#222] border border-[#3ecf8e]/40 hover:border-[#3ecf8e] text-xs font-medium text-[#3ecf8e] transition-all"
+                type="submit"
+                disabled={isSaving}
+                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-[#3ecf8e] hover:bg-[#34b27b] text-[#131313] text-xs font-bold font-sans shadow-md shadow-[#3ecf8e]/20 transition-all disabled:opacity-50 active:scale-95"
               >
-                {isApplyingPresets ? (
+                {isSaving ? (
                   <Refresh className="w-3.5 h-3.5 animate-spin" />
                 ) : (
-                  <Spark className="w-3.5 h-3.5" />
+                  <CheckCircle className="w-3.5 h-3.5" />
                 )}
-                <span>Load 1-Click Presets</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  setEditingJob(null);
-                  setIsModalOpen(true);
-                }}
-                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-[#3ecf8e] hover:bg-[#34b27b] text-[#131313] text-xs font-bold transition-all shadow-lg shadow-[#3ecf8e]/20"
-              >
-                <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
-                <span>Create Custom Schedule</span>
+                <span>{editId ? 'Update' : 'Create'}</span>
               </button>
             </div>
+          </form>
+        )}
+
+        {/* ── JOBS LIST ── */}
+        {isLoading ? (
+          <div className="py-16 flex flex-col items-center gap-2">
+            <Refresh className="w-5 h-5 text-[#3ecf8e] animate-spin" />
+            <span className="text-xs font-mono text-[#6b7280]">Loading schedules...</span>
+          </div>
+        ) : jobs.length === 0 && !showForm ? (
+          <div className="py-16 flex flex-col items-center gap-3 text-center">
+            <Clock className="w-8 h-8 text-[#333]" />
+            <p className="text-sm font-heading text-[#9ca3af]">No cron jobs configured</p>
+            <p className="text-xs font-sans text-[#6b7280] max-w-xs">
+              Click &ldquo;New Schedule&rdquo; to set up automated scraping at specific times and days.
+            </p>
           </div>
         ) : (
-          /* Cron Schedules Grid */
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-            {jobs.map((job) => (
-              <CronJobCard
-                key={job.id}
-                job={job}
-                onToggle={handleToggle}
-                onRun={handleRunNow}
-                onEdit={(j) => {
-                  setEditingJob(j);
-                  setIsModalOpen(true);
-                }}
-                onDelete={(id) => {
-                  const target = jobs.find((j) => j.id === id) || null;
-                  setJobToDelete(target);
-                }}
-                isRunning={runningJobIds[job.id] || false}
-                isToggling={togglingJobIds[job.id] || false}
-              />
-            ))}
+          <div className="divide-y divide-[#262626]">
+            {jobs.map((job) => {
+              const pColor = providerStyle[job.provider] || 'text-[#9ca3af]';
+              const ProvIcon = PROVIDERS.find((p) => p.id === job.provider)?.icon || Globe;
+              const isRunning = runningIds[job.id] || false;
+              const isDeleting = deletingId === job.id;
+
+              return (
+                <div
+                  key={job.id}
+                  className={cn(
+                    'py-3 flex items-center gap-3 group transition-colors',
+                    !job.is_enabled && 'opacity-50'
+                  )}
+                >
+                  {/* toggle */}
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={job.is_enabled}
+                    disabled={togglingIds[job.id]}
+                    onClick={() => handleToggle(job.id)}
+                    className={cn(
+                      'relative inline-flex h-4 w-7 shrink-0 rounded-full border-2 border-transparent transition-colors disabled:opacity-50',
+                      job.is_enabled ? 'bg-[#3ecf8e]' : 'bg-[#2e2e2e]'
+                    )}
+                  >
+                    <span className={cn('inline-block h-3 w-3 rounded-full bg-white transition-transform', job.is_enabled ? 'translate-x-3' : 'translate-x-0')} />
+                  </button>
+
+                  {/* provider icon */}
+                  <ProvIcon className={cn('w-4 h-4 shrink-0', pColor)} />
+
+                  {/* info */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-semibold text-white truncate">{job.name}</span>
+                      {job.auto_parse && (
+                        <span className="text-[10px] font-mono text-[#3ecf8e] bg-[#3ecf8e]/10 px-1.5 py-px rounded">
+                          parse
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-1.5 mt-0.5 text-[11px] text-[#6b7280] font-sans">
+                      <span className="font-mono text-[#9ca3af]">{fmt12(job.hour, job.minute)}</span>
+                      <span className="text-[#4b5563]">·</span>
+                      <span>{daysSummary(job.days_of_week)}</span>
+                      {paramsSummary(job.search_params) && (
+                        <>
+                          <span className="text-[#4b5563] hidden sm:inline">·</span>
+                          <span className="hidden sm:inline truncate max-w-[200px]">{paramsSummary(job.search_params)}</span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* status */}
+                  <div className="hidden sm:flex items-center gap-2 shrink-0 text-[11px] font-mono">
+                    {job.last_status === 'success' ? (
+                      <span className="text-[#3ecf8e]">
+                        <CheckCircle className="w-3 h-3 inline mr-0.5" />
+                        {formatRelativeTime(job.last_run_at)}
+                      </span>
+                    ) : job.last_status === 'failed' ? (
+                      <span className="text-rose-400">
+                        <WarningTriangle className="w-3 h-3 inline mr-0.5" />
+                        failed
+                      </span>
+                    ) : job.last_status === 'running' || isRunning ? (
+                      <span className="text-amber-400">
+                        <Refresh className="w-3 h-3 inline animate-spin mr-0.5" />
+                        running
+                      </span>
+                    ) : (
+                      <span className="text-[#4b5563]">never run</span>
+                    )}
+                  </div>
+
+                  {/* actions */}
+                  <div className="flex items-center gap-1 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => handleRun(job.id)}
+                      disabled={isRunning}
+                      title="Run now"
+                      className="p-1.5 rounded-lg text-[#6b7280] hover:text-[#3ecf8e] hover:bg-[#3ecf8e]/10 transition-colors disabled:opacity-50"
+                    >
+                      {isRunning ? <Refresh className="w-3.5 h-3.5 animate-spin text-[#3ecf8e]" /> : <Play className="w-3.5 h-3.5" />}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => openEdit(job)}
+                      title="Edit"
+                      className="p-1.5 rounded-lg text-[#6b7280] hover:text-white hover:bg-[#222] transition-colors"
+                    >
+                      <EditPencil className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDelete(job.id)}
+                      disabled={isDeleting}
+                      title="Delete"
+                      className="p-1.5 rounded-lg text-[#6b7280] hover:text-rose-400 hover:bg-rose-500/10 transition-colors disabled:opacity-50"
+                    >
+                      <Trash className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         )}
       </div>
-
-      {/* Add / Edit Cron Modal */}
-      <CronModal
-        isOpen={isModalOpen}
-        job={editingJob}
-        onClose={() => {
-          setIsModalOpen(false);
-          setEditingJob(null);
-        }}
-        onSave={handleSaveJob}
-        isSaving={isSaving}
-      />
-
-      {/* Delete Confirmation Modal */}
-      {jobToDelete && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-150">
-          <div
-            className="w-full max-w-md bg-[#181818] border border-[#2e2e2e] rounded-xl shadow-2xl p-5 sm:p-6 space-y-4 animate-in zoom-in-95 duration-150"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-start gap-3">
-              <div className="w-9 h-9 rounded-lg bg-rose-500/15 border border-rose-500/30 flex items-center justify-center shrink-0 text-rose-400">
-                <WarningTriangle className="w-4 h-4" />
-              </div>
-              <div className="space-y-1 min-w-0 flex-1">
-                <h3 className="text-sm sm:text-base font-bold font-heading text-white">
-                  Delete Scheduled Job?
-                </h3>
-                <p className="text-xs text-[#9ca3af] leading-relaxed font-sans">
-                  This will permanently remove{' '}
-                  <strong className="text-white font-mono">{jobToDelete.name}</strong>.
-                  Future scheduled scraping triggers for this job will cease immediately.
-                </p>
-              </div>
-              <button
-                type="button"
-                disabled={isDeleting}
-                onClick={() => setJobToDelete(null)}
-                className="p-1 rounded text-[#9ca3af] hover:text-white hover:bg-[#252525] transition-colors"
-              >
-                <Xmark className="w-4 h-4" />
-              </button>
-            </div>
-
-            <div className="flex items-center justify-end gap-2 pt-2 border-t border-[#262626]">
-              <button
-                type="button"
-                disabled={isDeleting}
-                onClick={() => setJobToDelete(null)}
-                className="px-3.5 py-1.5 rounded-lg bg-[#222] hover:bg-[#2a2a2a] border border-[#333] text-xs font-sans text-[#d1d5db] hover:text-white transition-colors"
-              >
-                Cancel
-              </button>
-
-              <button
-                type="button"
-                disabled={isDeleting}
-                onClick={handleDeleteConfirm}
-                className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-500 text-white text-xs font-sans font-semibold transition-all disabled:opacity-50"
-              >
-                {isDeleting ? (
-                  <>
-                    <Refresh className="w-3.5 h-3.5 animate-spin" />
-                    <span>Deleting...</span>
-                  </>
-                ) : (
-                  <>
-                    <Trash className="w-3.5 h-3.5" />
-                    <span>Delete</span>
-                  </>
-                )}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
