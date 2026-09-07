@@ -251,6 +251,13 @@ function JobsExplorerContent() {
     fetchJobs();
   }, [fetchJobs]);
 
+  // Reset multi-selection when switching tabs so archived/saved/active
+  // selections never mix across sections
+  useEffect(() => {
+    setIsSelectMode(false);
+    setSelectedIds(new Set());
+  }, [activeTab]);
+
   // Filter jobs based on active tab and search query
   const displayedJobs = useMemo(() => {
     // 1. Exclude deleted jobs from all views
@@ -593,14 +600,12 @@ function JobsExplorerContent() {
         {/* Swappable Top Control Slot: Filter Bar OR Multi-Selection Bar (prevents layout shift) */}
         <div className="relative">
           {isSelectMode ? (
-            <div className="h-[37px] w-full bg-[#181818] border border-[#333] shadow-lg rounded-lg px-2 flex items-center justify-between gap-1 text-xs font-sans text-white">
-              {/* Left: Count & Select All */}
-              <div className="flex items-center gap-1.5 shrink-0">
-                <div className="flex items-center gap-1 font-mono">
-                  <span className="min-w-[22px] h-6 px-1.5 rounded bg-[#3ecf8e]/20 text-[#3ecf8e] border border-[#3ecf8e]/40 font-bold text-[11px] flex items-center justify-center">
-                    {selectedIds.size}
-                  </span>
-                </div>
+            <div className="flex justify-center">
+              <div className="h-[34px] w-auto max-w-full mx-auto bg-[#181818] border border-[#333] shadow-lg rounded-full pl-2.5 pr-1.5 flex items-center justify-center gap-1 text-xs font-sans text-white">
+                {/* Count */}
+                <span className="min-w-[22px] h-6 px-1.5 rounded-full bg-[#3ecf8e]/20 text-[#3ecf8e] border border-[#3ecf8e]/40 font-mono font-bold text-[11px] flex items-center justify-center">
+                  {selectedIds.size}
+                </span>
 
                 <div className="h-4 w-px bg-[#333]" />
 
@@ -617,21 +622,20 @@ function JobsExplorerContent() {
                       ? 'Deselect all'
                       : 'Select all'
                   }
-                  className="h-7 w-7 p-0 flex items-center justify-center rounded-md bg-[#202020] hover:bg-[#282828] border border-[#333] text-white hover:text-[#3ecf8e] transition-colors active:scale-95"
+                  className="h-7 w-7 p-0 flex items-center justify-center rounded-full bg-[#202020] hover:bg-[#282828] border border-[#333] text-white hover:text-[#3ecf8e] transition-colors active:scale-95"
                 >
                   <Check className="w-4 h-4" />
                 </button>
-              </div>
 
-              {/* Right: Actions (Save, Archive/Registered, Delete, Cancel) — icon-only square buttons */}
-              <div className="flex items-center gap-1 shrink-0 ml-auto">
+                <div className="h-4 w-px bg-[#333]" />
+
                 <button
                   type="button"
                   disabled={selectedIds.size === 0}
                   onClick={handleBatchSave}
                   title="Save selected"
                   aria-label="Save selected"
-                  className="h-7 w-7 p-0 flex items-center justify-center rounded-md bg-[#202020] hover:bg-[#3ecf8e]/20 border border-[#333] hover:border-[#3ecf8e]/50 text-white hover:text-[#3ecf8e] transition-all disabled:opacity-40 disabled:cursor-not-allowed active:scale-95"
+                  className="h-7 w-7 p-0 flex items-center justify-center rounded-full bg-[#202020] hover:bg-[#3ecf8e]/20 border border-[#333] hover:border-[#3ecf8e]/50 text-white hover:text-[#3ecf8e] transition-all disabled:opacity-40 disabled:cursor-not-allowed active:scale-95"
                 >
                   <Bookmark className="w-4 h-4 text-[#3ecf8e]" />
                 </button>
@@ -642,7 +646,7 @@ function JobsExplorerContent() {
                   onClick={handleBatchArchiveOrRegister}
                   title={activeTab === 'archived' ? 'Unarchive selected' : 'Archive selected'}
                   aria-label={activeTab === 'archived' ? 'Unarchive selected' : 'Archive selected'}
-                  className="h-7 w-7 p-0 flex items-center justify-center rounded-md bg-[#202020] hover:bg-amber-500/20 border border-[#333] hover:border-amber-500/50 text-white hover:text-amber-400 transition-all disabled:opacity-40 disabled:cursor-not-allowed active:scale-95"
+                  className="h-7 w-7 p-0 flex items-center justify-center rounded-full bg-[#202020] hover:bg-amber-500/20 border border-[#333] hover:border-amber-500/50 text-white hover:text-amber-400 transition-all disabled:opacity-40 disabled:cursor-not-allowed active:scale-95"
                 >
                   {activeTab === 'archived' ? (
                     <Undo className="w-4 h-4 text-amber-400" />
@@ -657,7 +661,7 @@ function JobsExplorerContent() {
                   onClick={handleBatchDelete}
                   title="Delete selected"
                   aria-label="Delete selected"
-                  className="h-7 w-7 p-0 flex items-center justify-center rounded-md bg-rose-500/15 hover:bg-rose-500/25 border border-rose-500/40 text-rose-300 transition-all disabled:opacity-40 disabled:cursor-not-allowed active:scale-95"
+                  className="h-7 w-7 p-0 flex items-center justify-center rounded-full bg-rose-500/15 hover:bg-rose-500/25 border border-rose-500/40 text-rose-300 transition-all disabled:opacity-40 disabled:cursor-not-allowed active:scale-95"
                 >
                   <Trash className="w-4 h-4 text-rose-400" />
                 </button>
@@ -669,7 +673,7 @@ function JobsExplorerContent() {
                   onClick={handleCancelSelectMode}
                   title="Cancel selection mode"
                   aria-label="Cancel selection mode"
-                  className="p-1 rounded hover:bg-[#282828] text-[#9ca3af] hover:text-white transition-colors active:scale-95 h-7 w-7 flex items-center justify-center"
+                  className="rounded-full hover:bg-[#282828] text-[#9ca3af] hover:text-white transition-colors active:scale-95 h-7 w-7 flex items-center justify-center"
                 >
                   <Xmark className="w-4 h-4" />
                 </button>
