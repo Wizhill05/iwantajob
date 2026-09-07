@@ -1,4 +1,5 @@
 import logging
+from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Annotated
 from fastapi import FastAPI, Query, status, Body, HTTPException
@@ -36,6 +37,8 @@ from src.clients.wellfound import (
 )
 from src.clients.linkedin import LinkedInClient
 from src.models.job import JobSearchResponse, JobItem, ErrorDetail
+from src.services.scheduler import start_scheduler_loop, stop_scheduler_loop
+from src.api.cron_router import router as cron_router
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("iwantajob")
@@ -69,6 +72,10 @@ TAGS_METADATA = [
         "name": "System",
         "description": "Operational health checks and container readiness probes.",
     },
+    {
+        "name": "Cron",
+        "description": "Scheduled scraping jobs management, automated cron execution, and interval triggers.",
+    },
 ]
 
 APP_DESCRIPTION = """
@@ -91,6 +98,20 @@ Production-grade ingestion backend that aggregates, parses, and normalizes job p
 * [Wellfound Testing Portal](/wellfound)
 """
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """
+    FastAPI lifespan context manager:
+    - On startup: initialize database tables and start the background scheduler loop.
+    - On shutdown: stop the background scheduler loop.
+    """
+    logger.info("Initializing database and starting scheduler loop...")
+    await init_db()
+    start_scheduler_loop()
+    yield
+    logger.info("Stopping scheduler loop...")
+    stop_scheduler_loop()
+
 app = FastAPI(
     title="Autonomous Job Discovery API",
     description=APP_DESCRIPTION,
@@ -98,7 +119,10 @@ app = FastAPI(
     docs_url="/docs",
     redoc_url="/redoc",
     openapi_tags=TAGS_METADATA,
+    lifespan=lifespan,
 )
+
+app.include_router(cron_router, prefix="/api/cron", tags=["Cron"])
 
 app.add_middleware(
     CORSMiddleware,
