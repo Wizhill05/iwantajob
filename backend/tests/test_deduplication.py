@@ -67,13 +67,14 @@ async def test_raw_ingestion_duplicate_skipping():
     assert ind_res2 is False
 
     # 3. Wellfound
+    num_id = "".join([c for c in uid if c.isdigit()] or ["7", "6", "5", "4", "3"])
     wf_data = {
         "external_id": f"test_wf_{uid}",
         "job_slug": f"ai-eng-{uid}",
         "title": "AI Engineer",
         "company_name": "TestStartup",
         "location_raw": "Remote",
-        "url": f"https://wellfound.com/jobs/888{uid}-ai-eng?utm_source=google",
+        "url": f"https://wellfound.com/jobs/999{num_id}-ai-eng?utm_source=google",
         "description_text": "AI role.",
         "raw_payload": {"test": 3},
     }

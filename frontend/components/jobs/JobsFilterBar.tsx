@@ -20,6 +20,7 @@ export interface JobsFilterValues {
   source: 'all' | 'indeed' | 'linkedin' | 'wellfound';
   city: string;
   is_fresher_friendly: 'all' | 'true' | 'false';
+  experience_level: 'all' | 'fresher' | 'experienced';
   easy_apply_available: 'all' | 'true' | 'false';
   min_salary_lpa: number; // 0 to 50 LPA
   searchQuery?: string;
@@ -29,6 +30,7 @@ export const DEFAULT_FILTERS: JobsFilterValues = {
   source: 'all',
   city: '',
   is_fresher_friendly: 'all',
+  experience_level: 'all',
   easy_apply_available: 'all',
   min_salary_lpa: 0,
   searchQuery: '',
@@ -38,7 +40,8 @@ export function getActiveFilterCount(filters: JobsFilterValues): number {
   let count = 0;
   if (filters.source !== 'all') count++;
   if (filters.city.trim() !== '') count++;
-  if (filters.is_fresher_friendly !== 'all') count++;
+  if (filters.experience_level !== 'all') count++;
+  else if (filters.is_fresher_friendly !== 'all') count++;
   if (filters.easy_apply_available !== 'all') count++;
   if (filters.min_salary_lpa > 0) count++;
   return count;
@@ -107,7 +110,7 @@ export function JobsFilterBar({
             value={filters.searchQuery || ''}
             onChange={(e) => updateField('searchQuery', e.target.value)}
             placeholder="Search role, skills, or company..."
-            className="w-full pl-9 pr-3 py-2 text-xs font-sans rounded-lg bg-[#181818] border border-[#262626] text-white placeholder-[#6b7280] focus:outline-none focus:border-[#3ecf8e] transition-colors"
+            className="w-full pl-9 pr-3 py-3 text-xs font-sans rounded-lg bg-[#181818] border border-[#262626] text-white placeholder-[#6b7280] focus:outline-none focus:border-[#3ecf8e] transition-colors"
           />
           {filters.searchQuery && (
             <button
@@ -125,7 +128,7 @@ export function JobsFilterBar({
           type="button"
           onClick={() => setIsOpen((prev) => !prev)}
           className={cn(
-            'flex items-center gap-1.5 px-3 py-2 rounded-lg border text-xs font-sans font-medium transition-all shrink-0',
+            'flex items-center gap-1.5 px-3 py-3 rounded-lg border text-xs font-sans font-medium transition-all shrink-0',
             isOpen
               ? 'bg-[#3ecf8e]/15 border-[#3ecf8e]/40 text-[#3ecf8e]'
               : activeCount > 0
@@ -284,30 +287,33 @@ export function JobsFilterBar({
                   <GraduationCap className="w-3.5 h-3.5 text-[#3ecf8e]" />
                   <span>Experience</span>
                 </span>
-                <span className="text-[10px] text-[#6b7280]">min &le; 1 yr</span>
+                <span className="text-[10px] text-[#6b7280]">0y / freshers</span>
               </span>
               <div className="grid grid-cols-3 gap-1 p-1 bg-[#141414] border border-[#262626] rounded-lg">
                 {[
                   { id: 'all', label: 'All' },
-                  { id: 'true', label: 'Freshers' },
-                  { id: 'false', label: 'Experienced' },
-                ].map((opt) => (
-                  <button
-                    key={opt.id}
-                    type="button"
-                    onClick={() =>
-                      updateField('is_fresher_friendly', opt.id as JobsFilterValues['is_fresher_friendly'])
-                    }
-                    className={cn(
-                      'py-1 text-[11px] font-sans rounded transition-all text-center',
-                      filters.is_fresher_friendly === opt.id
-                        ? 'bg-[#3ecf8e]/15 text-[#3ecf8e] font-medium'
-                        : 'text-[#808080] hover:text-white'
-                    )}
-                  >
-                    {opt.label}
-                  </button>
-                ))}
+                  { id: 'fresher', label: 'Just fresher' },
+                  { id: 'experienced', label: 'Experience' },
+                ].map((opt) => {
+                  const isSelected = filters.experience_level === opt.id;
+                  return (
+                    <button
+                      key={opt.id}
+                      type="button"
+                      onClick={() =>
+                        updateField('experience_level', opt.id as JobsFilterValues['experience_level'])
+                      }
+                      className={cn(
+                        'py-1.5 text-[11px] font-sans rounded transition-all text-center font-medium',
+                        isSelected
+                          ? 'bg-[#3ecf8e]/20 text-[#3ecf8e] border border-[#3ecf8e]/40'
+                          : 'text-[#808080] hover:text-white'
+                      )}
+                    >
+                      {opt.label}
+                    </button>
+                  );
+                })}
               </div>
             </div>
 

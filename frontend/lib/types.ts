@@ -131,6 +131,7 @@ export interface UnifiedJobsQueryParams {
   source?: 'indeed' | 'linkedin' | 'wellfound';
   city?: string;
   is_fresher_friendly?: boolean;
+  experience_level?: 'all' | 'fresher' | 'experienced';
   easy_apply_available?: boolean;
   min_salary_inr?: number;
   is_saved?: boolean;

@@ -209,6 +209,9 @@ class ApiClient {
     if (params.is_fresher_friendly !== undefined) {
       searchParams.set('is_fresher_friendly', String(params.is_fresher_friendly));
     }
+    if (params.experience_level && params.experience_level !== 'all') {
+      searchParams.set('experience_level', params.experience_level);
+    }
     if (params.easy_apply_available !== undefined) {
       searchParams.set('easy_apply_available', String(params.easy_apply_available));
     }
