@@ -14,7 +14,7 @@ import {
   NavArrowRight,
   Filter,
 } from 'iconoir-react';
-import type { ProviderParsingStats, ParseResult } from '@/lib/types';
+import type { ProviderParsingStats, ParseStartResult } from '@/lib/types';
 import { useActivity } from '@/context/ActivityContext';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
@@ -74,7 +74,7 @@ export function ParserControlCard({
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
 
   // Execution result
-  const [lastResult, setLastResult] = useState<ParseResult | null>(null);
+  const [lastResult, setLastResult] = useState<ParseStartResult | null>(null);
   const [lastDurationMs, setLastDurationMs] = useState<number | null>(null);
   const [lastError, setLastError] = useState<string | null>(null);
 
@@ -97,34 +97,26 @@ export function ParserControlCard({
     const startTime = performance.now();
 
     try {
-      const result = await api.triggerParse(provider, {
+      const ack = await api.triggerParse(provider, {
         batchSize,
       });
 
       const elapsed = Math.round(performance.now() - startTime);
       setLastDurationMs(elapsed);
-      setLastResult(result);
+      setLastResult(ack);
 
-      if (result.errors && result.errors.length > 0) {
-        finishProcess(
-          procId,
-          'completed',
-          `Parsed ${result.processed} records with ${result.errors.length} warnings. Promoted ${result.promoted_to_unified} to unified.`
-        );
-      } else {
-        finishProcess(
-          procId,
-          'completed',
-          `Successfully parsed ${result.processed} records, promoting ${result.promoted_to_unified} to unified.`
-        );
-      }
+      finishProcess(
+        procId,
+        'completed',
+        `Parse job started in background (batch of ${ack.batch_size}).`
+      );
 
       addLog(
         'PARSE',
         provider,
-        `Normalized batch: ${result.promoted_to_unified}/${result.processed} promoted in ${elapsed}ms`,
+        `Parse job started in background for ${provider} (batch of ${ack.batch_size})`,
         elapsed,
-        result
+        ack
       );
 
       // Trigger status refresh
@@ -326,7 +318,7 @@ export function ParserControlCard({
             <div className="flex items-center justify-between text-white font-medium">
               <div className="flex items-center gap-1.5 text-[#3ecf8e]">
                 <CheckCircle className="w-3.5 h-3.5" />
-                <span>Last Normalization Run</span>
+                <span>Last Parse Trigger</span>
               </div>
               {lastDurationMs !== null && (
                 <span className="text-[11px] font-mono text-[#9ca3af]">{lastDurationMs}ms</span>
@@ -335,23 +327,12 @@ export function ParserControlCard({
 
             <div className="grid grid-cols-2 gap-2 text-[11px] pt-1">
               <div className="text-[#9ca3af]">
-                Processed: <strong className="text-white font-mono">{lastResult.processed}</strong>
+                Provider: <strong className="text-white font-mono capitalize">{lastResult.provider}</strong>
               </div>
               <div className="text-[#9ca3af]">
-                Promoted: <strong className="text-[#3ecf8e] font-mono">{lastResult.promoted_to_unified}</strong>
+                Batch: <strong className="text-[#3ecf8e] font-mono">{lastResult.batch_size}</strong>
               </div>
             </div>
-
-            {lastResult.errors && lastResult.errors.length > 0 && (
-              <div className="mt-1 pt-1.5 border-t border-[#262626] text-[10px] text-amber-400 font-sans">
-                <span className="font-semibold"><span className="font-mono">{lastResult.errors.length}</span> Warnings/Errors:</span>
-                <ul className="list-disc list-inside mt-0.5 space-y-0.5 text-[#9ca3af] font-mono">
-                  {lastResult.errors.slice(0, 3).map((err, idx) => (
-                    <li key={idx} className="truncate">{err}</li>
-                  ))}
-                </ul>
-              </div>
-            )}
           </div>
         )}
       </div>

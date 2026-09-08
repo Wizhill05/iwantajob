@@ -16,6 +16,7 @@ import {
   Filter,
   Refresh,
   Database,
+  WarningTriangle,
 } from 'iconoir-react';
 import { useActivity } from '@/context/ActivityContext';
 import { api } from '@/lib/api';
@@ -41,6 +42,7 @@ export function LogsTerminalView() {
   const [isExporting, setIsExporting] = useState<boolean>(false);
   const [isClearing, setIsClearing] = useState<boolean>(false);
   const [isClearingTestData, setIsClearingTestData] = useState<boolean>(false);
+  const [showClearConfirm, setShowClearConfirm] = useState<boolean>(false);
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
@@ -376,12 +378,12 @@ export function LogsTerminalView() {
               )}
             </button>
 
-            {/* Clear Test Data Button */}
+            {/* Clear Test Data Button — opens confirmation modal */}
             <button
               type="button"
-              onClick={handleClearTestData}
+              onClick={() => setShowClearConfirm(true)}
               disabled={isClearingTestData}
-              title="Clear test data from database (rows with test_ IDs)"
+              title="Clear test data from database (rows with test_/wf_/li_ IDs)"
               className="w-10 h-10 rounded-xl border border-[#262626] bg-[#181818] text-[#9ca3af] hover:text-amber-400 hover:border-amber-500/30 transition-colors disabled:opacity-40 flex items-center justify-center shrink-0"
             >
               {isClearingTestData ? (
@@ -610,6 +612,77 @@ export function LogsTerminalView() {
           )}
         </div>
       </div>
+
+      {/* Clear Test Data Confirmation Modal */}
+      {showClearConfirm && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-in fade-in duration-150"
+          onClick={() => !isClearingTestData && setShowClearConfirm(false)}
+        >
+          <div
+            className="w-full max-w-md bg-[#181818] border border-[#2e2e2e] rounded-lg shadow-2xl overflow-hidden p-5 sm:p-6 space-y-4 animate-in zoom-in-95 duration-150"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start gap-3">
+              <div className="w-9 h-9 rounded-md bg-amber-500/15 border border-amber-500/30 flex items-center justify-center shrink-0 text-amber-400">
+                <WarningTriangle className="w-4 h-4" />
+              </div>
+              <div className="space-y-1 min-w-0 flex-1">
+                <h3 className="text-sm sm:text-base font-semibold font-heading text-white">
+                  Clear test data from the database?
+                </h3>
+                <p className="text-xs text-[#9ca3af] leading-relaxed font-sans">
+                  This permanently deletes all test-seeded rows (IDs starting with{' '}
+                  <strong className="text-amber-300 font-mono">test_</strong>,{' '}
+                  <strong className="text-amber-300 font-mono">wf_</strong> or{' '}
+                  <strong className="text-amber-300 font-mono">li_</strong>) from the raw,
+                  unified and cron tables. This action cannot be undone.
+                </p>
+              </div>
+              <button
+                type="button"
+                disabled={isClearingTestData}
+                onClick={() => setShowClearConfirm(false)}
+                className="p-1 rounded-md text-[#9ca3af] hover:text-white hover:bg-[#252525] transition-colors"
+              >
+                <Xmark className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-[#262626]">
+              <button
+                type="button"
+                disabled={isClearingTestData}
+                onClick={() => setShowClearConfirm(false)}
+                className="px-3.5 py-1.5 rounded-md bg-[#222] hover:bg-[#2a2a2a] border border-[#333] text-xs font-sans text-[#d1d5db] hover:text-white transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={isClearingTestData}
+                onClick={() => {
+                  setShowClearConfirm(false);
+                  void handleClearTestData();
+                }}
+                className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-md bg-amber-600 hover:bg-amber-500 text-white text-xs font-sans font-semibold shadow-lg shadow-amber-900/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isClearingTestData ? (
+                  <>
+                    <Refresh className="w-3.5 h-3.5 animate-spin" />
+                    <span>Clearing...</span>
+                  </>
+                ) : (
+                  <>
+                    <Database className="w-3.5 h-3.5" />
+                    <span>Clear Test Data</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

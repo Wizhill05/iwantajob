@@ -12,7 +12,24 @@ from src.models.db_entities import CronJob
 async def setup_db():
     await init_db()
     async with async_session_maker() as session:
-        await session.execute(CronJob.__table__.delete())
+        from sqlalchemy import text as _text
+        await session.execute(
+            _text(
+                """
+                DELETE FROM cron_jobs
+                WHERE name IN (
+                    'Daily Indeed AI Engineer',
+                    'Initial Job',
+                    'Updated Job Name',
+                    'Toggle Test Job',
+                    'To Delete Job',
+                    'Immediate Run Job'
+                )
+                OR name LIKE 'test_%'
+                OR name LIKE 'Test %'
+                """
+            )
+        )
         await session.commit()
 
 

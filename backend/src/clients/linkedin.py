@@ -304,8 +304,7 @@ class LinkedInClient:
         if fetch_descriptions and jobs:
             # Respect limit
             jobs = jobs[:limit]
-            tasks = [self._fetch_job_description(job) for job in jobs]
-            jobs = await asyncio.gather(*tasks)
+            await self._enrich_descriptions(jobs)
 
         if persist and jobs:
             from src.services.raw_ingestion import save_raw_linkedin_job

@@ -1,9 +1,22 @@
 import pytest
+import asyncio
 import time
 from httpx import AsyncClient, ASGITransport
 from src.main import app
 from src.core.database import init_db
 from src.services.raw_ingestion import save_raw_wellfound_job
+
+
+async def wait_for_pipeline_completion(client: AsyncClient, timeout_s: float = 30) -> dict:
+    """Poll parsing status until the background pipeline job finishes."""
+    deadline = time.monotonic() + timeout_s
+    while time.monotonic() < deadline:
+        resp = await client.get("/api/status/parsing")
+        data = resp.json()
+        if data.get("active_job") is None:
+            return data
+        await asyncio.sleep(0.2)
+    pytest.fail("Pipeline job did not finish in time")
 
 @pytest.mark.asyncio
 async def test_live_scraping_persists_raw_and_manual_parsing():
@@ -40,11 +53,13 @@ async def test_live_scraping_persists_raw_and_manual_parsing():
         st = status_resp.json()
         assert st["wellfound"]["total_raw"] >= 1
 
-        # 2. Trigger manual parsing for Wellfound
-        parse_wf = await client.post("/api/parse/wellfound?batch_size=50&use_llm=false")
+        # 2. Trigger manual parsing for Wellfound (starts background job; poll until done)
+        parse_wf = await client.post("/api/parse/wellfound?batch_size=500&use_llm=false")
         assert parse_wf.status_code == 200
-        p_data = parse_wf.json()
-        assert p_data["promoted_to_unified"] >= 1
+        assert parse_wf.json()["started"] is True
+        wf_status = await wait_for_pipeline_completion(client)
+        assert wf_status["last_job"]["provider"] == "wellfound"
+        assert wf_status["last_job"]["promoted"] >= 1
 
         # 3. Check unified jobs endpoint returns parsed records
         uni_resp = await client.get("/api/jobs/unified?source=wellfound&limit=100")

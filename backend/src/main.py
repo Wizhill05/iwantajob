@@ -757,8 +757,11 @@ async def parse_indeed(
     batch_size: Annotated[int, Query(ge=1, le=500, description="Max raw jobs to parse in this run")] = 50,
     use_llm: Annotated[bool, Query(description="Whether to use Gemini LLM batch parsing")] = True,
 ):
-    """Parses unparsed raw Indeed records into clean unified_jobs records using Gemini LLM in batches of 25."""
-    return await ParserService.parse_indeed_jobs(batch_size=batch_size, use_llm=use_llm)
+    """Starts a background parse of unparsed raw Indeed records into unified_jobs. Returns 409 if a pipeline job is already running."""
+    started = ParserService.start_parse("indeed", batch_size=batch_size, use_llm=use_llm)
+    if started is None:
+        raise HTTPException(status_code=409, detail="PIPELINE_BUSY: a pipeline job is already running — see /api/status/parsing")
+    return started
 
 @app.post(
     "/api/parse/linkedin",
@@ -769,8 +772,11 @@ async def parse_linkedin(
     batch_size: Annotated[int, Query(ge=1, le=500, description="Max raw jobs to parse in this run")] = 50,
     use_llm: Annotated[bool, Query(description="Whether to use Gemini LLM batch parsing")] = True,
 ):
-    """Parses unparsed raw LinkedIn records into clean unified_jobs records using Gemini LLM in batches of 25."""
-    return await ParserService.parse_linkedin_jobs(batch_size=batch_size, use_llm=use_llm)
+    """Starts a background parse of unparsed raw LinkedIn records into unified_jobs. Returns 409 if a pipeline job is already running."""
+    started = ParserService.start_parse("linkedin", batch_size=batch_size, use_llm=use_llm)
+    if started is None:
+        raise HTTPException(status_code=409, detail="PIPELINE_BUSY: a pipeline job is already running — see /api/status/parsing")
+    return started
 
 @app.post(
     "/api/parse/wellfound",
@@ -781,8 +787,11 @@ async def parse_wellfound(
     batch_size: Annotated[int, Query(ge=1, le=500, description="Max raw jobs to parse in this run")] = 50,
     use_llm: Annotated[bool, Query(description="Whether to use Gemini LLM batch parsing")] = True,
 ):
-    """Parses unparsed raw Wellfound records into clean unified_jobs records using Gemini LLM in batches of 25."""
-    return await ParserService.parse_wellfound_jobs(batch_size=batch_size, use_llm=use_llm)
+    """Starts a background parse of unparsed raw Wellfound records into unified_jobs. Returns 409 if a pipeline job is already running."""
+    started = ParserService.start_parse("wellfound", batch_size=batch_size, use_llm=use_llm)
+    if started is None:
+        raise HTTPException(status_code=409, detail="PIPELINE_BUSY: a pipeline job is already running — see /api/status/parsing")
+    return started
 
 @app.post(
     "/api/parse/reparse-unified",
@@ -796,13 +805,16 @@ async def reparse_unified_jobs_endpoint(
 ):
     """
     Backfills and reparses existing unified_jobs where experience or salary was missed.
-    Uses the upgraded regex engine and Gemini LLM.
-    """
-    return await ParserService.reparse_unified_jobs(
+    Uses the upgraded regex engine and Gemini LLM. Returns 409 if a pipeline job is already running."""
+    result = await ParserService.run_reparse(
         only_missing_experience=only_missing_experience,
         use_llm=use_llm,
         limit=limit,
     )
+    if result is None:
+        raise HTTPException(status_code=409, detail="PIPELINE_BUSY: a pipeline job is already running — see /api/status/parsing")
+    return result
+
 
 class JobTriageUpdateRequest(BaseModel):
     is_saved: bool | None = None
@@ -1186,6 +1198,35 @@ async def delete_unified_jobs(
         return {"deleted_count": res.rowcount}
 
 @app.post(
+    "/api/db/clear-bronze",
+    summary="Clear the entire bronze layer (all raw staging tables)",
+    tags=["System"],
+)
+async def clear_bronze():
+    """
+    Deletes every row from the three raw staging tables
+    (raw_indeed_jobs, raw_linkedin_jobs, raw_wellfound_jobs).
+    Unified jobs (silver layer) are left untouched.
+    """
+    async with async_session_maker() as session:
+        res_indeed = await session.execute(delete(RawIndeedJob))
+        res_linkedin = await session.execute(delete(RawLinkedInJob))
+        res_wellfound = await session.execute(delete(RawWellfoundJob))
+        await session.commit()
+
+    return {
+        "status": "success",
+        "deleted": {
+            "raw_indeed_jobs": res_indeed.rowcount,
+            "raw_linkedin_jobs": res_linkedin.rowcount,
+            "raw_wellfound_jobs": res_wellfound.rowcount,
+        },
+        "total_deleted": (
+            res_indeed.rowcount + res_linkedin.rowcount + res_wellfound.rowcount
+        ),
+    }
+
+@app.post(
     "/api/db/reset",
     summary="Reset and wipe the database entirely from scratch",
     tags=["System"],
@@ -1209,23 +1250,25 @@ async def reset_database():
 )
 async def clear_test_data():
     """
-    Deletes any row whose external_id starts with 'test_' from all raw
-    staging tables and unified_jobs, plus known test CronJob names.
-    Safe to run against the production database at any time — only
-    removes data that matches the test-data naming convention.
+    Deletes test-seeded rows from all raw staging tables and unified_jobs,
+    plus known test CronJob names. Test rows are identified by synthetic
+    external_id prefixes ('test_', 'wf_', 'li_') — live scrapers always
+    produce bare numeric/hex IDs, so prefixed IDs only ever come from
+    tester UIs and pytest seeds. Safe to run at any time.
     """
+    test_id_pattern = "^(test_|wf_|li_)"
     async with async_session_maker() as session:
         res_indeed = await session.execute(
-            text("DELETE FROM raw_indeed_jobs WHERE external_id LIKE 'test_%'")
+            text("DELETE FROM raw_indeed_jobs WHERE external_id ~ :pat").bindparams(pat=test_id_pattern)
         )
         res_linkedin = await session.execute(
-            text("DELETE FROM raw_linkedin_jobs WHERE external_id LIKE 'test_%'")
+            text("DELETE FROM raw_linkedin_jobs WHERE external_id ~ :pat").bindparams(pat=test_id_pattern)
         )
         res_wellfound = await session.execute(
-            text("DELETE FROM raw_wellfound_jobs WHERE external_id LIKE 'test_%'")
+            text("DELETE FROM raw_wellfound_jobs WHERE external_id ~ :pat").bindparams(pat=test_id_pattern)
         )
         res_unified = await session.execute(
-            text("DELETE FROM unified_jobs WHERE external_id LIKE 'test_%'")
+            text("DELETE FROM unified_jobs WHERE external_id ~ :pat").bindparams(pat=test_id_pattern)
         )
         res_cron = await session.execute(
             text(

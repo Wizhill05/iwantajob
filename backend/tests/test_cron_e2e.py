@@ -12,7 +12,21 @@ from src.models.db_entities import CronJob
 async def setup_db():
     await init_db()
     async with async_session_maker() as session:
-        await session.execute(CronJob.__table__.delete())
+        from sqlalchemy import text as _text
+        await session.execute(
+            _text(
+                """
+                DELETE FROM cron_jobs
+                WHERE name IN (
+                    'Indeed Weekdays 6 AM',
+                    'Indeed Auto-Parse Job',
+                    'Omni Scrape Daily'
+                )
+                OR name LIKE 'test_%'
+                OR name LIKE 'Test %'
+                """
+            )
+        )
         await session.commit()
 
 
@@ -171,7 +185,7 @@ async def test_cron_auto_parse_integration():
             mock_scraper.search_jobs.return_value = mock_search_results
             mock_indeed_cls.return_value = mock_scraper
 
-            mock_parser_cls.parse_indeed_jobs = AsyncMock(
+            mock_parser_cls.run_parse = AsyncMock(
                 return_value={"source": "indeed", "promoted_to_unified": 3}
             )
 
@@ -192,7 +206,7 @@ async def test_cron_auto_parse_integration():
                 persist=True,
             )
             # Verify parser called
-            mock_parser_cls.parse_indeed_jobs.assert_awaited_once()
+            mock_parser_cls.run_parse.assert_awaited_once()
 
         # Check DB record updated
         async with async_session_maker() as session:
@@ -242,9 +256,10 @@ async def test_cron_auto_parse_all_providers():
             mock_wf.search_jobs.return_value = ([MagicMock()], "cursor", {})
             mock_wf_cls.return_value = mock_wf
 
-            mock_parser_cls.parse_indeed_jobs = AsyncMock(return_value={"promoted_to_unified": 1})
-            mock_parser_cls.parse_linkedin_jobs = AsyncMock(return_value={"promoted_to_unified": 2})
-            mock_parser_cls.parse_wellfound_jobs = AsyncMock(return_value={"promoted_to_unified": 1})
+            async def _run_parse_side_effect(provider, *args, **kwargs):
+                return {"promoted_to_unified": {"indeed": 1, "linkedin": 2, "wellfound": 1}[provider]}
+
+            mock_parser_cls.run_parse = AsyncMock(side_effect=_run_parse_side_effect)
 
             run_res = await client.post(f"/api/cron/{job_id}/run")
             assert run_res.status_code == 200
@@ -256,9 +271,7 @@ async def test_cron_auto_parse_all_providers():
             mock_ind.search_jobs.assert_awaited_once()
             mock_lk.search_jobs.assert_awaited_once()
             mock_wf.search_jobs.assert_awaited_once()
-            mock_parser_cls.parse_indeed_jobs.assert_awaited_once()
-            mock_parser_cls.parse_linkedin_jobs.assert_awaited_once()
-            mock_parser_cls.parse_wellfound_jobs.assert_awaited_once()
+            assert mock_parser_cls.run_parse.await_count == 3
 
         async with async_session_maker() as session:
             db_job = await session.get(CronJob, UUID(job_id))

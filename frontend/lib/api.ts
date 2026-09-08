@@ -4,7 +4,7 @@
   UnifiedJobItem,
   ParsingStatus,
   WellfoundRolesResponse,
-  ParseResult,
+  ParseStartResult,
   UnifiedJobsQueryParams,
   HealthCheckResponse,
   UserPreferences,
@@ -186,23 +186,37 @@ class ApiClient {
   }
 
   /**
-   * Trigger Gemini LLM normalization and parsing for a specific provider.
+   * Start a background parse job for a specific provider. The job keeps running
+   * server-side even if the client navigates away; poll getParsingStatus() for
+   * live progress via `active_job` / `last_job`. Throws on 409 if already busy.
    */
   async triggerParse(
     source: 'indeed' | 'linkedin' | 'wellfound',
     options: {
       batchSize?: number;
     } = {}
-  ): Promise<ParseResult> {
+  ): Promise<ParseStartResult> {
     const searchParams = new URLSearchParams();
     if (options.batchSize !== undefined) {
       searchParams.set('batch_size', String(options.batchSize));
     }
 
     const qs = searchParams.toString();
-    return this.request<ParseResult>(`/api/parse/${source}${qs ? `?${qs}` : ''}`, {
+    return this.request<ParseStartResult>(`/api/parse/${source}${qs ? `?${qs}` : ''}`, {
       method: 'POST',
     });
+  }
+
+  /**
+   * Wipe the entire bronze layer: all raw staging tables (indeed, linkedin,
+   * wellfound). Unified jobs are left untouched.
+   */
+  async clearBronze(): Promise<{
+    status: string;
+    deleted: { raw_indeed_jobs: number; raw_linkedin_jobs: number; raw_wellfound_jobs: number };
+    total_deleted: number;
+  }> {
+    return this.request('/api/db/clear-bronze', { method: 'POST' });
   }
 
   /**

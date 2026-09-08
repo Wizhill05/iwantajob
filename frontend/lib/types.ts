@@ -75,11 +75,29 @@ export interface ProviderParsingStats {
   unparsed: number;
 }
 
+export interface PipelineRunJob {
+  provider: 'indeed' | 'linkedin' | 'wellfound' | 'unified';
+  kind: 'parse' | 'reparse';
+  started_at: string;
+  batch_size: number | null;
+  processed: number;
+  promoted: number;
+  error: string | null;
+}
+
+export interface LastPipelineJob extends PipelineRunJob {
+  status: 'completed' | 'failed';
+  finished_at: string;
+  updated?: number;
+}
+
 export interface ParsingStatus {
   indeed: ProviderParsingStats;
   linkedin: ProviderParsingStats;
   wellfound: ProviderParsingStats;
   unified_total: number;
+  active_job: PipelineRunJob | null;
+  last_job: LastPipelineJob | null;
 }
 
 export interface WellfoundSlugItem {
@@ -98,6 +116,14 @@ export interface ParseResult {
   processed: number;
   promoted_to_unified: number;
   errors: string[];
+}
+
+/** Ack returned by POST /api/parse/{provider} — the job itself runs in the backend. */
+export interface ParseStartResult {
+  started: boolean;
+  provider: string;
+  batch_size: number;
+  use_llm: boolean;
 }
 
 export interface ActiveProcess {

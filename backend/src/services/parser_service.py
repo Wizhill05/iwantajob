@@ -1,5 +1,6 @@
 import asyncio
 import logging
+from datetime import datetime, timezone
 from typing import Any
 from sqlalchemy import select, update
 from sqlalchemy.dialects.postgresql import insert
@@ -21,6 +22,139 @@ LLM_BATCH_CHUNK_SIZE = 10
 
 
 class ParserService:
+    # Global pipeline run state — only one parse/reparse job may run at a time.
+    # Kept in-process so the UI can surface real status across page reloads.
+    _active_run: dict[str, Any] | None = None
+    _last_run: dict[str, Any] | None = None
+
+    @staticmethod
+    def _utcnow_iso() -> str:
+        return datetime.now(timezone.utc).isoformat()
+
+    @classmethod
+    def _begin_run(cls, provider: str, kind: str, batch_size: int | None = None) -> dict[str, Any]:
+        run = {
+            "provider": provider,
+            "kind": kind,
+            "started_at": cls._utcnow_iso(),
+            "batch_size": batch_size,
+            "processed": 0,
+            "promoted": 0,
+            "error": None,
+        }
+        cls._active_run = run
+        return run
+
+    @classmethod
+    def _finish_run(
+        cls,
+        run: dict[str, Any],
+        status: str,
+        result: dict[str, Any] | None = None,
+        error: Any = None,
+    ) -> None:
+        finished = {**run, "status": status, "finished_at": cls._utcnow_iso()}
+        if result:
+            finished["processed"] = result.get("processed", run.get("processed", 0))
+            finished["promoted"] = result.get("promoted_to_unified", run.get("promoted", 0))
+            finished["updated"] = result.get("updated", 0)
+        if error is not None:
+            finished["error"] = str(error)
+        cls._last_run = finished
+        if cls._active_run is run:
+            cls._active_run = None
+
+    @classmethod
+    def get_run_state(cls) -> dict[str, Any]:
+        return {"active_job": cls._active_run, "last_job": cls._last_run}
+
+    @classmethod
+    def start_parse(cls, provider: str, batch_size: int = 50, use_llm: bool = True) -> dict[str, Any] | None:
+        """
+        Start a provider parse as a background task so it keeps running even if
+        the client disconnects. Returns None if the pipeline is already busy.
+        """
+        if provider not in ("indeed", "linkedin", "wellfound"):
+            raise ValueError(f"Unsupported parse provider: {provider}")
+        if cls._active_run is not None:
+            return None
+        cls._begin_run(provider, "parse", batch_size)
+        asyncio.create_task(cls._run_background(provider, batch_size, use_llm))
+        return {"started": True, "provider": provider, "batch_size": batch_size, "use_llm": use_llm}
+
+    @classmethod
+    async def run_parse(cls, provider: str, batch_size: int = 50, use_llm: bool = True) -> dict[str, Any] | None:
+        """Run a provider parse inline (used by the cron scheduler). Returns None if the pipeline is busy."""
+        if provider not in ("indeed", "linkedin", "wellfound"):
+            raise ValueError(f"Unsupported parse provider: {provider}")
+        return await cls._execute_run(provider, batch_size, use_llm)
+
+    @classmethod
+    async def run_reparse(
+        cls,
+        only_missing_experience: bool = True,
+        use_llm: bool = True,
+        limit: int = 100,
+    ) -> dict[str, Any] | None:
+        """Run the unified reparse inline under the same exclusivity guard. Returns None if the pipeline is busy."""
+        if cls._active_run is not None:
+            return None
+        run = cls._begin_run("unified", "reparse", limit)
+        try:
+            result = await cls.reparse_unified_jobs(
+                only_missing_experience=only_missing_experience,
+                use_llm=use_llm,
+                limit=limit,
+            )
+            cls._finish_run(run, "completed", result=result)
+            return result
+        except Exception as exc:
+            logger.error(f"Reparse run failed: {exc}", exc_info=True)
+            cls._finish_run(run, "failed", error=exc)
+            raise
+
+    @classmethod
+    async def _run_background(cls, provider: str, batch_size: int, use_llm: bool) -> None:
+        try:
+            await cls._execute_run(provider, batch_size, use_llm, reserved=True)
+        except Exception:
+            pass  # Already logged and recorded in _last_run
+
+    @classmethod
+    async def _execute_run(
+        cls,
+        provider: str,
+        batch_size: int,
+        use_llm: bool,
+        reserved: bool = False,
+    ) -> dict[str, Any] | None:
+        if not reserved:
+            if cls._active_run is not None:
+                return None
+            cls._begin_run(provider, "parse", batch_size)
+        run = cls._active_run
+        runners = {
+            "indeed": cls.parse_indeed_jobs,
+            "linkedin": cls.parse_linkedin_jobs,
+            "wellfound": cls.parse_wellfound_jobs,
+        }
+        try:
+            result = await runners[provider](batch_size=batch_size, use_llm=use_llm)
+            cls._finish_run(run, "completed", result=result)
+            return result
+        except Exception as exc:
+            logger.error(f"Parse run for {provider} failed: {exc}", exc_info=True)
+            cls._finish_run(run, "failed", error=exc)
+            raise
+
+    @classmethod
+    def _report_progress(cls, processed: int, promoted: int) -> None:
+        """Live progress tick from inside a running parse, surfaced via /api/status/parsing."""
+        run = cls._active_run
+        if run is not None:
+            run["processed"] = processed
+            run["promoted"] = promoted
+
     @classmethod
     async def get_parsing_status(cls) -> dict[str, Any]:
         """Returns the total raw counts and unparsed counts for all 3 sources."""
@@ -39,19 +173,20 @@ class ParserService:
                 "indeed": {
                     "total_raw": len(raw_indeed_count),
                     "parsed": len(indeed_parsed_ids),
-                    "unparsed": len(raw_indeed_count) - len(indeed_parsed_ids),
+                    "unparsed": max(0, len(raw_indeed_count) - len(indeed_parsed_ids)),
                 },
                 "linkedin": {
                     "total_raw": len(raw_linkedin_count),
                     "parsed": len(linkedin_parsed_ids),
-                    "unparsed": len(raw_linkedin_count) - len(linkedin_parsed_ids),
+                    "unparsed": max(0, len(raw_linkedin_count) - len(linkedin_parsed_ids)),
                 },
                 "wellfound": {
                     "total_raw": len(raw_wellfound_count),
                     "parsed": len(wellfound_parsed_ids),
-                    "unparsed": len(raw_wellfound_count) - len(wellfound_parsed_ids),
+                    "unparsed": max(0, len(raw_wellfound_count) - len(wellfound_parsed_ids)),
                 },
                 "unified_total": len(unified_rows),
+                **cls.get_run_state(),
             }
 
     @classmethod
@@ -172,6 +307,8 @@ class ParserService:
                     logger.error(f"Failed to parse indeed job {r_job.external_id}: {e}")
                     errors.append({"id": str(r_job.id), "error": str(e)})
 
+            cls._report_progress(processed=i + len(chunk), promoted=promoted)
+
         return {
             "source": "indeed",
             "processed": len(raw_jobs),
@@ -290,6 +427,8 @@ class ParserService:
                 except Exception as e:
                     logger.error(f"Failed to parse linkedin job {r_job.external_id}: {e}")
                     errors.append({"id": str(r_job.id), "error": str(e)})
+
+            cls._report_progress(processed=i + len(chunk), promoted=promoted)
 
         return {
             "source": "linkedin",
@@ -415,6 +554,8 @@ class ParserService:
                 except Exception as e:
                     logger.error(f"Failed to parse wellfound job {r_job.external_id}: {e}")
                     errors.append({"id": str(r_job.id), "error": str(e)})
+
+            cls._report_progress(processed=i + len(chunk), promoted=promoted)
 
         return {
             "source": "wellfound",

@@ -29,10 +29,11 @@ function PipelineContent() {
   useEffect(() => {
     loadPipelineData();
 
-    // Auto-poll status every 10 seconds
+    // Poll faster while a background pipeline job is running so the UI stays live
+    const isRunning = Boolean(parsingStatus?.active_job);
     const interval = setInterval(() => {
       loadPipelineData();
-    }, 10000);
+    }, isRunning ? 3000 : 10000);
 
     const handlePlatformRefresh = () => {
       loadPipelineData();
@@ -43,7 +44,7 @@ function PipelineContent() {
       clearInterval(interval);
       window.removeEventListener('platform:refresh', handlePlatformRefresh);
     };
-  }, [loadPipelineData]);
+  }, [loadPipelineData, parsingStatus?.active_job]);
 
   return (
     <div className="relative max-w-7xl mx-auto pb-16">

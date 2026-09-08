@@ -61,14 +61,14 @@ async def test_execute_cron_job_indeed_success():
         mock_client = AsyncMock()
         mock_client.search_jobs.return_value = mock_indeed_res
         mock_client_cls.return_value = mock_client
-        mock_parser_cls.parse_indeed_jobs = AsyncMock(return_value={"promoted_to_unified": 1})
+        mock_parser_cls.run_parse = AsyncMock(return_value={"promoted_to_unified": 1})
 
         res = await execute_cron_job(job_id)
 
         assert res["status"] == "success"
         assert "indeed" in res["details"]
         mock_client.search_jobs.assert_awaited_once()
-        mock_parser_cls.parse_indeed_jobs.assert_awaited_once()
+        mock_parser_cls.run_parse.assert_awaited_once()
 
     async with async_session_maker() as session:
         updated = await session.get(CronJob, job_id)
@@ -115,7 +115,25 @@ async def test_execute_cron_job_failure_updates_status():
 async def test_check_and_run_due_jobs_matching():
     await init_db()
     async with async_session_maker() as session:
-        await session.execute(CronJob.__table__.delete())
+        from sqlalchemy import text as _text
+        await session.execute(
+            _text(
+                """
+                DELETE FROM cron_jobs
+                WHERE name IN (
+                    'Indeed Engineer Daily',
+                    'Failing Job',
+                    'All Providers Job',
+                    'Due Job',
+                    'Wrong Minute Job',
+                    'Disabled Job',
+                    'Already Run Job'
+                )
+                OR name LIKE 'test_%'
+                OR name LIKE 'Test %'
+                """
+            )
+        )
         await session.commit()
 
     test_dt = datetime(2026, 9, 7, 14, 30, 0, tzinfo=timezone.utc)  # 2026-09-07 is Monday (weekday 0)
@@ -215,9 +233,10 @@ async def test_execute_cron_job_all_providers_success():
         mock_wf.search_jobs.return_value = [MagicMock(id=3)]
         mock_wf_cls.return_value = mock_wf
 
-        mock_parser_cls.parse_indeed = AsyncMock(return_value={"promoted_to_unified": 1})
-        mock_parser_cls.parse_linkedin = AsyncMock(return_value={"promoted_to_unified": 2})
-        mock_parser_cls.parse_wellfound = AsyncMock(return_value={"promoted_to_unified": 3})
+        async def _run_parse_side_effect(provider, *args, **kwargs):
+            return {"promoted_to_unified": {"indeed": 1, "linkedin": 2, "wellfound": 3}[provider]}
+
+        mock_parser_cls.run_parse = AsyncMock(side_effect=_run_parse_side_effect)
 
         res = await execute_cron_job(job_id)
 

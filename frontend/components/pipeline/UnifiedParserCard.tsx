@@ -13,7 +13,7 @@ import {
   NavArrowDown,
   NavArrowUp,
 } from 'iconoir-react';
-import type { ProviderParsingStats, ParseResult } from '@/lib/types';
+import type { ProviderParsingStats, ParseStartResult } from '@/lib/types';
 import { useActivity } from '@/context/ActivityContext';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
@@ -55,7 +55,7 @@ const PROVIDERS: ProviderConfig[] = [
 interface ProviderRunState {
   isProcessing: boolean;
   durationMs: number | null;
-  result: ParseResult | null;
+  result: ParseStartResult | null;
   error: string | null;
 }
 
@@ -103,7 +103,7 @@ export function UnifiedParserCard({
     const startTime = performance.now();
 
     try {
-      const result = await api.triggerParse(provider, { batchSize });
+      const ack = await api.triggerParse(provider, { batchSize });
       const elapsed = Math.round(performance.now() - startTime);
 
       setProviderStates((prev) => ({
@@ -111,7 +111,7 @@ export function UnifiedParserCard({
         [provider]: {
           isProcessing: false,
           durationMs: elapsed,
-          result,
+          result: ack,
           error: null,
         },
       }));
@@ -119,15 +119,15 @@ export function UnifiedParserCard({
       finishProcess(
         procId,
         'completed',
-        `Parsed ${result.processed} records, promoted ${result.promoted_to_unified} to unified.`
+        `Parse job started in background (batch of ${ack.batch_size}).`
       );
 
       addLog(
         'PARSE',
         provider,
-        `Normalized batch: ${result.promoted_to_unified}/${result.processed} promoted in ${elapsed}ms`,
+        `Parse job started in background for ${provider} (batch of ${ack.batch_size})`,
         elapsed,
-        result
+        ack
       );
 
       return true;
@@ -343,7 +343,7 @@ export function UnifiedParserCard({
                 {state.result && !state.error && (
                   <span className="text-[11px] font-mono text-[#3ecf8e] flex items-center gap-1 bg-[#3ecf8e]/10 px-2 py-0.5 rounded border border-[#3ecf8e]/20">
                     <CheckCircle className="w-3 h-3" />
-                    <span>+{state.result.promoted_to_unified} promoted</span>
+                    <span>Parse started</span>
                     {state.durationMs && (
                       <span className="text-[#9ca3af]">({state.durationMs}ms)</span>
                     )}

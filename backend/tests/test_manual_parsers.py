@@ -1,4 +1,5 @@
 import pytest
+import asyncio
 import time
 from httpx import AsyncClient, ASGITransport
 from src.main import app
@@ -8,6 +9,18 @@ from src.services.raw_ingestion import (
     save_raw_linkedin_job,
     save_raw_wellfound_job,
 )
+
+
+async def wait_for_pipeline_completion(client: AsyncClient, timeout_s: float = 30) -> dict:
+    """Poll parsing status until the background pipeline job finishes."""
+    deadline = time.monotonic() + timeout_s
+    while time.monotonic() < deadline:
+        resp = await client.get("/api/status/parsing")
+        data = resp.json()
+        if data.get("active_job") is None:
+            return data
+        await asyncio.sleep(0.2)
+    pytest.fail("Pipeline job did not finish in time")
 
 @pytest.mark.asyncio
 async def test_manual_parsers_and_status():
@@ -59,17 +72,21 @@ async def test_manual_parsers_and_status():
         assert "linkedin" in status_data
         assert "wellfound" in status_data
 
-        # 2. Parse Indeed manually
-        ind_resp = await client.post("/api/parse/indeed?batch_size=10&use_llm=false")
+        # 2. Parse Indeed manually (starts background job; poll until done)
+        ind_resp = await client.post("/api/parse/indeed?batch_size=500&use_llm=false")
         assert ind_resp.status_code == 200
-        ind_data = ind_resp.json()
-        assert ind_data["promoted_to_unified"] >= 1
+        assert ind_resp.json()["started"] is True
+        ind_status = await wait_for_pipeline_completion(client)
+        assert ind_status["last_job"]["provider"] == "indeed"
+        assert ind_status["last_job"]["promoted"] >= 1
 
         # 3. Parse LinkedIn manually
-        li_resp = await client.post("/api/parse/linkedin?batch_size=10&use_llm=false")
+        li_resp = await client.post("/api/parse/linkedin?batch_size=500&use_llm=false")
         assert li_resp.status_code == 200
-        li_data = li_resp.json()
-        assert li_data["promoted_to_unified"] >= 1
+        assert li_resp.json()["started"] is True
+        li_status = await wait_for_pipeline_completion(client)
+        assert li_status["last_job"]["provider"] == "linkedin"
+        assert li_status["last_job"]["promoted"] >= 1
 
         # 4. Query unified jobs with fresher filter
         uni_resp = await client.get("/api/jobs/unified?is_fresher_friendly=true")

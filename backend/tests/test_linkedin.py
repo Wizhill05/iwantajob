@@ -159,6 +159,26 @@ async def test_linkedin_routes_and_endpoint():
         assert first["title"]
 
 @pytest.mark.asyncio
+async def test_search_jobs_with_descriptions_enriches(monkeypatch):
+    """Regression: search_jobs(fetch_descriptions=True) must enrich in place via
+    _enrich_descriptions, not call the removed _fetch_job_description."""
+    client = LinkedInClient()
+    client.detail_cache.clear()
+
+    async def mock_fetch_html(url: str):
+        if "seeMoreJobPostings" in url:
+            return SAMPLE_SEARCH_HTML
+        return SAMPLE_DETAIL_HTML
+
+    monkeypatch.setattr(client, "_fetch_html", mock_fetch_html)
+
+    jobs = await client.search_jobs(keywords="software engineer", location="India", fetch_descriptions=True)
+    assert len(jobs) == 2
+    assert all(j.description_text for j in jobs)
+    assert "Software Engineer" in jobs[0].description_text
+
+
+@pytest.mark.asyncio
 async def test_linkedin_cache_prevents_duplicate_detail_fetches(monkeypatch):
     client = LinkedInClient()
     client.detail_cache.clear()

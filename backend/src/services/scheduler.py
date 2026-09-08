@@ -20,16 +20,13 @@ _scheduler_task: asyncio.Task | None = None
 _scheduler_running: bool = False
 
 
-async def _safe_parse(method_name: str, fallback_name: str) -> dict[str, Any]:
-    for name in (method_name, fallback_name):
-        method = getattr(ParserService, name, None)
-        if callable(method):
-            res = method()
-            if asyncio.iscoroutine(res):
-                return await res
-            elif isinstance(res, dict):
-                return res
-    return {}
+async def _safe_parse(provider: str) -> dict[str, Any]:
+    """Run a provider parse under the global pipeline exclusivity guard. Returns {} if the pipeline is busy."""
+    res = await ParserService.run_parse(provider)
+    if res is None:
+        logger.info(f"Auto-parse for {provider} skipped: another pipeline job is already running")
+        return {}
+    return res
 
 
 async def _run_job_logic(job: CronJob, session: AsyncSession) -> dict[str, Any]:
@@ -47,7 +44,7 @@ async def _run_job_logic(job: CronJob, session: AsyncSession) -> dict[str, Any]:
             items = res[0] if isinstance(res, tuple) else res
             scraped_counts["indeed"] = len(items) if items else 0
             if auto_parse:
-                parse_res = await _safe_parse("parse_indeed", "parse_indeed_jobs")
+                parse_res = await _safe_parse("indeed")
                 parsed_counts["indeed"] = parse_res.get("promoted_to_unified", 0)
 
         elif provider == "linkedin":
@@ -55,7 +52,7 @@ async def _run_job_logic(job: CronJob, session: AsyncSession) -> dict[str, Any]:
             items = await client.search_jobs(**search_params, persist=True)
             scraped_counts["linkedin"] = len(items) if items else 0
             if auto_parse:
-                parse_res = await _safe_parse("parse_linkedin", "parse_linkedin_jobs")
+                parse_res = await _safe_parse("linkedin")
                 parsed_counts["linkedin"] = parse_res.get("promoted_to_unified", 0)
 
         elif provider == "wellfound":
@@ -64,7 +61,7 @@ async def _run_job_logic(job: CronJob, session: AsyncSession) -> dict[str, Any]:
             items = res[0] if isinstance(res, tuple) else res
             scraped_counts["wellfound"] = len(items) if items else 0
             if auto_parse:
-                parse_res = await _safe_parse("parse_wellfound", "parse_wellfound_jobs")
+                parse_res = await _safe_parse("wellfound")
                 parsed_counts["wellfound"] = parse_res.get("promoted_to_unified", 0)
 
         elif provider == "all":
@@ -103,9 +100,9 @@ async def _run_job_logic(job: CronJob, session: AsyncSession) -> dict[str, Any]:
             scraped_counts["wellfound"] = len(wf_items) if wf_items else 0
 
             if auto_parse:
-                p_ind = await _safe_parse("parse_indeed", "parse_indeed_jobs")
-                p_lk = await _safe_parse("parse_linkedin", "parse_linkedin_jobs")
-                p_wf = await _safe_parse("parse_wellfound", "parse_wellfound_jobs")
+                p_ind = await _safe_parse("indeed")
+                p_lk = await _safe_parse("linkedin")
+                p_wf = await _safe_parse("wellfound")
                 parsed_counts["indeed"] = p_ind.get("promoted_to_unified", 0)
                 parsed_counts["linkedin"] = p_lk.get("promoted_to_unified", 0)
                 parsed_counts["wellfound"] = p_wf.get("promoted_to_unified", 0)
