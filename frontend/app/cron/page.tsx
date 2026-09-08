@@ -11,7 +11,6 @@ import {
   Trash,
   Play,
   EditPencil,
-  NavArrowDown,
   Linkedin,
   Database,
   Building,
@@ -21,7 +20,6 @@ import { api } from '@/lib/api';
 import type {
   CronJob,
   CreateCronJobPayload,
-  UpdateCronJobPayload,
 } from '@/lib/types';
 import { useActivity } from '@/context/ActivityContext';
 import { PageHero } from '@/components/layout/PageHero';
@@ -30,10 +28,10 @@ import { cn, formatRelativeTime } from '@/lib/utils';
 /* ── constants ── */
 
 const PROVIDERS = [
-  { id: 'indeed' as const, label: 'Indeed', icon: Database },
-  { id: 'linkedin' as const, label: 'LinkedIn', icon: Linkedin },
-  { id: 'wellfound' as const, label: 'Wellfound', icon: Building },
-  { id: 'all' as const, label: 'All', icon: Globe },
+  { id: 'indeed' as const, label: 'Indeed', icon: Database, active: 'border-sky-500/50 bg-sky-500/10 text-sky-400' },
+  { id: 'linkedin' as const, label: 'LinkedIn', icon: Linkedin, active: 'border-blue-500/50 bg-blue-500/10 text-blue-400' },
+  { id: 'wellfound' as const, label: 'Wellfound', icon: Building, active: 'border-rose-500/50 bg-rose-500/10 text-rose-400' },
+  { id: 'all' as const, label: 'All', icon: Globe, active: 'border-[#3ecf8e]/50 bg-[#3ecf8e]/10 text-[#3ecf8e]' },
 ];
 
 const WEEKDAYS = [
@@ -70,12 +68,18 @@ function paramsSummary(p: Record<string, any>): string {
   return parts.join(' · ');
 }
 
-const providerStyle: Record<string, string> = {
+const providerColor: Record<string, string> = {
   indeed: 'text-sky-400',
   linkedin: 'text-blue-400',
   wellfound: 'text-rose-400',
   all: 'text-[#3ecf8e]',
 };
+
+/* shared circular button style — same language as the jobs selection menu */
+const circleBtn =
+  'h-[42px] w-[42px] p-0 shrink-0 flex items-center justify-center rounded-full border transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed';
+const circleBtnSm =
+  'h-9 w-9 p-0 shrink-0 flex items-center justify-center rounded-full border transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed';
 
 /* ── inline form defaults ── */
 
@@ -102,7 +106,6 @@ function CronContent() {
   const [jobs, setJobs] = useState<CronJob[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
   // inline form
   const [showForm, setShowForm] = useState(false);
@@ -128,9 +131,7 @@ function CronContent() {
   const loadJobs = useCallback(async (silent = false) => {
     if (!silent) setIsRefreshing(true);
     try {
-      const data = await api.getCronJobs();
-      setJobs(data);
-      setLastUpdated(new Date());
+      setJobs(await api.getCronJobs());
     } catch (e: any) {
       if (!silent) showToast('error', e.message || 'Failed to load schedules');
     } finally {
@@ -283,80 +284,66 @@ function CronContent() {
   };
 
   const activeCount = jobs.filter((j) => j.is_enabled).length;
+  const selectedProvider = PROVIDERS.find((p) => p.id === form.provider);
 
   return (
     <div className="relative max-w-7xl mx-auto pb-16">
       <PageHero title="Cron Jobs" />
 
-      <div className="relative z-10 -mt-8 pt-4 space-y-0 bg-[#131313] min-h-[60vh]">
+      <div className="relative z-10 -mt-8 pt-4 bg-[#131313] min-h-[60vh]">
         {/* toast */}
         {toast && (
           <div
             className={cn(
-              'fixed top-20 right-6 z-50 flex items-center gap-2.5 px-4 py-2.5 rounded-lg border text-xs font-sans shadow-xl',
+              'fixed top-20 right-4 sm:right-6 z-50 flex items-center gap-2 px-3.5 py-2.5 rounded-lg border text-xs font-sans shadow-xl max-w-[calc(100vw-2rem)]',
               toast.type === 'success' && 'bg-[#18261e] border-[#3ecf8e]/40 text-[#3ecf8e]',
               toast.type === 'error' && 'bg-[#29171c] border-rose-500/40 text-rose-300',
               toast.type === 'info' && 'bg-[#182029] border-blue-500/40 text-blue-300'
             )}
           >
-            {toast.type === 'success' && <CheckCircle className="w-3.5 h-3.5" />}
-            {toast.type === 'error' && <WarningTriangle className="w-3.5 h-3.5" />}
-            {toast.type === 'info' && <Clock className="w-3.5 h-3.5" />}
-            <span>{toast.msg}</span>
-            <button type="button" onClick={() => setToast(null)} className="p-0.5 hover:opacity-70">
+            {toast.type === 'success' && <CheckCircle className="w-3.5 h-3.5 shrink-0" />}
+            {toast.type === 'error' && <WarningTriangle className="w-3.5 h-3.5 shrink-0" />}
+            {toast.type === 'info' && <Clock className="w-3.5 h-3.5 shrink-0" />}
+            <span className="truncate">{toast.msg}</span>
+            <button type="button" onClick={() => setToast(null)} className="p-0.5 hover:opacity-70 shrink-0">
               <Xmark className="w-3 h-3" />
             </button>
           </div>
         )}
 
-        {/* toolbar */}
-        <div className="flex items-center justify-between pb-3 border-b border-[#262626]">
-          <div className="flex items-center gap-3">
-            <span className="text-xs font-heading font-semibold text-white tracking-wide uppercase text-[11px]">
-              Scheduled Scrapers
-            </span>
-            <span className="h-3 w-px bg-[#262626]" />
-            <span className="text-[11px] font-mono text-[#6b7280]">
-              <span className="text-white font-bold">{activeCount}</span> active of{' '}
-              <span className="text-white font-bold">{jobs.length}</span>
-            </span>
-          </div>
+        {/* toolbar — wraps cleanly on mobile, circular icon actions */}
+        <div className="flex items-center justify-between gap-2 pb-3 border-b border-[#262626]">
+          <p className="text-[11px] font-mono text-[#6b7280] whitespace-nowrap min-w-0 truncate">
+            <span className="text-white font-bold">{activeCount}</span>
+            {' / '}
+            <span className="text-white font-bold">{jobs.length}</span>
+            {' active'}
+          </p>
 
-          <div className="flex items-center gap-2">
-            {lastUpdated && (
-              <span className="text-[11px] font-mono text-[#6b7280] hidden sm:inline">
-                {lastUpdated.toLocaleTimeString([], { hour12: false })}
-              </span>
-            )}
+          <div className="flex items-center gap-2 shrink-0">
             <button
               type="button"
               onClick={() => loadJobs()}
               disabled={isRefreshing}
-              className="p-1.5 rounded-lg border border-[#262626] bg-[#181818] hover:bg-[#222] text-[#9ca3af] hover:text-white transition-colors disabled:opacity-50"
+              title="Refresh schedules"
+              aria-label="Refresh schedules"
+              className={cn(circleBtn, 'bg-[#202020] border-[#333] text-white hover:text-[#3ecf8e]')}
             >
-              <Refresh className={cn('w-3.5 h-3.5', isRefreshing && 'animate-spin text-[#3ecf8e]')} />
+              <Refresh className={cn('w-5 h-5', isRefreshing && 'animate-spin text-[#3ecf8e]')} />
             </button>
             <button
               type="button"
               onClick={showForm ? cancelForm : openNew}
+              title={showForm ? 'Cancel' : 'New schedule'}
+              aria-label={showForm ? 'Cancel' : 'New schedule'}
               className={cn(
-                'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold font-sans transition-all active:scale-95',
+                circleBtn,
                 showForm
-                  ? 'bg-[#222] border border-[#333] text-[#9ca3af] hover:text-white'
-                  : 'bg-[#3ecf8e] hover:bg-[#34b27b] text-[#131313] shadow-md shadow-[#3ecf8e]/20'
+                  ? 'bg-[#202020] border-[#333] text-[#9ca3af] hover:text-white'
+                  : 'bg-[#3ecf8e] border-[#3ecf8e] text-[#131313] hover:bg-[#34b27b] shadow-md shadow-[#3ecf8e]/20'
               )}
             >
-              {showForm ? (
-                <>
-                  <Xmark className="w-3.5 h-3.5" />
-                  <span>Cancel</span>
-                </>
-              ) : (
-                <>
-                  <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
-                  <span>New Schedule</span>
-                </>
-              )}
+              {showForm ? <Xmark className="w-5 h-5" /> : <Plus className="w-5 h-5 stroke-[2.5]" />}
             </button>
           </div>
         </div>
@@ -364,88 +351,98 @@ function CronContent() {
         {/* ── INLINE ADD / EDIT FORM ── */}
         {showForm && (
           <form onSubmit={handleSubmit} className="border-b border-[#262626] py-5 space-y-4">
-            {formError && (
-              <p className="text-xs text-rose-400 font-sans">{formError}</p>
-            )}
+            {formError && <p className="text-xs text-rose-400 font-sans">{formError}</p>}
 
-            {/* row 1: name + provider */}
-            <div className="flex flex-col sm:flex-row gap-3">
-              <div className="flex-1">
-                <label className="text-[11px] font-sans text-[#6b7280] block mb-1">Name</label>
-                <input
-                  type="text"
-                  value={form.name}
-                  onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-                  placeholder="e.g. Morning Indeed Scrape"
-                  className="w-full px-3 py-2 rounded-lg bg-[#181818] border border-[#262626] focus:border-[#3ecf8e]/60 focus:outline-none text-xs font-sans text-white placeholder-[#555]"
-                />
-              </div>
-              <div className="w-full sm:w-48">
-                <label className="text-[11px] font-sans text-[#6b7280] block mb-1">Provider</label>
-                <div className="flex gap-1">
-                  {PROVIDERS.map((p) => {
-                    const Icon = p.icon;
-                    return (
-                      <button
-                        key={p.id}
-                        type="button"
-                        onClick={() => setForm((f) => ({ ...f, provider: p.id }))}
-                        className={cn(
-                          'flex-1 flex items-center justify-center gap-1 py-2 rounded-lg border text-[11px] font-sans transition-all',
-                          form.provider === p.id
-                            ? 'border-[#3ecf8e]/50 bg-[#3ecf8e]/10 text-[#3ecf8e]'
-                            : 'border-[#262626] bg-[#181818] text-[#6b7280] hover:text-white hover:border-[#333]'
-                        )}
-                      >
-                        <Icon className="w-3 h-3" />
-                      </button>
-                    );
-                  })}
-                </div>
+            {/* name */}
+            <div className="min-w-0">
+              <label className="text-[11px] font-sans text-[#6b7280] block mb-1.5">Name</label>
+              <input
+                type="text"
+                value={form.name}
+                onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+                placeholder="e.g. Morning Indeed Scrape"
+                className="w-full px-3 py-3 rounded-lg bg-[#181818] border border-[#262626] focus:border-[#3ecf8e] focus:outline-none text-xs font-sans text-white placeholder-[#555] transition-colors"
+              />
+            </div>
+
+            {/* provider — floating circles */}
+            <div className="min-w-0">
+              <p className="text-[11px] font-sans text-[#6b7280] mb-1.5">
+                Provider <span className="text-[#9ca3af]">· {selectedProvider?.label}</span>
+              </p>
+              <div className="flex items-center gap-2.5">
+                {PROVIDERS.map((p) => {
+                  const Icon = p.icon;
+                  const selected = form.provider === p.id;
+                  return (
+                    <button
+                      key={p.id}
+                      type="button"
+                      onClick={() => setForm((f) => ({ ...f, provider: p.id }))}
+                      title={p.label}
+                      aria-label={p.label}
+                      aria-pressed={selected}
+                      className={cn(
+                        circleBtn,
+                        selected ? p.active : 'bg-[#202020] border-[#333] text-[#6b7280] hover:text-white'
+                      )}
+                    >
+                      <Icon className="w-5 h-5" />
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
-            {/* row 2: time + days */}
-            <div className="flex flex-col sm:flex-row gap-3 items-start">
-              <div className="flex items-center gap-2">
-                <div>
-                  <label className="text-[11px] font-sans text-[#6b7280] block mb-1">Hour</label>
+            {/* time + days */}
+            <div className="flex flex-wrap items-end gap-x-5 gap-y-4 min-w-0">
+              <div className="min-w-0">
+                <p className="text-[11px] font-sans text-[#6b7280] mb-1.5">Time</p>
+                <div className="flex items-center gap-2">
                   <input
                     type="number"
                     min={0}
                     max={23}
                     value={form.hour}
+                    aria-label="Hour"
                     onChange={(e) => setForm((f) => ({ ...f, hour: Math.min(23, Math.max(0, parseInt(e.target.value) || 0)) }))}
-                    className="w-16 px-2 py-2 rounded-lg bg-[#181818] border border-[#262626] focus:border-[#3ecf8e]/60 focus:outline-none text-xs font-mono text-white text-center"
+                    className="w-16 px-2 py-2.5 rounded-lg bg-[#181818] border border-[#262626] focus:border-[#3ecf8e] focus:outline-none text-xs font-mono text-white text-center"
                   />
-                </div>
-                <span className="text-[#6b7280] font-mono text-sm mt-5">:</span>
-                <div>
-                  <label className="text-[11px] font-sans text-[#6b7280] block mb-1">Min</label>
+                  <span className="text-[#6b7280] font-mono">:</span>
                   <input
                     type="number"
                     min={0}
                     max={59}
                     value={form.minute}
+                    aria-label="Minute"
                     onChange={(e) => setForm((f) => ({ ...f, minute: Math.min(59, Math.max(0, parseInt(e.target.value) || 0)) }))}
-                    className="w-16 px-2 py-2 rounded-lg bg-[#181818] border border-[#262626] focus:border-[#3ecf8e]/60 focus:outline-none text-xs font-mono text-white text-center"
+                    className="w-16 px-2 py-2.5 rounded-lg bg-[#181818] border border-[#262626] focus:border-[#3ecf8e] focus:outline-none text-xs font-mono text-white text-center"
                   />
+                  <span className="text-[11px] font-mono text-[#3ecf8e] whitespace-nowrap">
+                    {fmt12(form.hour, form.minute)}
+                  </span>
                 </div>
-                <span className="text-[11px] font-mono text-[#3ecf8e] mt-5 ml-1">
-                  {fmt12(form.hour, form.minute)}
-                </span>
               </div>
 
-              <div className="flex-1">
-                <label className="text-[11px] font-sans text-[#6b7280] block mb-1">Active Days</label>
-                <div className="flex items-center gap-1">
+              <div className="min-w-0">
+                <div className="flex items-center gap-2 mb-1.5">
+                  <p className="text-[11px] font-sans text-[#6b7280]">Days</p>
+                  <button type="button" onClick={() => setForm((f) => ({ ...f, days: [0, 1, 2, 3, 4] }))} className="text-[10px] font-sans text-[#6b7280] hover:text-[#3ecf8e] underline underline-offset-2">
+                    Wkdays
+                  </button>
+                  <button type="button" onClick={() => setForm((f) => ({ ...f, days: [0, 1, 2, 3, 4, 5, 6] }))} className="text-[10px] font-sans text-[#6b7280] hover:text-[#3ecf8e] underline underline-offset-2">
+                    All
+                  </button>
+                </div>
+                <div className="flex items-center gap-1.5">
                   {WEEKDAYS.map((d) => (
                     <button
                       key={d.i}
                       type="button"
                       onClick={() => toggleDay(d.i)}
+                      aria-pressed={form.days.includes(d.i)}
                       className={cn(
-                        'w-8 h-8 rounded-lg text-[11px] font-mono font-bold flex items-center justify-center border transition-all',
+                        'h-9 w-9 shrink-0 rounded-full text-[11px] font-mono font-bold flex items-center justify-center border transition-all active:scale-95',
                         form.days.includes(d.i)
                           ? 'bg-[#3ecf8e]/15 text-[#3ecf8e] border-[#3ecf8e]/40'
                           : 'bg-[#181818] text-[#4b5563] border-[#262626] hover:text-[#9ca3af]'
@@ -454,101 +451,95 @@ function CronContent() {
                       {d.l}
                     </button>
                   ))}
-                  <span className="h-5 w-px bg-[#262626] mx-1" />
-                  <button type="button" onClick={() => setForm((f) => ({ ...f, days: [0, 1, 2, 3, 4] }))} className="text-[10px] font-sans text-[#6b7280] hover:text-[#3ecf8e] underline underline-offset-2">
-                    Wkdays
-                  </button>
-                  <button type="button" onClick={() => setForm((f) => ({ ...f, days: [0, 1, 2, 3, 4, 5, 6] }))} className="text-[10px] font-sans text-[#6b7280] hover:text-[#3ecf8e] underline underline-offset-2">
-                    All
-                  </button>
                 </div>
               </div>
             </div>
 
-            {/* row 3: search params */}
-            <div className="flex flex-col sm:flex-row gap-3">
-              <div className="flex-1">
-                <label className="text-[11px] font-sans text-[#6b7280] block mb-1">Keywords / Role</label>
+            {/* search */}
+            <div className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_96px] gap-3 min-w-0">
+              <div className="min-w-0">
+                <label className="text-[11px] font-sans text-[#6b7280] block mb-1.5">Keywords / Role</label>
                 <input
                   type="text"
                   value={form.what}
                   onChange={(e) => setForm((f) => ({ ...f, what: e.target.value }))}
                   placeholder="software engineer"
-                  className="w-full px-3 py-2 rounded-lg bg-[#181818] border border-[#262626] focus:border-[#3ecf8e]/60 focus:outline-none text-xs font-sans text-white placeholder-[#555]"
+                  className="w-full px-3 py-3 rounded-lg bg-[#181818] border border-[#262626] focus:border-[#3ecf8e] focus:outline-none text-xs font-sans text-white placeholder-[#555] transition-colors"
                 />
               </div>
-              <div className="flex-1">
-                <label className="text-[11px] font-sans text-[#6b7280] block mb-1">Location</label>
+              <div className="min-w-0">
+                <label className="text-[11px] font-sans text-[#6b7280] block mb-1.5">Location</label>
                 <input
                   type="text"
                   value={form.where}
                   onChange={(e) => setForm((f) => ({ ...f, where: e.target.value }))}
                   placeholder="India"
-                  className="w-full px-3 py-2 rounded-lg bg-[#181818] border border-[#262626] focus:border-[#3ecf8e]/60 focus:outline-none text-xs font-sans text-white placeholder-[#555]"
+                  className="w-full px-3 py-3 rounded-lg bg-[#181818] border border-[#262626] focus:border-[#3ecf8e] focus:outline-none text-xs font-sans text-white placeholder-[#555] transition-colors"
                 />
               </div>
-              <div className="w-24">
-                <label className="text-[11px] font-sans text-[#6b7280] block mb-1">Limit</label>
+              <div className="min-w-0">
+                <label className="text-[11px] font-sans text-[#6b7280] block mb-1.5">Limit</label>
                 <input
                   type="number"
                   min={1}
                   max={100}
                   value={form.limit}
                   onChange={(e) => setForm((f) => ({ ...f, limit: parseInt(e.target.value) || 25 }))}
-                  className="w-full px-3 py-2 rounded-lg bg-[#181818] border border-[#262626] focus:border-[#3ecf8e]/60 focus:outline-none text-xs font-mono text-white"
+                  className="w-full px-3 py-3 rounded-lg bg-[#181818] border border-[#262626] focus:border-[#3ecf8e] focus:outline-none text-xs font-mono text-white"
                 />
               </div>
             </div>
 
-            {/* row 4: toggles + submit */}
-            <div className="flex items-center justify-between pt-1">
-              <div className="flex items-center gap-5">
-                {/* auto parse toggle */}
-                <label className="flex items-center gap-2 cursor-pointer select-none">
-                  <button
-                    type="button"
-                    role="switch"
-                    aria-checked={form.autoParse}
-                    onClick={() => setForm((f) => ({ ...f, autoParse: !f.autoParse }))}
-                    className={cn(
-                      'relative inline-flex h-4 w-7 shrink-0 rounded-full border-2 border-transparent transition-colors',
-                      form.autoParse ? 'bg-[#3ecf8e]' : 'bg-[#2e2e2e]'
-                    )}
-                  >
-                    <span className={cn('inline-block h-3 w-3 rounded-full bg-white transition-transform', form.autoParse ? 'translate-x-3' : 'translate-x-0')} />
-                  </button>
-                  <span className="text-[11px] font-sans text-[#9ca3af]">Auto-parse</span>
-                </label>
+            {/* toggles + submit */}
+            <div className="flex flex-wrap items-center gap-x-5 gap-y-3 pt-1">
+              <label className="flex items-center gap-2 cursor-pointer select-none">
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={form.autoParse}
+                  aria-label="Auto-parse"
+                  onClick={() => setForm((f) => ({ ...f, autoParse: !f.autoParse }))}
+                  className={cn(
+                    'relative inline-flex h-4 w-7 shrink-0 rounded-full border-2 border-transparent transition-colors',
+                    form.autoParse ? 'bg-[#3ecf8e]' : 'bg-[#2e2e2e]'
+                  )}
+                >
+                  <span className={cn('inline-block h-3 w-3 rounded-full bg-white transition-transform', form.autoParse ? 'translate-x-3' : 'translate-x-0')} />
+                </button>
+                <span className="text-[11px] font-sans text-[#9ca3af]">Auto-parse</span>
+              </label>
 
-                {/* enabled toggle */}
-                <label className="flex items-center gap-2 cursor-pointer select-none">
-                  <button
-                    type="button"
-                    role="switch"
-                    aria-checked={form.enabled}
-                    onClick={() => setForm((f) => ({ ...f, enabled: !f.enabled }))}
-                    className={cn(
-                      'relative inline-flex h-4 w-7 shrink-0 rounded-full border-2 border-transparent transition-colors',
-                      form.enabled ? 'bg-[#3ecf8e]' : 'bg-[#2e2e2e]'
-                    )}
-                  >
-                    <span className={cn('inline-block h-3 w-3 rounded-full bg-white transition-transform', form.enabled ? 'translate-x-3' : 'translate-x-0')} />
-                  </button>
-                  <span className="text-[11px] font-sans text-[#9ca3af]">Enabled</span>
-                </label>
-              </div>
+              <label className="flex items-center gap-2 cursor-pointer select-none">
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={form.enabled}
+                  aria-label="Enabled"
+                  onClick={() => setForm((f) => ({ ...f, enabled: !f.enabled }))}
+                  className={cn(
+                    'relative inline-flex h-4 w-7 shrink-0 rounded-full border-2 border-transparent transition-colors',
+                    form.enabled ? 'bg-[#3ecf8e]' : 'bg-[#2e2e2e]'
+                  )}
+                >
+                  <span className={cn('inline-block h-3 w-3 rounded-full bg-white transition-transform', form.enabled ? 'translate-x-3' : 'translate-x-0')} />
+                </button>
+                <span className="text-[11px] font-sans text-[#9ca3af]">Enabled</span>
+              </label>
+
+              <div className="flex-1" />
 
               <button
                 type="submit"
                 disabled={isSaving}
-                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-[#3ecf8e] hover:bg-[#34b27b] text-[#131313] text-xs font-bold font-sans shadow-md shadow-[#3ecf8e]/20 transition-all disabled:opacity-50 active:scale-95"
+                className={cn(circleBtn, 'bg-[#3ecf8e] border-[#3ecf8e] text-[#131313] hover:bg-[#34b27b] shadow-md shadow-[#3ecf8e]/20')}
+                title={editId ? 'Update schedule' : 'Create schedule'}
+                aria-label={editId ? 'Update schedule' : 'Create schedule'}
               >
                 {isSaving ? (
-                  <Refresh className="w-3.5 h-3.5 animate-spin" />
+                  <Refresh className="w-5 h-5 animate-spin" />
                 ) : (
-                  <CheckCircle className="w-3.5 h-3.5" />
+                  <CheckCircle className="w-5 h-5" />
                 )}
-                <span>{editId ? 'Update' : 'Create'}</span>
               </button>
             </div>
           </form>
@@ -561,17 +552,17 @@ function CronContent() {
             <span className="text-xs font-mono text-[#6b7280]">Loading schedules...</span>
           </div>
         ) : jobs.length === 0 && !showForm ? (
-          <div className="py-16 flex flex-col items-center gap-3 text-center">
+          <div className="py-16 flex flex-col items-center gap-3 text-center px-4">
             <Clock className="w-8 h-8 text-[#333]" />
             <p className="text-sm font-heading text-[#9ca3af]">No cron jobs configured</p>
             <p className="text-xs font-sans text-[#6b7280] max-w-xs">
-              Click &ldquo;New Schedule&rdquo; to set up automated scraping at specific times and days.
+              Tap the green + button above to set up automated scraping.
             </p>
           </div>
         ) : (
           <div className="divide-y divide-[#262626]">
             {jobs.map((job) => {
-              const pColor = providerStyle[job.provider] || 'text-[#9ca3af]';
+              const pColor = providerColor[job.provider] || 'text-[#9ca3af]';
               const ProvIcon = PROVIDERS.find((p) => p.id === job.provider)?.icon || Globe;
               const isRunning = runningIds[job.id] || false;
               const isDeleting = deletingId === job.id;
@@ -579,16 +570,14 @@ function CronContent() {
               return (
                 <div
                   key={job.id}
-                  className={cn(
-                    'py-3 flex items-center gap-3 group transition-colors',
-                    !job.is_enabled && 'opacity-50'
-                  )}
+                  className={cn('py-3 flex items-center gap-2.5', !job.is_enabled && 'opacity-50')}
                 >
-                  {/* toggle */}
+                  {/* enable toggle */}
                   <button
                     type="button"
                     role="switch"
                     aria-checked={job.is_enabled}
+                    aria-label={job.is_enabled ? 'Pause schedule' : 'Enable schedule'}
                     disabled={togglingIds[job.id]}
                     onClick={() => handleToggle(job.id)}
                     className={cn(
@@ -599,81 +588,83 @@ function CronContent() {
                     <span className={cn('inline-block h-3 w-3 rounded-full bg-white transition-transform', job.is_enabled ? 'translate-x-3' : 'translate-x-0')} />
                   </button>
 
-                  {/* provider icon */}
-                  <ProvIcon className={cn('w-4 h-4 shrink-0', pColor)} />
+                  {/* provider circle */}
+                  <span className="h-9 w-9 shrink-0 rounded-full bg-[#1a1a1a] border border-[#262626] flex items-center justify-center">
+                    <ProvIcon className={cn('w-4 h-4', pColor)} />
+                  </span>
 
                   {/* info */}
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1.5 min-w-0">
                       <span className="text-xs font-semibold text-white truncate">{job.name}</span>
                       {job.auto_parse && (
-                        <span className="text-[10px] font-mono text-[#3ecf8e] bg-[#3ecf8e]/10 px-1.5 py-px rounded">
-                          parse
-                        </span>
+                        <span className="text-[10px] font-mono text-[#3ecf8e] shrink-0">·parse</span>
                       )}
                     </div>
-                    <div className="flex items-center gap-1.5 mt-0.5 text-[11px] text-[#6b7280] font-sans">
+                    <p className="mt-0.5 text-[11px] font-sans text-[#6b7280] truncate">
                       <span className="font-mono text-[#9ca3af]">{fmt12(job.hour, job.minute)}</span>
-                      <span className="text-[#4b5563]">·</span>
-                      <span>{daysSummary(job.days_of_week)}</span>
+                      {' · '}
+                      {daysSummary(job.days_of_week)}
                       {paramsSummary(job.search_params) && (
-                        <>
-                          <span className="text-[#4b5563] hidden sm:inline">·</span>
-                          <span className="hidden sm:inline truncate max-w-[200px]">{paramsSummary(job.search_params)}</span>
-                        </>
+                        <span className="hidden sm:inline"> · {paramsSummary(job.search_params)}</span>
                       )}
-                    </div>
+                    </p>
+                    <p className="mt-0.5 text-[11px] font-mono sm:hidden">
+                      {job.last_status === 'success' ? (
+                        <span className="text-[#3ecf8e]">{formatRelativeTime(job.last_run_at)}</span>
+                      ) : job.last_status === 'failed' ? (
+                        <span className="text-rose-400">failed</span>
+                      ) : isRunning ? (
+                        <span className="text-amber-400">running</span>
+                      ) : (
+                        <span className="text-[#4b5563]">never run</span>
+                      )}
+                    </p>
                   </div>
 
-                  {/* status */}
-                  <div className="hidden sm:flex items-center gap-2 shrink-0 text-[11px] font-mono">
+                  {/* status — desktop */}
+                  <span className="hidden sm:block shrink-0 text-[11px] font-mono">
                     {job.last_status === 'success' ? (
-                      <span className="text-[#3ecf8e]">
-                        <CheckCircle className="w-3 h-3 inline mr-0.5" />
-                        {formatRelativeTime(job.last_run_at)}
-                      </span>
+                      <span className="text-[#3ecf8e]">{formatRelativeTime(job.last_run_at)}</span>
                     ) : job.last_status === 'failed' ? (
-                      <span className="text-rose-400">
-                        <WarningTriangle className="w-3 h-3 inline mr-0.5" />
-                        failed
-                      </span>
-                    ) : job.last_status === 'running' || isRunning ? (
-                      <span className="text-amber-400">
-                        <Refresh className="w-3 h-3 inline animate-spin mr-0.5" />
-                        running
-                      </span>
+                      <span className="text-rose-400">failed</span>
+                    ) : isRunning ? (
+                      <span className="text-amber-400">running</span>
                     ) : (
                       <span className="text-[#4b5563]">never run</span>
                     )}
-                  </div>
+                  </span>
 
-                  {/* actions */}
-                  <div className="flex items-center gap-1 shrink-0">
+                  {/* circular actions */}
+                  <div className="flex items-center gap-1.5 shrink-0">
                     <button
                       type="button"
                       onClick={() => handleRun(job.id)}
                       disabled={isRunning}
                       title="Run now"
-                      className="p-1.5 rounded-lg text-[#6b7280] hover:text-[#3ecf8e] hover:bg-[#3ecf8e]/10 transition-colors disabled:opacity-50"
+                      aria-label="Run now"
+                      className={cn(circleBtnSm, 'bg-[#202020] border-[#333] text-[#3ecf8e] hover:border-[#3ecf8e]/50 hover:bg-[#3ecf8e]/10')}
                     >
-                      {isRunning ? <Refresh className="w-3.5 h-3.5 animate-spin text-[#3ecf8e]" /> : <Play className="w-3.5 h-3.5" />}
+                      {isRunning ? <Refresh className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
                     </button>
                     <button
                       type="button"
                       onClick={() => openEdit(job)}
                       title="Edit"
-                      className="p-1.5 rounded-lg text-[#6b7280] hover:text-white hover:bg-[#222] transition-colors"
+                      aria-label="Edit"
+                      className={cn(circleBtnSm, 'bg-[#202020] border-[#333] text-[#9ca3af] hover:text-white')}
                     >
-                      <EditPencil className="w-3.5 h-3.5" />
+                      <EditPencil className="w-4 h-4" />
                     </button>
                     <button
                       type="button"
                       onClick={() => handleDelete(job.id)}
                       disabled={isDeleting}
                       title="Delete"
-                      className="p-1.5 rounded-lg text-[#6b7280] hover:text-rose-400 hover:bg-rose-500/10 transition-colors disabled:opacity-50"
+                      aria-label="Delete"
+                      className={cn(circleBtnSm, 'bg-rose-500/10 border-rose-500/30 text-rose-400 hover:bg-rose-500/20')}
                     >
-                      <Trash className="w-3.5 h-3.5" />
+                      <Trash className="w-4 h-4" />
                     </button>
                   </div>
                 </div>
