@@ -49,11 +49,16 @@ async def test_prefs_roundtrip_and_dry_run():
     from fastapi.testclient import TestClient
     from src.main import app
     c = TestClient(app)
+    # Reset to known state first: the prefs row persists in the real DB
+    # and may have been changed via the /settings UI. Restore it after.
+    original_max_exp = c.get("/api/preferences").json()["max_experience_years"]
+    r = c.put("/api/preferences", json={"max_experience_years": 2})
+    assert r.status_code == 200 and r.json()["max_experience_years"] == 2
     r = c.get("/api/preferences")
     assert r.status_code == 200 and r.json()["max_experience_years"] == 2
     r = c.put("/api/preferences", json={"max_experience_years": 1})
     assert r.json()["max_experience_years"] == 1
-    r = c.put("/api/preferences", json={"max_experience_years": 2})
-    assert r.json()["max_experience_years"] == 2
+    r = c.put("/api/preferences", json={"max_experience_years": original_max_exp})
+    assert r.json()["max_experience_years"] == original_max_exp
     r = c.post("/api/jobs/auto-triage?dry_run=true&limit=5")
     assert r.status_code == 200 and "evaluated" in r.json()
