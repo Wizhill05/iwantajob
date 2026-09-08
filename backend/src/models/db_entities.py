@@ -124,3 +124,47 @@ class UnifiedJob(Base):
     __table_args__ = (
         UniqueConstraint("source", "external_id", name="uq_source_external_id"),
     )
+
+
+class UserPreference(Base):
+    __tablename__ = "user_preferences"
+
+    id = Column(String, primary_key=True, default="default")
+    allow_international = Column(Boolean, default=False, nullable=False)
+    max_experience_years = Column(Integer, default=2, nullable=False)
+    require_fresher_friendly = Column(Boolean, default=False, nullable=False)
+    preferred_title_keywords = Column(JSONB, default=list, nullable=False)
+    blocked_title_keywords = Column(JSONB, default=list, nullable=False)
+    preferred_cities = Column(JSONB, default=list, nullable=False)
+    min_salary_inr_year = Column(BigInteger, nullable=True)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
+DEFAULT_PREFS: dict = {
+    "id": "default",
+    "allow_international": False,
+    "max_experience_years": 2,
+    "require_fresher_friendly": False,
+    "preferred_title_keywords": [
+        "ai engineer",
+        "genai",
+        "gen ai",
+        "agentic",
+        "prompt engineer",
+        "python",
+        "intern",
+    ],
+    "blocked_title_keywords": [
+        "senior",
+        "staff",
+        "lead",
+        "principal",
+        "manager",
+        "architect",
+        "qa",
+        "asic",
+        "snowflake",
+    ],
+    "preferred_cities": [],
+    "min_salary_inr_year": None,
+}

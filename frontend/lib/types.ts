@@ -144,3 +144,24 @@ export interface HealthCheckResponse {
   status: string;
   version: string;
 }
+
+export interface UserPreferences {
+  id: string;
+  allow_international: boolean;
+  max_experience_years: number;
+  require_fresher_friendly: boolean;
+  preferred_title_keywords: string[];
+  blocked_title_keywords: string[];
+  preferred_cities: string[];
+  min_salary_inr_year: number | null;
+}
+
+export interface AutoTriageResult {
+  dry_run: boolean;
+  evaluated: number;
+  saved: number;
+  archived: number;
+  left_active: number;
+  skipped_manual: number;
+  details: { id: string; action: string; reason: string }[];
+}

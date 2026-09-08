@@ -14,7 +14,10 @@ from src.models.db_entities import (
     RawIndeedJob,
     RawLinkedInJob,
     RawWellfoundJob,
+    UserPreference,
+    DEFAULT_PREFS,
 )
+from src.services.auto_triage import AutoTriageService
 from src.services.parser_service import ParserService
 from src.services.raw_ingestion import (
     save_raw_indeed_job,
@@ -785,6 +788,147 @@ class BatchJobTriageUpdateRequest(BaseModel):
     job_ids: list[str]
     is_saved: bool | None = None
     is_archived: bool | None = None
+
+class PreferencesUpdateRequest(BaseModel):
+    allow_international: bool | None = None
+    max_experience_years: int | None = None
+    require_fresher_friendly: bool | None = None
+    preferred_title_keywords: list[str] | None = None
+    blocked_title_keywords: list[str] | None = None
+    preferred_cities: list[str] | None = None
+    min_salary_inr_year: int | None = None
+
+
+def _prefs_to_dict(p: UserPreference) -> dict:
+    return {
+        "id": p.id,
+        "allow_international": p.allow_international,
+        "max_experience_years": p.max_experience_years,
+        "require_fresher_friendly": p.require_fresher_friendly,
+        "preferred_title_keywords": p.preferred_title_keywords or [],
+        "blocked_title_keywords": p.blocked_title_keywords or [],
+        "preferred_cities": p.preferred_cities or [],
+        "min_salary_inr_year": p.min_salary_inr_year,
+    }
+
+
+async def _get_or_create_prefs(session) -> UserPreference:
+    prefs = await session.get(UserPreference, "default")
+    if prefs is None:
+        prefs = UserPreference(**{k: v for k, v in DEFAULT_PREFS.items()})
+        session.add(prefs)
+        await session.commit()
+        await session.refresh(prefs)
+    return prefs
+
+
+@app.get(
+    "/api/preferences",
+    summary="Get auto-triage taste preferences",
+    tags=["System"],
+)
+async def get_preferences():
+    """Return the single-user taste preferences, creating defaults on first call."""
+    async with async_session_maker() as session:
+        prefs = await _get_or_create_prefs(session)
+        return _prefs_to_dict(prefs)
+
+
+@app.put(
+    "/api/preferences",
+    summary="Update auto-triage taste preferences",
+    tags=["System"],
+)
+async def update_preferences(payload: PreferencesUpdateRequest):
+    """Partially update taste preferences; only non-None fields are applied."""
+    async with async_session_maker() as session:
+        prefs = await _get_or_create_prefs(session)
+        data = payload.model_dump(exclude_none=True)
+        for key, value in data.items():
+            setattr(prefs, key, value)
+        await session.commit()
+        await session.refresh(prefs)
+        return _prefs_to_dict(prefs)
+
+
+@app.post(
+    "/api/jobs/auto-triage",
+    summary="Auto-save/archive active jobs using taste preferences",
+    tags=["System"],
+)
+async def auto_triage_jobs(
+    dry_run: Annotated[bool, Query(description="Preview only, no DB writes")] = True,
+    limit: Annotated[int, Query(ge=1, le=500, description="Max jobs to evaluate")] = 200,
+    force: Annotated[bool, Query(description="Re-classify manually saved/archived jobs too")] = False,
+):
+    """
+    Classify jobs with the strict rules engine. Manual saves/archives are skipped
+    unless force=true. Writes is_saved/is_archived unless dry_run=true.
+    """
+    async with async_session_maker() as session:
+        prefs = await _get_or_create_prefs(session)
+        prefs_dict = _prefs_to_dict(prefs)
+
+        stmt = select(UnifiedJob).order_by(UnifiedJob.parsed_at.desc()).limit(limit)
+        if not force:
+            stmt = stmt.where(
+                UnifiedJob.is_saved == False,  # noqa: E712
+                UnifiedJob.is_archived == False,  # noqa: E712
+            )
+        res = await session.execute(stmt)
+        jobs = res.scalars().all()
+
+        saved_ids: list = []
+        archived_ids: list = []
+        details: list[dict] = []
+        skipped_manual = 0
+
+        for j in jobs:
+            if not force and (j.is_saved or j.is_archived):
+                skipped_manual += 1
+                continue
+            action, reason = AutoTriageService.classify(
+                {
+                    "title": j.title,
+                    "is_international": j.is_international,
+                    "experience_min_years": j.experience_min_years,
+                    "is_fresher_friendly": j.is_fresher_friendly,
+                    "city": j.city,
+                    "salary_min_inr_year": j.salary_min_inr_year,
+                },
+                prefs_dict,
+            )
+            details.append({"id": str(j.id), "action": action, "reason": reason})
+            if action == "save":
+                saved_ids.append(j.id)
+            elif action == "archive":
+                archived_ids.append(j.id)
+
+        if not dry_run:
+            if saved_ids:
+                await session.execute(
+                    update(UnifiedJob)
+                    .where(UnifiedJob.id.in_(saved_ids))
+                    .values(is_saved=True, is_archived=False)
+                )
+            if archived_ids:
+                await session.execute(
+                    update(UnifiedJob)
+                    .where(UnifiedJob.id.in_(archived_ids))
+                    .values(is_archived=True, is_saved=False)
+                )
+            await session.commit()
+
+        left_active = sum(1 for d in details if d["action"] == "none")
+        return {
+            "dry_run": dry_run,
+            "evaluated": len(details),
+            "saved": len(saved_ids),
+            "archived": len(archived_ids),
+            "left_active": left_active,
+            "skipped_manual": skipped_manual,
+            "details": details,
+        }
 
 @app.get(
     "/api/jobs/unified",
