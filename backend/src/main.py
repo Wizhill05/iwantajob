@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel
-from sqlalchemy import select, and_, or_, delete, text, update
+from sqlalchemy import select, and_, or_, delete, text, update, func
 
 from src.core.database import init_db, async_session_maker
 from src.models.db_entities import (
@@ -1176,9 +1176,12 @@ async def delete_unified_jobs(
 ):
     """
     Permanently delete rows from unified_jobs by their IDs.
+    Cascades to the bronze layer: the raw staging rows referenced by the
+    deleted jobs are deleted too (unless another unified job still
+    references the same raw row).
     """
     if not job_ids:
-        return {"deleted_count": 0}
+        return {"deleted_count": 0, "bronze_deleted": 0}
 
     import uuid
     parsed_uuids = []
@@ -1189,13 +1192,51 @@ async def delete_unified_jobs(
             continue
 
     if not parsed_uuids:
-        return {"deleted_count": 0}
+        return {"deleted_count": 0, "bronze_deleted": 0}
 
     async with async_session_maker() as session:
+        # Capture bronze references of the rows about to be deleted
+        rows = (
+            await session.execute(
+                select(UnifiedJob.source, UnifiedJob.raw_ref_id, UnifiedJob.external_id)
+                .where(UnifiedJob.id.in_(parsed_uuids))
+            )
+        ).all()
+
         stmt = delete(UnifiedJob).where(UnifiedJob.id.in_(parsed_uuids))
         res = await session.execute(stmt)
+
+        raw_models = {
+            "indeed": RawIndeedJob,
+            "linkedin": RawLinkedInJob,
+            "wellfound": RawWellfoundJob,
+        }
+        bronze_deleted = 0
+
+        for source, raw_ref_id, external_id in rows:
+            model = raw_models.get(source or "")
+            if model is None:
+                continue
+
+            if raw_ref_id is not None:
+                # Only delete the raw row if no other unified job still references it
+                still_referenced = await session.scalar(
+                    select(func.count())
+                    .select_from(UnifiedJob)
+                    .where(UnifiedJob.raw_ref_id == raw_ref_id, UnifiedJob.source == source)
+                )
+                if still_referenced:
+                    continue
+                dres = await session.execute(delete(model).where(model.id == raw_ref_id))
+            else:
+                # No raw ref captured — fall back to matching external_id in bronze
+                dres = await session.execute(
+                    delete(model).where(model.external_id == external_id)
+                )
+            bronze_deleted += dres.rowcount
+
         await session.commit()
-        return {"deleted_count": res.rowcount}
+        return {"deleted_count": res.rowcount, "bronze_deleted": bronze_deleted}
 
 @app.post(
     "/api/db/clear-bronze",

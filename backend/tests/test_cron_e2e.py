@@ -67,13 +67,12 @@ async def test_cron_lifecycle_e2e():
         assert created_job["last_run_at"] is None
         assert created_job["last_status"] is None
 
-        # Step 2: Query list endpoint
+        # Step 2: Query list endpoint (independent of any user-created jobs in the DB)
         list_res = await client.get("/api/cron")
         assert list_res.status_code == 200
         jobs = list_res.json()
-        assert len(jobs) == 1
-        assert jobs[0]["id"] == job_id
-        assert jobs[0]["name"] == "Indeed Weekdays 6 AM"
+        created_job_row = next(j for j in jobs if j["id"] == job_id)
+        assert created_job_row["name"] == "Indeed Weekdays 6 AM"
 
         # Step 3: Toggle state (disable then re-enable)
         toggle_off = await client.patch(f"/api/cron/{job_id}/toggle")
@@ -140,9 +139,9 @@ async def test_cron_lifecycle_e2e():
             db_check = await session.get(CronJob, UUID(job_id))
             assert db_check is None
 
-        # Verify empty via GET endpoint
+        # Verify the deleted job is gone via GET endpoint (independent of any user-created jobs)
         empty_list = await client.get("/api/cron")
-        assert len(empty_list.json()) == 0
+        assert all(j["id"] != job_id for j in empty_list.json())
 
 
 @pytest.mark.asyncio

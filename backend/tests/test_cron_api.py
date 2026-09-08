@@ -62,12 +62,11 @@ async def test_create_and_list_cron_jobs():
         job_id = data["id"]
         assert job_id is not None
 
-        # List cron jobs
+        # List cron jobs (independent of any user-created jobs in the DB)
         list_res = await client.get("/api/cron")
         assert list_res.status_code == 200
         jobs = list_res.json()
-        assert len(jobs) == 1
-        assert jobs[0]["id"] == job_id
+        assert any(j["id"] == job_id for j in jobs)
 
 
 @pytest.mark.asyncio
@@ -209,9 +208,9 @@ async def test_delete_cron_job():
         toggle_res = await client.patch(f"/api/cron/{job_id}/toggle")
         assert toggle_res.status_code == 404
 
-        # Confirm empty list
+        # Confirm the deleted job is gone (independent of any user-created jobs in the DB)
         list_res = await client.get("/api/cron")
-        assert len(list_res.json()) == 0
+        assert all(j["id"] != job_id for j in list_res.json())
 
         # 404 on non-existent UUID delete
         rand_id = str(uuid4())

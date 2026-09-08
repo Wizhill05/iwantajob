@@ -5,9 +5,9 @@ backend/**/__pycache__/
 *.pyo
 *.pyd
 .pytest_cache/
-tunnel.log
-server.log
-backend/server.log
+# Log files
+*.log
+backend/job_portal_backend.egg-info/
 .DS_Store
 .worktrees/
 .env

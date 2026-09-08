@@ -1,6 +1,0 @@
-pyproject.toml
-job_portal_backend.egg-info/PKG-INFO
-job_portal_backend.egg-info/SOURCES.txt
-job_portal_backend.egg-info/dependency_links.txt
-job_portal_backend.egg-info/requires.txt
-job_portal_backend.egg-info/top_level.txt
