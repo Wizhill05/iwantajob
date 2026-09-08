@@ -1202,3 +1202,79 @@ async def reset_database():
         await session.commit()
         return {"status": "success", "message": "All raw and unified job tables have been reset to 0."}
 
+@app.post(
+    "/api/db/clear-test-data",
+    summary="Delete all test-seeded rows from every table",
+    tags=["System"],
+)
+async def clear_test_data():
+    """
+    Deletes any row whose external_id starts with 'test_' from all raw
+    staging tables and unified_jobs, plus known test CronJob names.
+    Safe to run against the production database at any time — only
+    removes data that matches the test-data naming convention.
+    """
+    async with async_session_maker() as session:
+        res_indeed = await session.execute(
+            text("DELETE FROM raw_indeed_jobs WHERE external_id LIKE 'test_%'")
+        )
+        res_linkedin = await session.execute(
+            text("DELETE FROM raw_linkedin_jobs WHERE external_id LIKE 'test_%'")
+        )
+        res_wellfound = await session.execute(
+            text("DELETE FROM raw_wellfound_jobs WHERE external_id LIKE 'test_%'")
+        )
+        res_unified = await session.execute(
+            text("DELETE FROM unified_jobs WHERE external_id LIKE 'test_%'")
+        )
+        res_cron = await session.execute(
+            text(
+                """
+                DELETE FROM cron_jobs
+                WHERE name IN (
+                    'Indeed Engineer Daily',
+                    'Failing Job',
+                    'All Providers Job',
+                    'Test Daily Indeed',
+                    'Due Job',
+                    'Wrong Minute Job',
+                    'Disabled Job',
+                    'Already Run Job',
+                    'Daily Indeed AI Engineer',
+                    'Bad Provider',
+                    'Bad Hour',
+                    'Bad Minute',
+                    'Initial Job',
+                    'Updated Job Name',
+                    'Toggle Test Job',
+                    'To Delete Job',
+                    'Immediate Run Job',
+                    'Indeed Weekdays 6 AM',
+                    'Indeed Auto-Parse Job',
+                    'Omni Scrape Daily'
+                )
+                OR name LIKE 'test_%'
+                OR name LIKE 'Test %'
+                """
+            )
+        )
+        await session.commit()
+
+    return {
+        "status": "success",
+        "deleted": {
+            "raw_indeed_jobs": res_indeed.rowcount,
+            "raw_linkedin_jobs": res_linkedin.rowcount,
+            "raw_wellfound_jobs": res_wellfound.rowcount,
+            "unified_jobs": res_unified.rowcount,
+            "cron_jobs": res_cron.rowcount,
+        },
+        "total_deleted": (
+            res_indeed.rowcount
+            + res_linkedin.rowcount
+            + res_wellfound.rowcount
+            + res_unified.rowcount
+            + res_cron.rowcount
+        ),
+    }
+

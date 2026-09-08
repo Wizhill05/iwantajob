@@ -287,6 +287,33 @@ class ApiClient {
   }
 
   /**
+   * Delete all test-seeded rows (external_id LIKE 'test_%') from every table.
+   */
+  async clearTestData(): Promise<{
+    status: string;
+    deleted: {
+      raw_indeed_jobs: number;
+      raw_linkedin_jobs: number;
+      raw_wellfound_jobs: number;
+      unified_jobs: number;
+      cron_jobs: number;
+    };
+    total_deleted: number;
+  }> {
+    return this.request<{
+      status: string;
+      deleted: {
+        raw_indeed_jobs: number;
+        raw_linkedin_jobs: number;
+        raw_wellfound_jobs: number;
+        unified_jobs: number;
+        cron_jobs: number;
+      };
+      total_deleted: number;
+    }>('/api/db/clear-test-data', { method: 'POST' });
+  }
+
+  /**
    * Get auto-triage taste preferences (creates defaults on first call).
    */
   async getPreferences(): Promise<UserPreferences> {

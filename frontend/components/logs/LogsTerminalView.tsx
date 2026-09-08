@@ -15,15 +15,17 @@ import {
   Xmark,
   Filter,
   Refresh,
+  Database,
 } from 'iconoir-react';
 import { useActivity } from '@/context/ActivityContext';
+import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import type { LogEntry, LogLevel } from '@/lib/types';
 
 type LevelFilter = 'ALL' | LogLevel;
 
 export function LogsTerminalView() {
-  const { logs, clearLogs } = useActivity();
+  const { logs, clearLogs, addLog } = useActivity();
 
   const [selectedLevel, setSelectedLevel] = useState<LevelFilter>('ALL');
   const [selectedSource, setSelectedSource] = useState<string>('all');
@@ -38,6 +40,7 @@ export function LogsTerminalView() {
   const [copySuccess, setCopySuccess] = useState<boolean>(false);
   const [isExporting, setIsExporting] = useState<boolean>(false);
   const [isClearing, setIsClearing] = useState<boolean>(false);
+  const [isClearingTestData, setIsClearingTestData] = useState<boolean>(false);
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
@@ -177,6 +180,31 @@ export function LogsTerminalView() {
       clearLogs();
       setIsClearing(false);
     }, 300);
+  };
+
+  const handleClearTestData = async () => {
+    if (isClearingTestData) return;
+    setIsClearingTestData(true);
+    const start = Date.now();
+    try {
+      const res = await api.clearTestData();
+      addLog(
+        'INFO',
+        'system',
+        `Cleared ${res.total_deleted} test row(s) from database`,
+        Date.now() - start,
+        res.deleted
+      );
+    } catch (err) {
+      addLog(
+        'ERROR',
+        'system',
+        `Failed to clear test data: ${err instanceof Error ? err.message : String(err)}`,
+        Date.now() - start
+      );
+    } finally {
+      setIsClearingTestData(false);
+    }
   };
 
   const resetFilters = () => {
@@ -345,6 +373,21 @@ export function LogsTerminalView() {
                 <Refresh className="w-4 h-4 animate-spin text-rose-400" />
               ) : (
                 <Trash className="w-4 h-4" />
+              )}
+            </button>
+
+            {/* Clear Test Data Button */}
+            <button
+              type="button"
+              onClick={handleClearTestData}
+              disabled={isClearingTestData}
+              title="Clear test data from database (rows with test_ IDs)"
+              className="w-10 h-10 rounded-xl border border-[#262626] bg-[#181818] text-[#9ca3af] hover:text-amber-400 hover:border-amber-500/30 transition-colors disabled:opacity-40 flex items-center justify-center shrink-0"
+            >
+              {isClearingTestData ? (
+                <Refresh className="w-4 h-4 animate-spin text-amber-400" />
+              ) : (
+                <Database className="w-4 h-4" />
               )}
             </button>
           </div>

@@ -11,7 +11,7 @@ async def test_live_scraping_persists_raw_and_manual_parsing():
     suffix = str(int(time.time()))
     # Seed a fresh raw wellfound job
     await save_raw_wellfound_job({
-        "external_id": f"wf_test_{suffix}",
+        "external_id": f"test_wf_e2e_{suffix}",
         "job_slug": "backend-engineer",
         "title": "Backend Engineer",
         "company_name": "Startup Alpha",
@@ -26,7 +26,7 @@ async def test_live_scraping_persists_raw_and_manual_parsing():
         "native_years_min": 0,
         "native_years_max": 2,
         "live_start_at": int(time.time()),
-        "url": f"https://wellfound.com/jobs/wf_test_{suffix}-backend-engineer",
+        "url": f"https://wellfound.com/jobs/test_wf_e2e_{suffix}-backend-engineer",
         "description_html": "<p>Fast growing startup</p>",
         "description_text": "Looking for fresh graduates with 0-2 years experience.",
         "posted_at": None,
@@ -51,7 +51,7 @@ async def test_live_scraping_persists_raw_and_manual_parsing():
         assert uni_resp.status_code == 200
         jobs = uni_resp.json()
         assert len(jobs) >= 1
-        target_job = next((j for j in jobs if j["external_id"] == f"wf_test_{suffix}"), None)
+        target_job = next((j for j in jobs if j["external_id"] == f"test_wf_e2e_{suffix}"), None)
         assert target_job is not None
         assert target_job["salary_min_inr_year"] == 1500000
         assert target_job["salary_max_inr_year"] == 2500000

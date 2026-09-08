@@ -12,7 +12,7 @@ from src.models.db_entities import RawIndeedJob, RawLinkedInJob, RawWellfoundJob
 async def test_save_raw_indeed():
     await init_db()
     data = {
-        "external_id": "test_jk_123",
+        "external_id": "test_jk_rawingestion_123",
         "tracking_key": "track_123",
         "title": "Software Engineer",
         "company_name": "TestCorp",
@@ -20,19 +20,19 @@ async def test_save_raw_indeed():
         "location_city": "bengaluru",
         "location_country": "India",
         "is_remote": False,
-        "apply_url": "http://in.indeed.com/job/test_jk_123",
+        "apply_url": "http://in.indeed.com/job/test_jk_rawingestion_123",
         "easy_apply_available": True,
         "attributes": [{"label": "Fresher"}],
         "salary_raw": "₹12L - ₹18L",
         "description_html": "<p>Job</p>",
         "description_text": "Job text",
         "date_published": None,
-        "raw_payload": {"key": "test_jk_123"},
+        "raw_payload": {"key": "test_jk_rawingestion_123"},
     }
     await save_raw_indeed_job(data)
     async with async_session_maker() as session:
         res = await session.execute(
-            select(RawIndeedJob).where(RawIndeedJob.external_id == "test_jk_123")
+            select(RawIndeedJob).where(RawIndeedJob.external_id == "test_jk_rawingestion_123")
         )
         job = res.scalar_one_or_none()
         assert job is not None
@@ -58,7 +58,7 @@ async def test_save_raw_indeed():
 async def test_save_raw_linkedin():
     await init_db()
     data = {
-        "external_id": "li_4430825",
+        "external_id": "test_li_rawingestion_4430825",
         "title": "AI Engineer",
         "company_name": "Shamrock AI",
         "company_logo_url": "https://media.licdn.com/logo.png",
@@ -67,17 +67,17 @@ async def test_save_raw_linkedin():
         "city": "bengaluru",
         "is_remote": True,
         "is_international": False,
-        "url": "https://linkedin.com/jobs/view/li_4430825",
+        "url": "https://linkedin.com/jobs/view/test_li_rawingestion_4430825",
         "salary_raw": None,
         "description_html": "<p>Desc</p>",
         "description_text": "Desc text",
         "posted_at": None,
-        "raw_payload": {"id": "li_4430825"},
+        "raw_payload": {"id": "test_li_rawingestion_4430825"},
     }
     await save_raw_linkedin_job(data)
     async with async_session_maker() as session:
         res = await session.execute(
-            select(RawLinkedInJob).where(RawLinkedInJob.external_id == "li_4430825")
+            select(RawLinkedInJob).where(RawLinkedInJob.external_id == "test_li_rawingestion_4430825")
         )
         job = res.scalar_one_or_none()
         assert job is not None
@@ -88,7 +88,7 @@ async def test_save_raw_linkedin():
 async def test_save_raw_wellfound():
     await init_db()
     data = {
-        "external_id": "wf_4666122",
+        "external_id": "test_wf_rawingestion_4666122",
         "job_slug": "ai-engineer",
         "title": "AI Engineer",
         "company_name": "GoComet",
@@ -103,16 +103,16 @@ async def test_save_raw_wellfound():
         "native_years_min": 3,
         "native_years_max": 8,
         "live_start_at": 1788428419,
-        "url": "https://wellfound.com/jobs/wf_4666122-ai-engineer",
+        "url": "https://wellfound.com/jobs/test_wf_rawingestion_4666122-ai-engineer",
         "description_html": "<p>Desc</p>",
         "description_text": "Desc text",
         "posted_at": None,
-        "raw_payload": {"id": "wf_4666122"},
+        "raw_payload": {"id": "test_wf_rawingestion_4666122"},
     }
     await save_raw_wellfound_job(data)
     async with async_session_maker() as session:
         res = await session.execute(
-            select(RawWellfoundJob).where(RawWellfoundJob.external_id == "wf_4666122")
+            select(RawWellfoundJob).where(RawWellfoundJob.external_id == "test_wf_rawingestion_4666122")
         )
         job = res.scalar_one_or_none()
         assert job is not None
