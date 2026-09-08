@@ -1,4 +1,4 @@
-import type {
+ import type {
   JobItem,
   JobSearchResponse,
   UnifiedJobItem,
@@ -9,6 +9,10 @@ import type {
   HealthCheckResponse,
   UserPreferences,
   AutoTriageResult,
+  CronJob,
+  CreateCronJobPayload,
+  UpdateCronJobPayload,
+  CronRunResult,
 } from './types';
 
 const API_BASE_URL =
@@ -296,7 +300,7 @@ class ApiClient {
     payload: Partial<UserPreferences>
   ): Promise<UserPreferences> {
     return this.request<UserPreferences>('/api/preferences', {
-      method: 'PUT',
+      method: 'PATCH',
       body: JSON.stringify(payload),
     });
   }
@@ -322,6 +326,65 @@ class ApiClient {
       `/api/jobs/auto-triage${qs ? `?${qs}` : ''}`,
       { method: 'POST' }
     );
+  }
+
+  /**
+   * Fetch all configured cron jobs.
+   */
+  async getCronJobs(): Promise<CronJob[]> {
+    return this.request<CronJob[]>('/api/cron');
+  }
+
+  /**
+   * Create a new scheduled cron job.
+   */
+  async createCronJob(payload: CreateCronJobPayload): Promise<CronJob> {
+    return this.request<CronJob>('/api/cron', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  /**
+   * Update fields of an existing cron job.
+   */
+  async updateCronJob(id: string, payload: UpdateCronJobPayload): Promise<CronJob> {
+    return this.request<CronJob>(`/api/cron/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  /**
+   * Permanently delete a cron job.
+   */
+  async deleteCronJob(id: string): Promise<{ success: boolean; message: string }> {
+    const res = await this.request<{ deleted?: boolean; id?: string; success?: boolean; message?: string }>(
+      `/api/cron/${id}`,
+      { method: 'DELETE' }
+    );
+    return {
+      success: res.deleted ?? res.success ?? true,
+      message: res.message ?? `Cron job ${id} deleted successfully`,
+    };
+  }
+
+  /**
+   * Toggle enabled status of a cron job.
+   */
+  async toggleCronJob(id: string): Promise<CronJob> {
+    return this.request<CronJob>(`/api/cron/${id}/toggle`, {
+      method: 'PATCH',
+    });
+  }
+
+  /**
+   * Immediately execute a cron job.
+   */
+  async runCronJob(id: string): Promise<CronRunResult> {
+    return this.request<CronRunResult>(`/api/cron/${id}/run`, {
+      method: 'POST',
+    });
   }
 }
 

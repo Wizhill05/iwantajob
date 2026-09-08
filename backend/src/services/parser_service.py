@@ -509,3 +509,7 @@ class ParserService:
             "updated": updated,
             "errors": errors,
         }
+
+    parse_indeed = parse_indeed_jobs
+    parse_linkedin = parse_linkedin_jobs
+    parse_wellfound = parse_wellfound_jobs

@@ -165,3 +165,52 @@ export interface AutoTriageResult {
   skipped_manual: number;
   details: { id: string; action: string; reason: string }[];
 }
+
+export interface CronJob {
+  id: string;
+  name: string;
+  provider: 'indeed' | 'linkedin' | 'wellfound' | 'all';
+  hour: number;
+  minute: number;
+  days_of_week: number[];
+  search_params: Record<string, any>;
+  auto_parse: boolean;
+  is_enabled: boolean;
+  last_run_at: string | null;
+  last_status: 'success' | 'failed' | 'running' | null;
+  last_result_summary: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreateCronJobPayload {
+  name: string;
+  provider: 'indeed' | 'linkedin' | 'wellfound' | 'all';
+  hour: number;
+  minute: number;
+  days_of_week?: number[];
+  search_params?: Record<string, any>;
+  auto_parse?: boolean;
+  is_enabled?: boolean;
+}
+
+export interface UpdateCronJobPayload {
+  name?: string;
+  provider?: 'indeed' | 'linkedin' | 'wellfound' | 'all';
+  hour?: number;
+  minute?: number;
+  days_of_week?: number[];
+  search_params?: Record<string, any>;
+  auto_parse?: boolean;
+  is_enabled?: boolean;
+}
+
+export interface CronRunResult {
+  status: 'success' | 'failed' | 'running';
+  job_id: string;
+  provider?: string;
+  details?: string;
+  scraped?: Record<string, number>;
+  parsed?: Record<string, number>;
+  error?: string;
+}

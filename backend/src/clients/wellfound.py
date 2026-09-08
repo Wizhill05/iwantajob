@@ -348,6 +348,8 @@ class WellfoundClient:
         max_age_days: int | None = None,
         include_all_company_jobs: bool = False,
         return_raw: bool = False,
+        persist: bool = False,
+        **kwargs: Any,
     ) -> list[JobItem] | tuple[list[JobItem], dict[str, Any]]:
         # Guardrail: Enforce pagination ceiling
         clamped_page = max(1, min(page, MAX_WELLFOUND_PAGE))
@@ -393,6 +395,33 @@ class WellfoundClient:
             jobs = filtered_jobs
 
         res_jobs = jobs[:limit]
+
+        if persist and res_jobs:
+            from src.services.raw_ingestion import save_raw_wellfound_job
+            for j in res_jobs:
+                await save_raw_wellfound_job({
+                    "external_id": j.external_id,
+                    "job_slug": j.url.split("/")[-1] if j.url else "unknown",
+                    "title": j.title,
+                    "company_name": j.company_name,
+                    "company_slug": None,
+                    "company_logo_url": j.company_logo_url,
+                    "company_website": j.company_website,
+                    "location_raw": j.location_raw,
+                    "locations_list": [j.location_raw],
+                    "is_remote": j.is_remote,
+                    "is_international": j.is_international,
+                    "salary_raw": j.salary_raw,
+                    "native_years_min": j.experience_min_years,
+                    "native_years_max": j.experience_max_years,
+                    "live_start_at": None,
+                    "url": j.url,
+                    "description_html": j.description_html,
+                    "description_text": j.description_text,
+                    "posted_at": j.posted_at,
+                    "raw_payload": {"external_id": j.external_id, "title": j.title},
+                })
+
         if return_raw:
             return res_jobs, apollo_data
         return res_jobs
