@@ -24,11 +24,11 @@ interface CleanJobCardProps {
 }
 
 function formatExperience(job: UnifiedJobItem): string {
-  // Only label as "Fresher" when the job genuinely requires no experience.
-  // A job needing 1+ year can be flagged fresher-friendly (accepts early
-  // candidates), but must not display as "Fresher (0 – Xy)".
+  // Jobs requiring at most 1 year are treated as fresher (1 counts as 0,
+  // matching the experience_level filter). The flag alone (with unspecified
+  // min) also marks entry-level.
   const isEntryLevel =
-    job.experience_min_years === 0 ||
+    (job.experience_min_years != null && job.experience_min_years <= 1) ||
     (job.experience_min_years == null && job.is_fresher_friendly);
   if (isEntryLevel) {
     if (job.experience_max_years && job.experience_max_years > 0) {

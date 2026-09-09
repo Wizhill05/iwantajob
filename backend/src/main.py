@@ -975,7 +975,7 @@ async def get_unified_jobs(
     source: Annotated[str | None, Query(description="Filter by source: 'indeed', 'linkedin', 'wellfound'")] = None,
     city: Annotated[str | None, Query(description="Filter by lowercase city slug")] = None,
     is_fresher_friendly: Annotated[bool | None, Query(description="Filter strictly for freshers (min_years <= 1)")] = None,
-    experience_level: Annotated[str | None, Query(description="Filter by experience level: 'all', 'fresher', 'experienced' (unspecified included in both)")] = None,
+    experience_level: Annotated[str | None, Query(description="Filter by experience level: 'all', 'fresher' (min_years <= 1), 'experienced' (min_years > 1; unspecified included in both)")] = None,
     easy_apply_available: Annotated[bool | None, Query(description="Filter for direct Indeed/easy apply jobs")] = None,
     min_salary_inr: Annotated[int | None, Query(description="Minimum annual salary in INR")] = None,
     is_saved: Annotated[bool | None, Query(description="Filter by saved triage status")] = None,
@@ -995,26 +995,19 @@ async def get_unified_jobs(
         if experience_level:
             exp_lvl = experience_level.strip().lower()
             if exp_lvl == "fresher":
-                # Purely fresher: must NOT require experience (> 0 years).
-                # Only 0 years, explicit fresher tags, or unspecified.
+                # Fresher: jobs requiring at most 1 year (1 is treated the
+                # same as 0 per product decision), or with unspecified experience.
                 conditions.append(
-                    and_(
-                        or_(
-                            UnifiedJob.experience_min_years == 0,
-                            UnifiedJob.is_fresher_friendly == True,
-                            UnifiedJob.experience_min_years.is_(None),
-                        ),
-                        or_(
-                            UnifiedJob.experience_min_years.is_(None),
-                            UnifiedJob.experience_min_years == 0,
-                        ),
+                    or_(
+                        UnifiedJob.experience_min_years.is_(None),
+                        UnifiedJob.experience_min_years <= 1,
                     )
                 )
             elif exp_lvl == "experienced":
-                # Experienced: requires experience (> 0 years) OR unspecified
+                # Experienced: requires more than 1 year, or unspecified.
                 conditions.append(
                     or_(
-                        UnifiedJob.experience_min_years > 0,
+                        UnifiedJob.experience_min_years > 1,
                         UnifiedJob.experience_min_years.is_(None),
                     )
                 )
