@@ -233,7 +233,8 @@ export function JobDescriptionModal({
                 </span>
               </div>
               <div className="text-base font-sans font-bold text-[#3ecf8e]">
-                {job.is_fresher_friendly || job.experience_min_years === 0
+                {(job.experience_min_years === 0 ||
+                  (job.experience_min_years == null && job.is_fresher_friendly))
                   ? 'Fresher Eligible (0 yrs)'
                   : job.experience_min_years != null
                   ? `${job.experience_min_years}${

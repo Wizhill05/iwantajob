@@ -37,7 +37,13 @@ interface CompactJobRowProps {
 }
 
 function formatExperience(job: UnifiedJobItem): string {
-  if (job.is_fresher_friendly || job.experience_min_years === 0) {
+  // Only label as "Fresher" when the job genuinely requires no experience.
+  // A job needing 1+ year can be flagged fresher-friendly (accepts early
+  // candidates), but must not display as "Fresher (0 - Xy)".
+  const isEntryLevel =
+    job.experience_min_years === 0 ||
+    (job.experience_min_years == null && job.is_fresher_friendly);
+  if (isEntryLevel) {
     if (job.experience_max_years && job.experience_max_years > 0) {
       return `Fresher (0 - ${job.experience_max_years}y)`;
     }
