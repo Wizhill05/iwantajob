@@ -1,0 +1,15 @@
+{
+  "mcpServers": {
+    "iwantajob": {
+      "command": "uv",
+      "args": [
+        "run",
+        "--directory",
+        "/home/azureuser/iwantajob/backend",
+        "python",
+        "-m",
+        "src.mcp_server"
+      ]
+    }
+  }
+}

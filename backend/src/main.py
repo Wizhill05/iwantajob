@@ -40,8 +40,6 @@ from src.clients.wellfound import (
 )
 from src.clients.linkedin import LinkedInClient
 from src.models.job import JobSearchResponse, JobItem, ErrorDetail
-from src.services.scheduler import start_scheduler_loop, stop_scheduler_loop
-from src.api.cron_router import router as cron_router
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("iwantajob")
@@ -75,10 +73,6 @@ TAGS_METADATA = [
         "name": "System",
         "description": "Operational health checks and container readiness probes.",
     },
-    {
-        "name": "Cron",
-        "description": "Scheduled scraping jobs management, automated cron execution, and interval triggers.",
-    },
 ]
 
 APP_DESCRIPTION = """
@@ -105,15 +99,11 @@ Production-grade ingestion backend that aggregates, parses, and normalizes job p
 async def lifespan(app: FastAPI):
     """
     FastAPI lifespan context manager:
-    - On startup: initialize database tables and start the background scheduler loop.
-    - On shutdown: stop the background scheduler loop.
+    - On startup: initialize database tables.
     """
-    logger.info("Initializing database and starting scheduler loop...")
+    logger.info("Initializing database...")
     await init_db()
-    start_scheduler_loop()
     yield
-    logger.info("Stopping scheduler loop...")
-    stop_scheduler_loop()
 
 app = FastAPI(
     title="Autonomous Job Discovery API",
@@ -124,8 +114,6 @@ app = FastAPI(
     openapi_tags=TAGS_METADATA,
     lifespan=lifespan,
 )
-
-app.include_router(cron_router, prefix="/api/cron", tags=["Cron"])
 
 app.add_middleware(
     CORSMiddleware,
@@ -825,15 +813,6 @@ class BatchJobTriageUpdateRequest(BaseModel):
     is_saved: bool | None = None
     is_archived: bool | None = None
 
-class PreferencesUpdateRequest(BaseModel):
-    allow_international: bool | None = None
-    max_experience_years: int | None = None
-    require_fresher_friendly: bool | None = None
-    preferred_title_keywords: list[str] | None = None
-    blocked_title_keywords: list[str] | None = None
-    preferred_cities: list[str] | None = None
-    min_salary_inr_year: int | None = None
-
 
 def _prefs_to_dict(p: UserPreference) -> dict:
     return {
@@ -856,35 +835,6 @@ async def _get_or_create_prefs(session) -> UserPreference:
         await session.commit()
         await session.refresh(prefs)
     return prefs
-
-
-@app.get(
-    "/api/preferences",
-    summary="Get auto-triage taste preferences",
-    tags=["System"],
-)
-async def get_preferences():
-    """Return the single-user taste preferences, creating defaults on first call."""
-    async with async_session_maker() as session:
-        prefs = await _get_or_create_prefs(session)
-        return _prefs_to_dict(prefs)
-
-
-@app.put(
-    "/api/preferences",
-    summary="Update auto-triage taste preferences",
-    tags=["System"],
-)
-async def update_preferences(payload: PreferencesUpdateRequest):
-    """Partially update taste preferences; only non-None fields are applied."""
-    async with async_session_maker() as session:
-        prefs = await _get_or_create_prefs(session)
-        data = payload.model_dump(exclude_none=True)
-        for key, value in data.items():
-            setattr(prefs, key, value)
-        await session.commit()
-        await session.refresh(prefs)
-        return _prefs_to_dict(prefs)
 
 
 @app.post(
@@ -1339,8 +1289,8 @@ async def reset_database():
 )
 async def clear_test_data():
     """
-    Deletes test-seeded rows from all raw staging tables and unified_jobs,
-    plus known test CronJob names and their cron_runs history. Test rows are identified by synthetic
+    Deletes test-seeded rows from all raw staging tables and unified_jobs.
+    Test rows are identified by synthetic
     external_id prefixes ('test_', 'wf_', 'li_') — live scrapers always
     produce bare numeric/hex IDs, so prefixed IDs only ever come from
     tester UIs and pytest seeds. Safe to run at any time.
@@ -1359,46 +1309,6 @@ async def clear_test_data():
         res_unified = await session.execute(
             text("DELETE FROM unified_jobs WHERE external_id ~ :pat").bindparams(pat=test_id_pattern)
         )
-        res_cron = await session.execute(
-            text(
-                """
-                DELETE FROM cron_jobs
-                WHERE name IN (
-                    'Indeed Engineer Daily',
-                    'Failing Job',
-                    'All Providers Job',
-                    'Test Daily Indeed',
-                    'Due Job',
-                    'Wrong Minute Job',
-                    'Disabled Job',
-                    'Already Run Job',
-                    'Daily Indeed AI Engineer',
-                    'Bad Provider',
-                    'Bad Hour',
-                    'Bad Minute',
-                    'Initial Job',
-                    'Updated Job Name',
-                    'Toggle Test Job',
-                    'To Delete Job',
-                    'Immediate Run Job',
-                    'Indeed Weekdays 6 AM',
-                    'Indeed Auto-Parse Job',
-                    'Omni Scrape Daily'
-                )
-                OR name LIKE 'test_%'
-                OR name LIKE 'Test %'
-                """
-            )
-        )
-        res_cron_runs = await session.execute(
-            text(
-                """
-                DELETE FROM cron_runs
-                WHERE job_name LIKE 'test_%'
-                    OR job_name LIKE 'Test %'
-                """
-            )
-        )
         await session.commit()
 
     return {
@@ -1408,16 +1318,12 @@ async def clear_test_data():
             "raw_linkedin_jobs": res_linkedin.rowcount,
             "raw_wellfound_jobs": res_wellfound.rowcount,
             "unified_jobs": res_unified.rowcount,
-            "cron_jobs": res_cron.rowcount,
-            "cron_runs": res_cron_runs.rowcount,
         },
         "total_deleted": (
             res_indeed.rowcount
             + res_linkedin.rowcount
             + res_wellfound.rowcount
             + res_unified.rowcount
-            + res_cron.rowcount
-            + res_cron_runs.rowcount
         ),
     }
 

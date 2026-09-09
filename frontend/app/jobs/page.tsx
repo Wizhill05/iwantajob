@@ -932,16 +932,6 @@ function JobsExplorerContent() {
         </div>
       )}
 
-      {/* Job Preferences Entry Point */}
-      <div className="flex justify-center pt-8">
-        <Link
-          href="/settings"
-          className="px-4 py-2 rounded-lg bg-[#222222] hover:bg-[#2a2a2a] border border-[#333] text-xs font-sans text-white transition-colors"
-        >
-          Job preferences
-        </Link>
-      </div>
-
       {/* Delete Confirmation Modal */}
       <DeleteConfirmModal
         isOpen={deleteModalState.isOpen}

@@ -31,9 +31,9 @@ class ParserService:
     # Kept in-process so the UI can surface real status across page reloads.
     #
     # Mutual exclusion is enforced by the shared PIPELINE_LOCK (see
-    # services/pipeline_lock.py), which every entry point (UI endpoints, the
-    # background tasks started here, and the cron scheduler) acquires for the
-    # whole duration of the operation — including its finalization.
+    # services/pipeline_lock.py), which every entry point (UI endpoints and the
+    # background tasks started here) acquires for the whole duration of the
+    # operation — including its finalization.
     #
     # `_active_run` is only ever set while the lock is held; `_pending_run` is a
     # run that has been triggered but is still waiting for the lock.
@@ -139,7 +139,7 @@ class ParserService:
         wait_timeout: float | None = None,
     ) -> dict[str, Any] | None:
         """
-        Run a provider parse inline (used by the cron scheduler).
+        Run a provider parse inline.
 
         Returns None if the pipeline is busy and `wait` is False. With
         `wait=True` the call blocks (up to `wait_timeout` seconds) until the
@@ -249,7 +249,7 @@ class ParserService:
         wait: bool = False,
         wait_timeout: float | None = None,
     ) -> dict[str, Any] | None:
-        """Inline (non-background) parse run used by the cron scheduler."""
+        """Inline (non-background) parse run."""
         acquired = await PIPELINE_LOCK.acquire(
             f"parse:{provider}",
             wait=wait,

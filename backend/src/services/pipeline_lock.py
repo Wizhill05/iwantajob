@@ -1,9 +1,9 @@
 """
 Global pipeline mutex.
 
-Every pipeline operation in the backend (Pipeline page parse triggers, cron
-scraping jobs with auto-parse, unified reparse) must hold this lock while it
-runs so that scraping/normalizing operations are truly serialized.
+Every pipeline operation in the backend (Pipeline page parse triggers, unified
+reparse) must hold this lock while it runs so that scraping/normalizing
+operations are truly serialized.
 
 Why a dedicated mutex instead of a boolean status flag:
   * A plain "is busy" flag checked with `if flag: return` is a check-then-act
@@ -12,7 +12,7 @@ Why a dedicated mutex instead of a boolean status flag:
     `finally` block, so the guard survives failures and cancellations.
 
 The mutex is *task-owned and re-entrant*: the asyncio task that acquired it may
-acquire it again (e.g. a cron job holds it for the whole scrape and then calls
+acquire it again (e.g. it holds the lock for a whole operation and then calls
 `ParserService.run_parse` inside the same task). Re-entering is free instead of
 deadlocking; the outermost release is what hands the lock to the next waiter.
 """
@@ -110,6 +110,6 @@ class PipelineMutex:
         self._lock.release()
 
 
-# Single shared instance for the whole backend process: UI endpoints, background
-# parse tasks and the cron scheduler all serialize on this.
+# Single shared instance for the whole backend process: UI endpoints and
+# background parse tasks all serialize on this.
 PIPELINE_LOCK = PipelineMutex()

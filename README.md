@@ -229,6 +229,43 @@ Clears all records across raw staging tables and `unified_jobs`.
 
 ---
 
+## MCP server
+
+Every API endpoint above is also exposed as an MCP tool so agents (Claude Code, Claude Desktop, any MCP client) can drive the platform directly: scraping (Indeed / LinkedIn / Wellfound / all together), the bronze→silver parsing pipeline, unified job search, save/archive/unsave/unarchive triage, and database maintenance.
+
+- **Definition:** `backend/src/mcp_server.py` — stdio transport, 24 tools, 1:1 mapping to backend endpoints.
+- **Backend target:** `JOB_API_BASE_URL` env var (default `http://localhost:8020`).
+
+### Run standalone
+
+```bash
+cd backend && uv run python -m src.mcp_server
+```
+
+### Use from Claude Code
+
+The repo registers it via `.mcp.json` (project scope) — after approving the server, tools are available as `mcp__iwantajob__*`:
+
+```json
+{
+  "mcpServers": {
+    "iwantajob": {
+      "command": "uv",
+      "args": ["run", "--directory", "/home/azureuser/iwantajob/backend", "python", "-m", "src.mcp_server"]
+    }
+  }
+}
+```
+
+Typical agent workflows:
+
+1. **Scrape → parse → search:** `scrape_indeed` / `scrape_linkedin` / `scrape_wellfound` (or `scrape_all_providers`) with `persist=true`, then `parse_indeed_jobs` etc., then `search_unified_jobs`.
+2. **Organize:** `save_jobs`, `archive_jobs`, `unsave_jobs`, `unarchive_jobs` (undo), or preference-driven bulk classification via `run_auto_triage`.
+
+The `clear_bronze_layer` / `clear_test_data` / `reset_database` tools are destructive and should be confirmed with the user before an agent calls them.
+
+---
+
 ## Database schema
 
 ### `unified_jobs`

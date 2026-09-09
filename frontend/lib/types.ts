@@ -173,17 +173,6 @@ export interface HealthCheckResponse {
   version: string;
 }
 
-export interface UserPreferences {
-  id: string;
-  allow_international: boolean;
-  max_experience_years: number;
-  require_fresher_friendly: boolean;
-  preferred_title_keywords: string[];
-  blocked_title_keywords: string[];
-  preferred_cities: string[];
-  min_salary_inr_year: number | null;
-}
-
 export interface AutoTriageResult {
   dry_run: boolean;
   evaluated: number;
@@ -192,74 +181,4 @@ export interface AutoTriageResult {
   left_active: number;
   skipped_manual: number;
   details: { id: string; action: string; reason: string }[];
-}
-
-export interface CronJob {
-  id: string;
-  name: string;
-  provider: 'indeed' | 'linkedin' | 'wellfound' | 'all';
-  hour: number;
-  minute: number;
-  days_of_week: number[];
-  search_params: Record<string, any>;
-  auto_parse: boolean;
-  is_enabled: boolean;
-  last_run_at: string | null;
-  last_status: 'success' | 'failed' | 'running' | null;
-  last_result_summary: string | null;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface CreateCronJobPayload {
-  name: string;
-  provider: 'indeed' | 'linkedin' | 'wellfound' | 'all';
-  hour: number;
-  minute: number;
-  days_of_week?: number[];
-  search_params?: Record<string, any>;
-  auto_parse?: boolean;
-  is_enabled?: boolean;
-}
-
-export interface UpdateCronJobPayload {
-  name?: string;
-  provider?: 'indeed' | 'linkedin' | 'wellfound' | 'all';
-  hour?: number;
-  minute?: number;
-  days_of_week?: number[];
-  search_params?: Record<string, any>;
-  auto_parse?: boolean;
-  is_enabled?: boolean;
-}
-
-export interface CronRunResult {
-  status: 'success' | 'failed' | 'running';
-  job_id: string;
-  provider?: string;
-  details?: string;
-  scraped?: Record<string, number>;
-  parsed?: Record<string, number>;
-  error?: string;
-  run_id?: string | null;
-}
-
-export interface CronRunRecord {
-  id: string;
-  cron_job_id: string | null;
-  job_name: string;
-  provider: string;
-  trigger: 'manual' | 'scheduler' | string;
-  status: 'running' | 'success' | 'failed' | string;
-  started_at: string | null;
-  finished_at: string | null;
-  result_summary: string | null;
-  error: string | null;
-}
-
-export interface CronRunsPage {
-  total: number;
-  limit: number;
-  offset: number;
-  runs: CronRunRecord[];
 }

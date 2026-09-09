@@ -635,8 +635,8 @@ export function LogsTerminalView() {
                   This permanently deletes all test-seeded rows (IDs starting with{' '}
                   <strong className="text-amber-300 font-mono">test_</strong>,{' '}
                   <strong className="text-amber-300 font-mono">wf_</strong> or{' '}
-                  <strong className="text-amber-300 font-mono">li_</strong>) from the raw,
-                  unified and cron tables. This action cannot be undone.
+                  <strong className="text-amber-300 font-mono">li_</strong>) from the raw
+                  and unified tables. This action cannot be undone.
                 </p>
               </div>
               <button

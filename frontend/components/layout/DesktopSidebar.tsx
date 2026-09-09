@@ -11,7 +11,6 @@ import {
   Terminal,
   Activity,
   Server,
-  Clock,
 } from 'iconoir-react';
 import { useActivity } from '@/context/ActivityContext';
 import { cn } from '@/lib/utils';
@@ -27,7 +26,6 @@ const NAV_ITEMS: NavItem[] = [
   { name: 'Scraper Lab', href: '/scrapers', icon: Cpu },
   { name: 'Pipeline', href: '/pipeline', icon: RefreshDouble },
   { name: 'Unified Jobs', href: '/jobs', icon: Suitcase },
-  { name: 'Cron Jobs', href: '/cron', icon: Clock },
   { name: 'Logs & System', href: '/logs', icon: Terminal },
 ];
 

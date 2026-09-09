@@ -44,21 +44,33 @@ import pytest
 
 @pytest.mark.asyncio
 async def test_prefs_roundtrip_and_dry_run():
-    from src.core.database import init_db
+    from src.core.database import init_db, async_session_maker
     await init_db()
     from fastapi.testclient import TestClient
     from src.main import app
+    from src.models.db_entities import UserPreference
     c = TestClient(app)
-    # Reset to known state first: the prefs row persists in the real DB
-    # and may have been changed via the /settings UI. Restore it after.
-    original_max_exp = c.get("/api/preferences").json()["max_experience_years"]
-    r = c.put("/api/preferences", json={"max_experience_years": 2})
-    assert r.status_code == 200 and r.json()["max_experience_years"] == 2
-    r = c.get("/api/preferences")
-    assert r.status_code == 200 and r.json()["max_experience_years"] == 2
-    r = c.put("/api/preferences", json={"max_experience_years": 1})
-    assert r.json()["max_experience_years"] == 1
-    r = c.put("/api/preferences", json={"max_experience_years": original_max_exp})
-    assert r.json()["max_experience_years"] == original_max_exp
+    # Reset to known state first: the prefs row persists in the real DB.
+    # Read the current value, exercise the ORM roundtrip, then restore it.
+    async with async_session_maker() as session:
+        prefs = await session.get(UserPreference, "default")
+        assert prefs is not None
+        original_max_exp = prefs.max_experience_years
+
+        prefs.max_experience_years = 2
+        await session.commit()
+
+        refreshed = await session.get(UserPreference, "default")
+        assert refreshed.max_experience_years == 2
+
+        refreshed.max_experience_years = 1
+        await session.commit()
+
+        refreshed = await session.get(UserPreference, "default")
+        assert refreshed.max_experience_years == 1
+
+        refreshed.max_experience_years = original_max_exp
+        await session.commit()
+
     r = c.post("/api/jobs/auto-triage?dry_run=true&limit=5")
     assert r.status_code == 200 and "evaluated" in r.json()

@@ -7,14 +7,7 @@
   ParseStartResult,
   UnifiedJobsQueryParams,
   HealthCheckResponse,
-  UserPreferences,
   AutoTriageResult,
-  CronJob,
-  CreateCronJobPayload,
-  UpdateCronJobPayload,
-  CronRunResult,
-  CronRunsPage,
-  CronRunRecord,
 } from './types';
 
 const API_BASE_URL =
@@ -314,7 +307,6 @@ class ApiClient {
       raw_linkedin_jobs: number;
       raw_wellfound_jobs: number;
       unified_jobs: number;
-      cron_jobs: number;
     };
     total_deleted: number;
   }> {
@@ -325,29 +317,9 @@ class ApiClient {
         raw_linkedin_jobs: number;
         raw_wellfound_jobs: number;
         unified_jobs: number;
-        cron_jobs: number;
       };
       total_deleted: number;
     }>('/api/db/clear-test-data', { method: 'POST' });
-  }
-
-  /**
-   * Get auto-triage taste preferences (creates defaults on first call).
-   */
-  async getPreferences(): Promise<UserPreferences> {
-    return this.request<UserPreferences>('/api/preferences');
-  }
-
-  /**
-   * Partially update auto-triage taste preferences.
-   */
-  async updatePreferences(
-    payload: Partial<UserPreferences>
-  ): Promise<UserPreferences> {
-    return this.request<UserPreferences>('/api/preferences', {
-      method: 'PATCH',
-      body: JSON.stringify(payload),
-    });
   }
 
   /**
@@ -371,84 +343,6 @@ class ApiClient {
       `/api/jobs/auto-triage${qs ? `?${qs}` : ''}`,
       { method: 'POST' }
     );
-  }
-
-  /**
-   * Fetch all configured cron jobs.
-   */
-  async getCronJobs(): Promise<CronJob[]> {
-    return this.request<CronJob[]>('/api/cron');
-  }
-
-  /**
-   * Create a new scheduled cron job.
-   */
-  async createCronJob(payload: CreateCronJobPayload): Promise<CronJob> {
-    return this.request<CronJob>('/api/cron', {
-      method: 'POST',
-      body: JSON.stringify(payload),
-    });
-  }
-
-  /**
-   * Update fields of an existing cron job.
-   */
-  async updateCronJob(id: string, payload: UpdateCronJobPayload): Promise<CronJob> {
-    return this.request<CronJob>(`/api/cron/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(payload),
-    });
-  }
-
-  /**
-   * Permanently delete a cron job.
-   */
-  async deleteCronJob(id: string): Promise<{ success: boolean; message: string }> {
-    const res = await this.request<{ deleted?: boolean; id?: string; success?: boolean; message?: string }>(
-      `/api/cron/${id}`,
-      { method: 'DELETE' }
-    );
-    return {
-      success: res.deleted ?? res.success ?? true,
-      message: res.message ?? `Cron job ${id} deleted successfully`,
-    };
-  }
-
-  /**
-   * Toggle enabled status of a cron job.
-   */
-  async toggleCronJob(id: string): Promise<CronJob> {
-    return this.request<CronJob>(`/api/cron/${id}/toggle`, {
-      method: 'PATCH',
-    });
-  }
-
-  /**
-   * Immediately execute a cron job.
-   */
-  async runCronJob(id: string): Promise<CronRunResult> {
-    return this.request<CronRunResult>(`/api/cron/${id}/run`, {
-      method: 'POST',
-    });
-  }
-
-  /**
-   * Fetch recent cron run history (most recent first, includes running runs).
-   */
-  async getCronRuns(limit = 50, offset = 0): Promise<CronRunsPage> {
-    return this.request<CronRunsPage>(
-      `/api/cron/runs?limit=${limit}&offset=${offset}`
-    );
-  }
-
-  /**
-   * Fetch cron runs currently in progress on the backend.
-   */
-  async getRunningCronRuns(): Promise<CronRunRecord[]> {
-    const res = await this.request<{ running: CronRunRecord[] }>(
-      '/api/cron/runs/running'
-    );
-    return res.running;
   }
 }
 
