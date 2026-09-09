@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState, useCallback, Suspense } from 'react';
+import React, { useEffect, useState, useCallback, useMemo, Suspense } from 'react';
 import {
   Clock,
   Plus,
@@ -15,11 +15,13 @@ import {
   Database,
   Building,
   Globe,
+  ClockRotateRight,
 } from 'iconoir-react';
 import { api } from '@/lib/api';
 import type {
   CronJob,
   CreateCronJobPayload,
+  CronRunRecord,
 } from '@/lib/types';
 import { useActivity } from '@/context/ActivityContext';
 import { PageHero } from '@/components/layout/PageHero';
@@ -75,6 +77,20 @@ const providerColor: Record<string, string> = {
   all: 'text-[#3ecf8e]',
 };
 
+const RUNS_PAGE_SIZE = 25;
+
+/* duration of a finished run, or elapsed time for one still running */
+function runDuration(run: CronRunRecord): string {
+  if (!run.started_at) return '';
+  const start = new Date(run.started_at).getTime();
+  if (isNaN(start)) return '';
+  const end = run.finished_at ? new Date(run.finished_at).getTime() : Date.now();
+  if (isNaN(end)) return '';
+  const s = Math.max(0, Math.round((end - start) / 1000));
+  if (s < 60) return `${s}s`;
+  return `${Math.floor(s / 60)}m ${s % 60}s`;
+}
+
 /* shared circular button style — same language as the jobs selection menu */
 const circleBtn =
   'h-[42px] w-[42px] p-0 shrink-0 flex items-center justify-center rounded-full border transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed';
@@ -119,6 +135,13 @@ function CronContent() {
   const [togglingIds, setTogglingIds] = useState<Record<string, boolean>>({});
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
+  // cron run history (backend source of truth for "currently running")
+  const [runs, setRuns] = useState<CronRunRecord[]>([]);
+  const [runsTotal, setRunsTotal] = useState(0);
+  const [runsOffset, setRunsOffset] = useState(0);
+  const [isLoadingRuns, setIsLoadingRuns] = useState(true);
+  const [isLoadingMoreRuns, setIsLoadingMoreRuns] = useState(false);
+
   // toast
   const [toast, setToast] = useState<{ type: 'success' | 'error' | 'info'; msg: string } | null>(null);
   const showToast = useCallback((type: 'success' | 'error' | 'info', msg: string) => {
@@ -140,13 +163,53 @@ function CronContent() {
     }
   }, [showToast]);
 
+  /* ── run history loading ── */
+
+  const loadRuns = useCallback(async (offset = 0, append = false) => {
+    if (append) setIsLoadingMoreRuns(true);
+    try {
+      const page = await api.getCronRuns(RUNS_PAGE_SIZE, offset);
+      setRunsTotal(page.total);
+      setRuns((prev) => {
+        if (!append) return page.runs;
+        const seen = new Set(prev.map((r) => r.id));
+        return [...prev, ...page.runs.filter((r) => !seen.has(r.id))];
+      });
+      setRunsOffset(offset);
+    } catch {
+      // background polling — the run history is non-critical, ignore errors
+    } finally {
+      setIsLoadingRuns(false);
+      setIsLoadingMoreRuns(false);
+    }
+  }, []);
+
+  /* running state is derived from the backend so it survives navigation:
+     a run row with status 'running' means the backend is still executing */
+  const backendRunning = useMemo(() => {
+    const m: Record<string, boolean> = {};
+    for (const r of runs) {
+      if (r.status === 'running' && r.cron_job_id) m[r.cron_job_id] = true;
+    }
+    return m;
+  }, [runs]);
+  const isJobRunning = useCallback(
+    (id: string) => Boolean(runningIds[id] || backendRunning[id]),
+    [backendRunning, runningIds]
+  );
+  const runningRunCount = useMemo(
+    () => runs.filter((r) => r.status === 'running').length,
+    [runs]
+  );
+
   useEffect(() => {
     loadJobs();
-    const iv = setInterval(() => loadJobs(true), 10000);
-    const handler = () => loadJobs();
+    loadRuns();
+    const iv = setInterval(() => { loadJobs(true); loadRuns(); }, 10000);
+    const handler = () => { loadJobs(); loadRuns(); };
     window.addEventListener('platform:refresh', handler);
     return () => { clearInterval(iv); window.removeEventListener('platform:refresh', handler); };
-  }, [loadJobs]);
+  }, [loadJobs, loadRuns]);
 
   /* ── form helpers ── */
 
@@ -265,6 +328,8 @@ function CronContent() {
       showToast('error', e.message);
     } finally {
       setRunningIds((p) => ({ ...p, [id]: false }));
+      // refresh run history so the spinner/status comes from the backend
+      loadRuns();
     }
   };
 
@@ -564,7 +629,7 @@ function CronContent() {
             {jobs.map((job) => {
               const pColor = providerColor[job.provider] || 'text-[#9ca3af]';
               const ProvIcon = PROVIDERS.find((p) => p.id === job.provider)?.icon || Globe;
-              const isRunning = runningIds[job.id] || false;
+              const isRunning = isJobRunning(job.id);
               const isDeleting = deletingId === job.id;
 
               return (
@@ -672,6 +737,123 @@ function CronContent() {
             })}
           </div>
         )}
+
+        {/* ── RUN HISTORY ── */}
+        <div className="pt-10">
+          <div className="flex items-center justify-between gap-2 pb-3 border-b border-[#262626]">
+            <div className="flex items-center gap-2 min-w-0">
+              <ClockRotateRight className="w-4 h-4 text-[#6b7280] shrink-0" />
+              <p className="text-[11px] font-mono text-[#6b7280] whitespace-nowrap min-w-0">
+                <span className="text-white font-bold">{runsTotal}</span>
+                {' runs'}
+                {runningRunCount > 0 && (
+                  <span className="text-amber-400"> · {runningRunCount} running</span>
+                )}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => { setRuns([]); loadRuns(); }}
+              title="Refresh run history"
+              aria-label="Refresh run history"
+              className={cn(circleBtnSm, 'bg-[#202020] border-[#333] text-[#9ca3af] hover:text-[#3ecf8e]')}
+            >
+              <Refresh className={cn('w-4 h-4', isLoadingRuns && 'animate-spin text-[#3ecf8e]')} />
+            </button>
+          </div>
+
+          {isLoadingRuns ? (
+            <div className="py-10 flex flex-col items-center gap-2">
+              <Refresh className="w-4 h-4 text-[#3ecf8e] animate-spin" />
+              <span className="text-xs font-mono text-[#6b7280]">Loading run history...</span>
+            </div>
+          ) : runs.length === 0 ? (
+            <div className="py-10 flex flex-col items-center gap-3 text-center px-4">
+              <ClockRotateRight className="w-8 h-8 text-[#333]" />
+              <p className="text-sm font-heading text-[#9ca3af]">No runs recorded yet</p>
+              <p className="text-xs font-sans text-[#6b7280] max-w-xs">
+                Every manual test run and scheduled scrape will show up here.
+              </p>
+            </div>
+          ) : (
+            <div className="divide-y divide-[#262626]">
+              {runs.map((run) => {
+                const ProvIcon = PROVIDERS.find((p) => p.id === run.provider)?.icon || Globe;
+                const pColor = providerColor[run.provider] || 'text-[#9ca3af]';
+                const isRunRunning = run.status === 'running';
+                const isError = run.status === 'failed';
+
+                return (
+                  <div key={run.id} className="py-3 flex items-center gap-2.5">
+                    {/* provider circle */}
+                    <span className="h-9 w-9 shrink-0 rounded-full bg-[#1a1a1a] border border-[#262626] flex items-center justify-center">
+                      <ProvIcon className={cn('w-4 h-4', pColor)} />
+                    </span>
+
+                    {/* info */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <span className="text-xs font-semibold text-white truncate">{run.job_name}</span>
+                        <span
+                          className={cn(
+                            'text-[10px] font-mono shrink-0',
+                            run.trigger === 'scheduler' ? 'text-blue-400' : 'text-[#3ecf8e]'
+                          )}
+                        >
+                          ·{run.trigger === 'scheduler' ? 'scheduled' : 'test'}
+                        </span>
+                      </div>
+                      <p
+                        className={cn(
+                          'mt-0.5 text-[11px] font-sans truncate',
+                          isError ? 'text-rose-400' : 'text-[#6b7280]'
+                        )}
+                        title={isError ? run.error || '' : run.result_summary || ''}
+                      >
+                        {isError ? run.error || 'Unknown error' : run.result_summary || (isRunRunning ? 'Scraping in progress...' : 'No summary')}
+                      </p>
+                    </div>
+
+                    {/* status + timing */}
+                    <div className="flex flex-col items-end gap-0.5 shrink-0 text-right">
+                      <span
+                        className={cn(
+                          'inline-flex items-center gap-1 text-[10px] font-sans px-1.5 py-0.5 rounded border',
+                          isRunRunning && 'bg-amber-500/15 text-amber-400 border-amber-500/30',
+                          run.status === 'success' && 'bg-[#3ecf8e]/15 text-[#3ecf8e] border-[#3ecf8e]/30',
+                          isError && 'bg-rose-500/15 text-rose-400 border-rose-500/30'
+                        )}
+                      >
+                        {isRunRunning && <Refresh className="w-2.5 h-2.5 animate-spin" />}
+                        {run.status}
+                      </span>
+                      <span className="text-[11px] font-mono text-[#6b7280] whitespace-nowrap">
+                        {formatRelativeTime(run.started_at)}
+                        {run.started_at && (
+                          <span className="hidden sm:inline"> · {runDuration(run)}</span>
+                        )}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* load more */}
+          {!isLoadingRuns && runs.length < runsTotal && (
+            <div className="py-4 flex justify-center">
+              <button
+                type="button"
+                onClick={() => loadRuns(runsOffset + RUNS_PAGE_SIZE, true)}
+                disabled={isLoadingMoreRuns}
+                className="px-4 py-2 rounded-lg bg-[#202020] border border-[#333] text-[11px] font-mono text-[#9ca3af] hover:text-white transition-colors disabled:opacity-50"
+              >
+                {isLoadingMoreRuns ? 'Loading...' : `Load more (${runsTotal - runs.length} remaining)`}
+              </button>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

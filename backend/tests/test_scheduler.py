@@ -195,7 +195,7 @@ async def test_check_and_run_due_jobs_matching():
     with patch("src.services.scheduler.execute_cron_job", new_callable=AsyncMock) as mock_exec:
         triggered_count = await check_and_run_due_jobs(now_dt=test_dt)
         assert triggered_count == 1
-        mock_exec.assert_awaited_once_with(job_due.id)
+        mock_exec.assert_awaited_once_with(job_due.id, trigger="scheduler")
 
 @pytest.mark.asyncio
 async def test_execute_cron_job_all_providers_success():

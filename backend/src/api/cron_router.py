@@ -5,11 +5,11 @@ from uuid import UUID, uuid4
 
 from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel, ConfigDict, Field, field_validator
-from sqlalchemy import select
+from sqlalchemy import select, func
 
 from src.core.database import async_session_maker
-from src.models.db_entities import CronJob
-from src.services.scheduler import execute_cron_job
+from src.models.db_entities import CronJob, CronRun
+from src.services.scheduler import execute_cron_job, mark_stale_running_runs
 
 logger = logging.getLogger(__name__)
 
@@ -132,6 +132,21 @@ def serialize_cron_job(job: CronJob) -> dict[str, Any]:
     }
 
 
+def serialize_cron_run(run: CronRun) -> dict[str, Any]:
+    return {
+        "id": str(run.id),
+        "cron_job_id": str(run.cron_job_id) if run.cron_job_id else None,
+        "job_name": run.job_name,
+        "provider": run.provider,
+        "trigger": run.trigger,
+        "status": run.status,
+        "started_at": run.started_at,
+        "finished_at": run.finished_at,
+        "result_summary": run.result_summary,
+        "error": run.error,
+    }
+
+
 @router.get("", response_model=list[CronJobResponse], summary="List all cron jobs")
 async def list_cron_jobs():
     """Returns all configured cron jobs ordered by creation date descending."""
@@ -213,6 +228,49 @@ async def toggle_cron_job(job_id: str):
         await session.commit()
         await session.refresh(job)
         return serialize_cron_job(job)
+
+
+@router.get("/runs", summary="List cron run history")
+async def list_cron_runs(
+    limit: int = 50,
+    offset: int = 0,
+):
+    """
+    Returns recent cron run records (most recent first), including any run
+    currently in progress. Runs left in 'running' state for abnormally long
+    (backend restart mid-run) are closed out as failed first.
+    """
+    limit = max(1, min(limit, 200))
+    offset = max(0, offset)
+
+    await mark_stale_running_runs()
+
+    async with async_session_maker() as session:
+        total = await session.scalar(select(func.count()).select_from(CronRun))
+        stmt = select(CronRun).order_by(CronRun.started_at.desc()).offset(offset).limit(limit)
+        result = await session.execute(stmt)
+        runs = result.scalars().all()
+        return {
+            "total": int(total or 0),
+            "limit": limit,
+            "offset": offset,
+            "runs": [serialize_cron_run(r) for r in runs],
+        }
+
+
+@router.get("/runs/running", summary="List currently running cron runs")
+async def list_running_cron_runs():
+    """
+    Returns cron runs still in progress. Used by the frontend to restore
+    spinning/running button state after navigating away and back.
+    """
+    await mark_stale_running_runs()
+
+    async with async_session_maker() as session:
+        stmt = select(CronRun).where(CronRun.status == "running").order_by(CronRun.started_at.desc())
+        result = await session.execute(stmt)
+        runs = result.scalars().all()
+        return {"running": [serialize_cron_run(r) for r in runs]}
 
 
 @router.post("/{job_id}/run", summary="Trigger immediate cron job execution")

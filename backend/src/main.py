@@ -1347,7 +1347,7 @@ async def reset_database():
 async def clear_test_data():
     """
     Deletes test-seeded rows from all raw staging tables and unified_jobs,
-    plus known test CronJob names. Test rows are identified by synthetic
+    plus known test CronJob names and their cron_runs history. Test rows are identified by synthetic
     external_id prefixes ('test_', 'wf_', 'li_') — live scrapers always
     produce bare numeric/hex IDs, so prefixed IDs only ever come from
     tester UIs and pytest seeds. Safe to run at any time.
@@ -1397,6 +1397,15 @@ async def clear_test_data():
                 """
             )
         )
+        res_cron_runs = await session.execute(
+            text(
+                """
+                DELETE FROM cron_runs
+                WHERE job_name LIKE 'test_%'
+                    OR job_name LIKE 'Test %'
+                """
+            )
+        )
         await session.commit()
 
     return {
@@ -1407,6 +1416,7 @@ async def clear_test_data():
             "raw_wellfound_jobs": res_wellfound.rowcount,
             "unified_jobs": res_unified.rowcount,
             "cron_jobs": res_cron.rowcount,
+            "cron_runs": res_cron_runs.rowcount,
         },
         "total_deleted": (
             res_indeed.rowcount
@@ -1414,6 +1424,7 @@ async def clear_test_data():
             + res_wellfound.rowcount
             + res_unified.rowcount
             + res_cron.rowcount
+            + res_cron_runs.rowcount
         ),
     }
 
