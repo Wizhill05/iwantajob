@@ -14,17 +14,31 @@ from src.models.db_entities import (
 from src.services.llm_parser import LLMJobParser
 from src.services.experience_extractor import ExperienceExtractor
 from src.services.pay_normalizer import PayNormalizer
+from src.services.pipeline_lock import PIPELINE_LOCK
 from src.utils.url_normalizer import normalize_job_url
 
 logger = logging.getLogger(__name__)
 
 LLM_BATCH_CHUNK_SIZE = 10
 
+# How long a triggered-but-queued run waits for the previous pipeline operation
+# to fully finish before giving up (seconds).
+QUEUE_WAIT_TIMEOUT = 600.0
+
 
 class ParserService:
     # Global pipeline run state — only one parse/reparse job may run at a time.
     # Kept in-process so the UI can surface real status across page reloads.
+    #
+    # Mutual exclusion is enforced by the shared PIPELINE_LOCK (see
+    # services/pipeline_lock.py), which every entry point (UI endpoints, the
+    # background tasks started here, and the cron scheduler) acquires for the
+    # whole duration of the operation — including its finalization.
+    #
+    # `_active_run` is only ever set while the lock is held; `_pending_run` is a
+    # run that has been triggered but is still waiting for the lock.
     _active_run: dict[str, Any] | None = None
+    _pending_run: dict[str, Any] | None = None
     _last_run: dict[str, Any] | None = None
 
     @staticmethod
@@ -32,18 +46,23 @@ class ParserService:
         return datetime.now(timezone.utc).isoformat()
 
     @classmethod
-    def _begin_run(cls, provider: str, kind: str, batch_size: int | None = None) -> dict[str, Any]:
-        run = {
+    def _begin_run(
+        cls,
+        provider: str,
+        kind: str,
+        batch_size: int | None = None,
+        state: str = "running",
+    ) -> dict[str, Any]:
+        return {
             "provider": provider,
             "kind": kind,
+            "state": state,
             "started_at": cls._utcnow_iso(),
             "batch_size": batch_size,
             "processed": 0,
             "promoted": 0,
             "error": None,
         }
-        cls._active_run = run
-        return run
 
     @classmethod
     def _finish_run(
@@ -53,7 +72,7 @@ class ParserService:
         result: dict[str, Any] | None = None,
         error: Any = None,
     ) -> None:
-        finished = {**run, "status": status, "finished_at": cls._utcnow_iso()}
+        finished = {**run, "status": status, "state": "finished", "finished_at": cls._utcnow_iso()}
         if result:
             finished["processed"] = result.get("processed", run.get("processed", 0))
             finished["promoted"] = result.get("promoted_to_unified", run.get("promoted", 0))
@@ -63,31 +82,78 @@ class ParserService:
         cls._last_run = finished
         if cls._active_run is run:
             cls._active_run = None
+        if cls._pending_run is run:
+            cls._pending_run = None
 
     @classmethod
     def get_run_state(cls) -> dict[str, Any]:
-        return {"active_job": cls._active_run, "last_job": cls._last_run}
+        # A queued run is surfaced as the active job so the UI (and any second
+        # trigger) sees the pipeline as busy until the queued work is done.
+        return {
+            "active_job": cls._active_run or cls._pending_run,
+            "last_job": cls._last_run,
+        }
+
+    @classmethod
+    def _runners(cls) -> dict[str, Any]:
+        return {
+            "indeed": cls.parse_indeed_jobs,
+            "linkedin": cls.parse_linkedin_jobs,
+            "wellfound": cls.parse_wellfound_jobs,
+        }
 
     @classmethod
     def start_parse(cls, provider: str, batch_size: int = 50, use_llm: bool = True) -> dict[str, Any] | None:
         """
         Start a provider parse as a background task so it keeps running even if
-        the client disconnects. Returns None if the pipeline is already busy.
+        the client disconnects.
+
+        The background task queues on the shared pipeline lock, so an operation
+        triggered while the previous one is still finishing is executed after it
+        completes instead of failing with a busy error. Returns None only when
+        an operation is already running AND one more is already queued behind it.
         """
         if provider not in ("indeed", "linkedin", "wellfound"):
             raise ValueError(f"Unsupported parse provider: {provider}")
-        if cls._active_run is not None:
+        if cls._pending_run is not None:
             return None
-        cls._begin_run(provider, "parse", batch_size)
-        asyncio.create_task(cls._run_background(provider, batch_size, use_llm))
-        return {"started": True, "provider": provider, "batch_size": batch_size, "use_llm": use_llm}
+        run = cls._begin_run(provider, "parse", batch_size, state="queued")
+        cls._pending_run = run
+        asyncio.create_task(cls._run_background(provider, batch_size, use_llm, run))
+        return {
+            "started": True,
+            "queued": True,
+            "state": "queued",
+            "provider": provider,
+            "batch_size": batch_size,
+            "use_llm": use_llm,
+        }
 
     @classmethod
-    async def run_parse(cls, provider: str, batch_size: int = 50, use_llm: bool = True) -> dict[str, Any] | None:
-        """Run a provider parse inline (used by the cron scheduler). Returns None if the pipeline is busy."""
+    async def run_parse(
+        cls,
+        provider: str,
+        batch_size: int = 50,
+        use_llm: bool = True,
+        wait: bool = False,
+        wait_timeout: float | None = None,
+    ) -> dict[str, Any] | None:
+        """
+        Run a provider parse inline (used by the cron scheduler).
+
+        Returns None if the pipeline is busy and `wait` is False. With
+        `wait=True` the call blocks (up to `wait_timeout` seconds) until the
+        previous operation has completely finished.
+        """
         if provider not in ("indeed", "linkedin", "wellfound"):
             raise ValueError(f"Unsupported parse provider: {provider}")
-        return await cls._execute_run(provider, batch_size, use_llm)
+        return await cls._execute_run(
+            provider,
+            batch_size,
+            use_llm,
+            wait=wait,
+            wait_timeout=wait_timeout,
+        )
 
     @classmethod
     async def run_reparse(
@@ -96,10 +162,12 @@ class ParserService:
         use_llm: bool = True,
         limit: int = 100,
     ) -> dict[str, Any] | None:
-        """Run the unified reparse inline under the same exclusivity guard. Returns None if the pipeline is busy."""
-        if cls._active_run is not None:
+        """Run the unified reparse under the same exclusivity guard. Returns None if the pipeline is busy."""
+        acquired = await PIPELINE_LOCK.acquire("reparse:unified")
+        if not acquired:
             return None
         run = cls._begin_run("unified", "reparse", limit)
+        cls._active_run = run
         try:
             result = await cls.reparse_unified_jobs(
                 only_missing_experience=only_missing_experience,
@@ -108,17 +176,69 @@ class ParserService:
             )
             cls._finish_run(run, "completed", result=result)
             return result
-        except Exception as exc:
+        except BaseException as exc:
             logger.error(f"Reparse run failed: {exc}", exc_info=True)
             cls._finish_run(run, "failed", error=exc)
             raise
+        finally:
+            # Always released, even when the run fails or is cancelled.
+            PIPELINE_LOCK.release()
 
     @classmethod
-    async def _run_background(cls, provider: str, batch_size: int, use_llm: bool) -> None:
+    async def _run_background(
+        cls,
+        provider: str,
+        batch_size: int,
+        use_llm: bool,
+        run: dict[str, Any],
+    ) -> None:
+        """Body of the background task started by `start_parse`.
+
+        Queues on the shared pipeline lock (so it never overlaps the previous
+        operation) and always clears the run state, even on failure or
+        cancellation.
+        """
+        acquired = False
         try:
-            await cls._execute_run(provider, batch_size, use_llm, reserved=True)
-        except Exception:
-            pass  # Already logged and recorded in _last_run
+            acquired = await PIPELINE_LOCK.acquire(
+                f"parse:{provider}",
+                wait=True,
+                wait_timeout=QUEUE_WAIT_TIMEOUT,
+            )
+            if not acquired:
+                cls._finish_run(
+                    run,
+                    "failed",
+                    error=(
+                        f"Timed out waiting for the current pipeline operation to finish; "
+                        f"{provider} parse was not started"
+                    ),
+                )
+                return
+
+            cls._active_run = run
+            cls._pending_run = None
+            run["state"] = "running"
+            try:
+                result = await cls._runners()[provider](batch_size=batch_size, use_llm=use_llm)
+                cls._finish_run(run, "completed", result=result)
+            except asyncio.CancelledError as exc:
+                cls._finish_run(run, "failed", error=exc)
+                raise
+            except Exception as exc:
+                # Already logged and recorded in _last_run; the background task
+                # must not surface the error as an unretrieved task exception.
+                logger.error(f"Parse run for {provider} failed: {exc}", exc_info=True)
+                cls._finish_run(run, "failed", error=exc)
+                return
+        finally:
+            if acquired:
+                PIPELINE_LOCK.release()
+            # Never leave a stale run behind (guards against cancellation).
+            if cls._active_run is run:
+                cls._active_run = None
+            if cls._pending_run is run:
+                cls._pending_run = None
 
     @classmethod
     async def _execute_run(
@@ -126,26 +246,29 @@ class ParserService:
         provider: str,
         batch_size: int,
         use_llm: bool,
-        reserved: bool = False,
+        wait: bool = False,
+        wait_timeout: float | None = None,
     ) -> dict[str, Any] | None:
-        if not reserved:
-            if cls._active_run is not None:
-                return None
-            cls._begin_run(provider, "parse", batch_size)
-        run = cls._active_run
-        runners = {
-            "indeed": cls.parse_indeed_jobs,
-            "linkedin": cls.parse_linkedin_jobs,
-            "wellfound": cls.parse_wellfound_jobs,
-        }
+        """Inline (non-background) parse run used by the cron scheduler."""
+        acquired = await PIPELINE_LOCK.acquire(
+            f"parse:{provider}",
+            wait=wait,
+            wait_timeout=wait_timeout,
+        )
+        if not acquired:
+            return None
+        run = cls._begin_run(provider, "parse", batch_size)
+        cls._active_run = run
         try:
-            result = await runners[provider](batch_size=batch_size, use_llm=use_llm)
+            result = await cls._runners()[provider](batch_size=batch_size, use_llm=use_llm)
             cls._finish_run(run, "completed", result=result)
             return result
-        except Exception as exc:
+        except BaseException as exc:
             logger.error(f"Parse run for {provider} failed: {exc}", exc_info=True)
             cls._finish_run(run, "failed", error=exc)
             raise
+        finally:
+            PIPELINE_LOCK.release()
 
     @classmethod
     def _report_progress(cls, processed: int, promoted: int) -> None:

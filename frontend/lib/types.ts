@@ -78,6 +78,8 @@ export interface ProviderParsingStats {
 export interface PipelineRunJob {
   provider: 'indeed' | 'linkedin' | 'wellfound' | 'unified';
   kind: 'parse' | 'reparse';
+  /** 'queued' while waiting for the previous pipeline operation to finish. */
+  state?: 'queued' | 'running' | 'finished';
   started_at: string;
   batch_size: number | null;
   processed: number;
