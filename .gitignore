@@ -14,3 +14,6 @@ backend/job_portal_backend.egg-info/
 .env.*
 !.env.example
 frontend/node_modules
+
+# Claude Code harness worktrees
+.claude/
