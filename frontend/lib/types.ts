@@ -239,4 +239,25 @@ export interface CronRunResult {
   scraped?: Record<string, number>;
   parsed?: Record<string, number>;
   error?: string;
+  run_id?: string | null;
+}
+
+export interface CronRunRecord {
+  id: string;
+  cron_job_id: string | null;
+  job_name: string;
+  provider: string;
+  trigger: 'manual' | 'scheduler' | string;
+  status: 'running' | 'success' | 'failed' | string;
+  started_at: string | null;
+  finished_at: string | null;
+  result_summary: string | null;
+  error: string | null;
+}
+
+export interface CronRunsPage {
+  total: number;
+  limit: number;
+  offset: number;
+  runs: CronRunRecord[];
 }

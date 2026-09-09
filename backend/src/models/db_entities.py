@@ -188,3 +188,26 @@ class CronJob(Base):
     last_result_summary = Column(Text, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+
+
+class CronRun(Base):
+    """
+    Append-only execution log for cron jobs. One row is created when a run
+    starts (status='running') and updated with the outcome when it finishes,
+    so the UI can derive live running state from the backend.
+    """
+    __tablename__ = "cron_runs"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    # Nullable: a cron job may be deleted while its historical runs remain.
+    cron_job_id = Column(UUID(as_uuid=True), nullable=True, index=True)
+    # Denormalized so history stays readable after the parent job is deleted.
+    job_name = Column(String, nullable=False)
+    provider = Column(String, nullable=False)
+    # 'manual' (test / run-now button) or 'scheduler' (automated tick)
+    trigger = Column(String, nullable=False, default="manual")
+    status = Column(String, nullable=False, default="running", index=True)  # running | success | failed
+    started_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    finished_at = Column(DateTime(timezone=True), nullable=True)
+    result_summary = Column(Text, nullable=True)
+    error = Column(Text, nullable=True)

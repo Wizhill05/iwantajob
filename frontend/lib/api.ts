@@ -13,6 +13,8 @@
   CreateCronJobPayload,
   UpdateCronJobPayload,
   CronRunResult,
+  CronRunsPage,
+  CronRunRecord,
 } from './types';
 
 const API_BASE_URL =
@@ -426,6 +428,25 @@ class ApiClient {
     return this.request<CronRunResult>(`/api/cron/${id}/run`, {
       method: 'POST',
     });
+  }
+
+  /**
+   * Fetch recent cron run history (most recent first, includes running runs).
+   */
+  async getCronRuns(limit = 50, offset = 0): Promise<CronRunsPage> {
+    return this.request<CronRunsPage>(
+      `/api/cron/runs?limit=${limit}&offset=${offset}`
+    );
+  }
+
+  /**
+   * Fetch cron runs currently in progress on the backend.
+   */
+  async getRunningCronRuns(): Promise<CronRunRecord[]> {
+    const res = await this.request<{ running: CronRunRecord[] }>(
+      '/api/cron/runs/running'
+    );
+    return res.running;
   }
 }
 

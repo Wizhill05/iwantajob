@@ -78,4 +78,10 @@ async def cleanup_test_data():
             )
         )
 
+        # CronRun history rows created by tests (test job names use the
+        # 'test_' / 'Test ' prefixes enforced by this suite).
+        await session.execute(
+            text("DELETE FROM cron_runs WHERE job_name LIKE 'test_%' OR job_name LIKE 'Test %'")
+        )
+
         await session.commit()

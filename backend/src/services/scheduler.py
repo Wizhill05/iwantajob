@@ -1,23 +1,103 @@
 import asyncio
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.clients.indeed import IndeedClient
 from src.clients.linkedin import LinkedInClient
 from src.clients.wellfound import WellfoundClient
 from src.core.database import async_session_maker
-from src.models.db_entities import CronJob
+from src.models.db_entities import CronJob, CronRun
 from src.services.parser_service import ParserService
 
 logger = logging.getLogger(__name__)
 
 _scheduler_task: asyncio.Task | None = None
 _scheduler_running: bool = False
+
+# Runs stuck in 'running' for longer than this are considered aborted
+# (e.g. the backend was restarted mid-run) and closed out when queried.
+STALE_RUN_CUTOFF_HOURS = 6
+
+
+async def start_cron_run(
+    cron_job_id: UUID | None,
+    job_name: str,
+    provider: str,
+    trigger: str = "manual",
+) -> UUID | None:
+    """Records the start of a cron run in its own session so it is visible
+    to pollers immediately. Returns the run id, or None if recording failed."""
+    try:
+        async with async_session_maker() as session:
+            run = CronRun(
+                cron_job_id=cron_job_id,
+                job_name=job_name,
+                provider=provider,
+                trigger=trigger,
+                status="running",
+            )
+            session.add(run)
+            await session.commit()
+            await session.refresh(run)
+            return run.id
+    except Exception as exc:
+        logger.error(f"Failed to record cron run start for {job_name}: {exc}", exc_info=True)
+        return None
+
+
+async def finish_cron_run(
+    run_id: UUID | None,
+    status: str,
+    result_summary: str | None = None,
+    error: str | None = None,
+) -> None:
+    """Finalizes a cron run record. Never raises — instrumentation must not
+    break job execution."""
+    if run_id is None:
+        return
+    try:
+        async with async_session_maker() as session:
+            run = await session.get(CronRun, run_id)
+            if not run:
+                return
+            run.status = status
+            run.finished_at = datetime.now(timezone.utc)
+            run.result_summary = result_summary
+            run.error = error
+            await session.commit()
+    except Exception as exc:
+        logger.error(f"Failed to record cron run finish for run {run_id}: {exc}", exc_info=True)
+
+
+async def mark_stale_running_runs(max_age_hours: int = STALE_RUN_CUTOFF_HOURS) -> int:
+    """
+    Closes out runs that were left in 'running' state (e.g. the backend was
+    restarted mid-run) so the UI never shows a spinner forever.
+    Returns the number of runs closed.
+    """
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=max_age_hours)
+    try:
+        async with async_session_maker() as session:
+            res = await session.execute(
+                update(CronRun)
+                .where(CronRun.status == "running", CronRun.started_at < cutoff)
+                .values(
+                    status="failed",
+                    finished_at=datetime.now(timezone.utc),
+                    error=f"Run aborted: no completion recorded within {max_age_hours}h (backend may have restarted)",
+                )
+            )
+            await session.commit()
+            return res.rowcount or 0
+    except Exception as exc:
+        logger.error(f"Failed to clean stale cron runs: {exc}", exc_info=True)
+        return 0
+
 
 
 async def _safe_parse(provider: str) -> dict[str, Any]:
@@ -143,25 +223,56 @@ async def _run_job_logic(job: CronJob, session: AsyncSession) -> dict[str, Any]:
         }
 
 
-async def execute_cron_job(job_id: UUID | str, session: AsyncSession | None = None) -> dict[str, Any]:
+async def _run_result_to_record(run_id: UUID | None, result: dict[str, Any]) -> None:
+    """Persists the outcome of a run based on its result dict."""
+    if result.get("status") == "success":
+        summary = result.get("details") or result.get("error")
+        await finish_cron_run(run_id, "success", result_summary=summary)
+    else:
+        error = result.get("error") or result.get("details") or "Unknown error"
+        await finish_cron_run(run_id, "failed", error=error)
+
+
+async def execute_cron_job(
+    job_id: UUID | str,
+    session: AsyncSession | None = None,
+    trigger: str = "manual",
+) -> dict[str, Any]:
     """
     Executes the scraper for the cron job's configured provider with persist=True.
     Optionally triggers ParserService auto-parsing and updates the job's last run status.
+
+    Every execution (manual/test runs and scheduler-triggered runs) is recorded
+    in the cron_runs table: a 'running' row on start, finalized on completion.
     """
     if isinstance(job_id, str):
         job_id = UUID(job_id)
+
+    async def _run_with_record(job: CronJob, sess: AsyncSession) -> dict[str, Any]:
+        run_id = await start_cron_run(job.id, job.name, job.provider, trigger=trigger)
+        try:
+            result = await _run_job_logic(job, sess)
+        except Exception as exc:
+            # _run_job_logic normally swallows exceptions; guard anyway so the
+            # run record never stays 'running' on an unexpected failure.
+            await finish_cron_run(run_id, "failed", error=str(exc))
+            raise
+        await _run_result_to_record(run_id, result)
+        if run_id is not None and isinstance(result, dict):
+            result["run_id"] = str(run_id)
+        return result
 
     if session is not None:
         job = await session.get(CronJob, job_id)
         if not job:
             return {"status": "failed", "job_id": str(job_id), "error": f"CronJob {job_id} not found"}
-        return await _run_job_logic(job, session)
+        return await _run_with_record(job, session)
 
     async with async_session_maker() as new_session:
         job = await new_session.get(CronJob, job_id)
         if not job:
             return {"status": "failed", "job_id": str(job_id), "error": f"CronJob {job_id} not found"}
-        return await _run_job_logic(job, new_session)
+        return await _run_with_record(job, new_session)
 
 
 async def check_and_run_due_jobs(now_dt: datetime | None = None) -> int:
@@ -206,7 +317,7 @@ async def check_and_run_due_jobs(now_dt: datetime | None = None) -> int:
             due_job_ids.append(job.id)
 
     for jid in due_job_ids:
-        asyncio.create_task(execute_cron_job(jid))
+        asyncio.create_task(execute_cron_job(jid, trigger="scheduler"))
 
     # Yield control to event loop so spawned tasks begin execution
     await asyncio.sleep(0)
