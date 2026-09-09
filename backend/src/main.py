@@ -757,10 +757,10 @@ async def parse_indeed(
     batch_size: Annotated[int, Query(ge=1, le=500, description="Max raw jobs to parse in this run")] = 50,
     use_llm: Annotated[bool, Query(description="Whether to use Gemini LLM batch parsing")] = True,
 ):
-    """Starts a background parse of unparsed raw Indeed records into unified_jobs. Returns 409 if a pipeline job is already running."""
+    """Starts a background parse of unparsed raw Indeed records into unified_jobs. Queues behind any running pipeline operation; returns 409 if one is already running or queued."""
     started = ParserService.start_parse("indeed", batch_size=batch_size, use_llm=use_llm)
     if started is None:
-        raise HTTPException(status_code=409, detail="PIPELINE_BUSY: a pipeline job is already running — see /api/status/parsing")
+        raise HTTPException(status_code=409, detail="PIPELINE_BUSY: only one scraping operation can run at a time and another operation is already running or queued — see /api/status/parsing")
     return started
 
 @app.post(
@@ -772,10 +772,10 @@ async def parse_linkedin(
     batch_size: Annotated[int, Query(ge=1, le=500, description="Max raw jobs to parse in this run")] = 50,
     use_llm: Annotated[bool, Query(description="Whether to use Gemini LLM batch parsing")] = True,
 ):
-    """Starts a background parse of unparsed raw LinkedIn records into unified_jobs. Returns 409 if a pipeline job is already running."""
+    """Starts a background parse of unparsed raw LinkedIn records into unified_jobs. Queues behind any running pipeline operation; returns 409 if one is already running or queued."""
     started = ParserService.start_parse("linkedin", batch_size=batch_size, use_llm=use_llm)
     if started is None:
-        raise HTTPException(status_code=409, detail="PIPELINE_BUSY: a pipeline job is already running — see /api/status/parsing")
+        raise HTTPException(status_code=409, detail="PIPELINE_BUSY: only one scraping operation can run at a time and another operation is already running or queued — see /api/status/parsing")
     return started
 
 @app.post(
@@ -787,10 +787,10 @@ async def parse_wellfound(
     batch_size: Annotated[int, Query(ge=1, le=500, description="Max raw jobs to parse in this run")] = 50,
     use_llm: Annotated[bool, Query(description="Whether to use Gemini LLM batch parsing")] = True,
 ):
-    """Starts a background parse of unparsed raw Wellfound records into unified_jobs. Returns 409 if a pipeline job is already running."""
+    """Starts a background parse of unparsed raw Wellfound records into unified_jobs. Queues behind any running pipeline operation; returns 409 if one is already running or queued."""
     started = ParserService.start_parse("wellfound", batch_size=batch_size, use_llm=use_llm)
     if started is None:
-        raise HTTPException(status_code=409, detail="PIPELINE_BUSY: a pipeline job is already running — see /api/status/parsing")
+        raise HTTPException(status_code=409, detail="PIPELINE_BUSY: only one scraping operation can run at a time and another operation is already running or queued — see /api/status/parsing")
     return started
 
 @app.post(
@@ -805,14 +805,14 @@ async def reparse_unified_jobs_endpoint(
 ):
     """
     Backfills and reparses existing unified_jobs where experience or salary was missed.
-    Uses the upgraded regex engine and Gemini LLM. Returns 409 if a pipeline job is already running."""
+    Uses the upgraded regex engine and Gemini LLM. Runs inline under the same exclusivity guard; returns 409 if a pipeline operation is already running or queued."""
     result = await ParserService.run_reparse(
         only_missing_experience=only_missing_experience,
         use_llm=use_llm,
         limit=limit,
     )
     if result is None:
-        raise HTTPException(status_code=409, detail="PIPELINE_BUSY: a pipeline job is already running — see /api/status/parsing")
+        raise HTTPException(status_code=409, detail="PIPELINE_BUSY: only one scraping operation can run at a time and another operation is already running or queued — see /api/status/parsing")
     return result
 
 

@@ -13,16 +13,26 @@ from src.clients.wellfound import WellfoundClient
 from src.core.database import async_session_maker
 from src.models.db_entities import CronJob
 from src.services.parser_service import ParserService
+from src.services.pipeline_lock import PIPELINE_LOCK
 
 logger = logging.getLogger(__name__)
 
 _scheduler_task: asyncio.Task | None = None
 _scheduler_running: bool = False
 
+# How long a cron job waits for the previous pipeline operation (a UI-triggered
+# parse, or another cron job) to fully finish before it is marked as skipped.
+CRON_PIPELINE_WAIT_TIMEOUT = 900.0
+
 
 async def _safe_parse(provider: str) -> dict[str, Any]:
-    """Run a provider parse under the global pipeline exclusivity guard. Returns {} if the pipeline is busy."""
-    res = await ParserService.run_parse(provider)
+    """
+    Run a provider parse under the global pipeline exclusivity guard.
+
+    The calling cron task already holds the pipeline lock (re-entrant), so this
+    runs inline. Returns {} if the pipeline is busy.
+    """
+    res = await ParserService.run_parse(provider, wait=True)
     if res is None:
         logger.info(f"Auto-parse for {provider} skipped: another pipeline job is already running")
         return {}
@@ -36,6 +46,28 @@ async def _run_job_logic(job: CronJob, session: AsyncSession) -> dict[str, Any]:
 
     scraped_counts: dict[str, int] = {}
     parsed_counts: dict[str, int] = {}
+
+    # Serialize whole scraping operations: wait for any previous operation (a
+    # Pipeline page trigger or another cron job) to completely finish instead of
+    # overlapping its finalization.
+    acquired = await PIPELINE_LOCK.acquire(
+        f"cron scrape:{provider}",
+        wait=True,
+        wait_timeout=CRON_PIPELINE_WAIT_TIMEOUT,
+    )
+    if not acquired:
+        job.last_run_at = datetime.now(timezone.utc)
+        job.last_status = "failed"
+        job.last_result_summary = (
+            "Skipped: only one scraping operation can run at a time and another "
+            "operation was still running"
+        )
+        await session.commit()
+        return {
+            "status": "skipped",
+            "job_id": str(job.id),
+            "error": job.last_result_summary,
+        }
 
     try:
         if provider == "indeed":
@@ -141,6 +173,9 @@ async def _run_job_logic(job: CronJob, session: AsyncSession) -> dict[str, Any]:
             "job_id": str(job.id),
             "error": str(exc),
         }
+    finally:
+        # Always released, even when the job fails or is cancelled.
+        PIPELINE_LOCK.release()
 
 
 async def execute_cron_job(job_id: UUID | str, session: AsyncSession | None = None) -> dict[str, Any]:

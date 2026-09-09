@@ -26,6 +26,14 @@ interface SquareParserActionsProps {
 
 const ALL_PROVIDERS: PipelineProvider[] = ['linkedin', 'indeed', 'wellfound'];
 
+// Backend rejects with 409 + a PIPELINE_BUSY detail while another scraping
+// operation is running/queued.
+const BUSY_ERROR_PATTERN = /PIPELINE_BUSY|one scraping operation|already running/i;
+// Minimum gap between "busy" retries, roughly one status poll cycle.
+const RETRY_BACKOFF_MS = 3000;
+
+const isBusyError = (message: string): boolean => BUSY_ERROR_PATTERN.test(message);
+
 const PROVIDER_META: Record<
   PipelineProvider,
   { label: string; ring: string; text: string; tint: string; hoverRing: string }
@@ -82,6 +90,9 @@ export function SquareParserActions({
   const pendingSinceRef = useRef<number>(0);
   const mountedAtRef = useRef<number>(Date.now());
   const ackedRunRef = useRef<string | null>(null);
+  // Timestamp of the last trigger rejected as busy, so queued retries wait for
+  // the next status poll instead of hammering the API.
+  const busyRetryAtRef = useRef<number>(0);
 
   const activeJob = status?.active_job ?? null;
 
@@ -133,18 +144,29 @@ export function SquareParserActions({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status?.last_job?.finished_at]);
 
-  const triggerProvider = async (provider: PipelineProvider): Promise<boolean> => {
+  type TriggerResult = 'started' | 'busy' | 'error';
+
+  const triggerProvider = async (provider: PipelineProvider): Promise<TriggerResult> => {
     setPendingProvider(provider);
     setTriggerError(null);
     pendingSinceRef.current = Date.now();
     try {
       await api.triggerParse(provider, { batchSize });
       onParseComplete?.();
-      return true;
+      return 'started';
     } catch (err: any) {
-      setTriggerError(err?.message || `Failed to start ${PROVIDER_META[provider].label} parse`);
+      const message = err?.message || `Failed to start ${PROVIDER_META[provider].label} parse`;
+      if (isBusyError(message)) {
+        // The server is still finishing the previous batch. The backend queues
+        // operations, so back off until the next status poll and try again
+        // instead of showing a scary error.
+        busyRetryAtRef.current = Date.now();
+        setPendingProvider(null);
+        return 'busy';
+      }
+      setTriggerError(message);
       setPendingProvider(null);
-      return false;
+      return 'error';
     }
   };
 
@@ -157,14 +179,25 @@ export function SquareParserActions({
       setIsParsingAll(false);
       return;
     }
+    if (Date.now() - busyRetryAtRef.current < RETRY_BACKOFF_MS) return;
     setQueued(rest);
-    void triggerProvider(next);
+    void triggerProvider(next).then((result) => {
+      if (result === 'busy') {
+        // Put it back at the front of the queue; retried after the backoff.
+        setQueued((prev) => [next, ...prev.filter((p) => p !== next)]);
+      }
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isParsingAll, activeJob, pendingProvider, queued]);
 
   const handleParse = async (provider: PipelineProvider) => {
     if (isBusy) return;
-    await triggerProvider(provider);
+    const result = await triggerProvider(provider);
+    if (result === 'busy') {
+      setTriggerError(
+        'The pipeline is busy — only one scraping operation runs at a time. Try again when the current batch finishes.'
+      );
+    }
   };
 
   const handleParseAll = () => {
@@ -290,7 +323,13 @@ export function SquareParserActions({
         <div className="px-3 py-2 rounded-lg bg-[#3ecf8e]/10 border border-[#3ecf8e]/20 text-[#3ecf8e] text-xs font-mono flex items-center gap-2">
           <RefreshDouble className="w-4 h-4 shrink-0 animate-spin" />
           <span className="capitalize font-semibold">
-            {activeJob ? `Parsing ${activeJob.provider}` : pendingProvider ? `Starting ${pendingProvider}` : 'Queuing'}…
+            {activeJob
+              ? activeJob.state === 'queued'
+                ? `Queued ${activeJob.provider}`
+                : `Parsing ${activeJob.provider}`
+              : pendingProvider
+                ? `Starting ${pendingProvider}`
+                : 'Queuing'}…
           </span>
           {elapsedSec !== null && <span>· {elapsedSec}s elapsed</span>}
           {activeJob && activeJob.processed > 0 && (
