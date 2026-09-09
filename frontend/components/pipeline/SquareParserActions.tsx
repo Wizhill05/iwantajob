@@ -179,10 +179,12 @@ export function SquareParserActions({
     const start = Date.now();
     try {
       const res = await api.clearBronze();
+      const skipped = (res as { skipped_silver?: number }).skipped_silver;
       addLog(
         'INFO',
         'system',
-        `Cleared bronze layer: ${res.total_deleted} raw row(s) deleted`,
+        `Cleared bronze layer: ${res.total_deleted} raw row(s) deleted` +
+          (typeof skipped === 'number' && skipped > 0 ? `, ${skipped} kept for silver jobs` : ''),
         Date.now() - start,
         res.deleted
       );
@@ -369,7 +371,7 @@ export function SquareParserActions({
           type="button"
           onClick={() => setShowBronzeConfirm(true)}
           disabled={isBusy || isClearingBronze}
-          title="Delete ALL raw scraped jobs from the bronze staging tables"
+          title="Delete raw scraped jobs that have not been parsed into unified jobs yet"
           className="flex items-center gap-2 px-4 py-2 rounded-lg border border-rose-500/30 bg-rose-500/5 text-rose-400 hover:bg-rose-500/15 hover:border-rose-500/50 text-xs font-sans font-medium transition-all disabled:opacity-40 disabled:cursor-not-allowed"
         >
           {isClearingBronze ? (
@@ -400,9 +402,10 @@ export function SquareParserActions({
                   Clear the whole bronze database?
                 </h3>
                 <p className="text-xs text-[#9ca3af] leading-relaxed font-sans">
-                  This permanently deletes <strong className="text-rose-300">all raw scraped jobs</strong>{' '}
-                  from the bronze staging tables (Indeed, LinkedIn and Wellfound). Cleaned unified
-                  jobs are kept. This action cannot be undone.
+                  This permanently deletes <strong className="text-rose-300">all unparsed raw jobs</strong>{' '}
+                  from the bronze staging tables (Indeed, LinkedIn and Wellfound). Raw jobs that were
+                  already parsed into unified jobs are kept, along with the unified jobs themselves.
+                  This action cannot be undone.
                 </p>
               </div>
               <button

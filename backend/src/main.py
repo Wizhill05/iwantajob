@@ -1240,31 +1240,86 @@ async def delete_unified_jobs(
 
 @app.post(
     "/api/db/clear-bronze",
-    summary="Clear the entire bronze layer (all raw staging tables)",
+    summary="Clear the bronze layer (raw rows not yet promoted to silver)",
     tags=["System"],
 )
 async def clear_bronze():
     """
-    Deletes every row from the three raw staging tables
-    (raw_indeed_jobs, raw_linkedin_jobs, raw_wellfound_jobs).
-    Unified jobs (silver layer) are left untouched.
+    Deletes rows from the three raw staging tables
+    (raw_indeed_jobs, raw_linkedin_jobs, raw_wellfound_jobs) that have NOT
+    been parsed into the silver layer yet.
+
+    A raw row is considered "passed on to silver" when a UnifiedJob row
+    references it — either via raw_ref_id or via (source, external_id).
+    Such rows are preserved so silver jobs always keep a valid bronze
+    lineage; unified_jobs (silver layer) rows themselves are never
+    touched by this endpoint.
     """
+    raw_models = {
+        "indeed": RawIndeedJob,
+        "linkedin": RawLinkedInJob,
+        "wellfound": RawWellfoundJob,
+    }
+
     async with async_session_maker() as session:
-        res_indeed = await session.execute(delete(RawIndeedJob))
-        res_linkedin = await session.execute(delete(RawLinkedInJob))
-        res_wellfound = await session.execute(delete(RawWellfoundJob))
+        # Bronze rows referenced by the silver layer must survive.
+        unified_rows = (
+            await session.execute(
+                select(UnifiedJob.source, UnifiedJob.raw_ref_id, UnifiedJob.external_id)
+            )
+        ).all()
+
+        silver_ref_ids: dict[str, set] = {src: set() for src in raw_models}
+        silver_external_ids: dict[str, set] = {src: set() for src in raw_models}
+        for source, raw_ref_id, external_id in unified_rows:
+            if source in silver_ref_ids:
+                if raw_ref_id is not None:
+                    silver_ref_ids[source].add(raw_ref_id)
+                if external_id is not None:
+                    silver_external_ids[source].add(external_id)
+
+        deleted_counts: dict[str, int] = {}
+        skipped = 0
+        for source, model in raw_models.items():
+            ref_ids = silver_ref_ids[source]
+            ext_ids = silver_external_ids[source]
+
+            conditions = []
+            if ref_ids:
+                conditions.append(model.id.not_in(ref_ids))
+            if ext_ids:
+                conditions.append(model.external_id.not_in(ext_ids))
+
+            if conditions:
+                keep_conditions = [
+                    model.id.in_(ref_ids),
+                    model.external_id.in_(ext_ids),
+                ]
+                skipped += await session.scalar(
+                    select(func.count())
+                    .select_from(model)
+                    .where(or_(*keep_conditions))
+                ) or 0
+                stmt = delete(model).where(*conditions)
+            else:
+                # Nothing in silver for this source: wipe the whole table.
+                stmt = delete(model)
+
+            deleted_counts[source] = (
+                await session.execute(stmt)
+            ).rowcount
+
         await session.commit()
 
     return {
         "status": "success",
         "deleted": {
-            "raw_indeed_jobs": res_indeed.rowcount,
-            "raw_linkedin_jobs": res_linkedin.rowcount,
-            "raw_wellfound_jobs": res_wellfound.rowcount,
+            "raw_indeed_jobs": deleted_counts["indeed"],
+            "raw_linkedin_jobs": deleted_counts["linkedin"],
+            "raw_wellfound_jobs": deleted_counts["wellfound"],
         },
-        "total_deleted": (
-            res_indeed.rowcount + res_linkedin.rowcount + res_wellfound.rowcount
-        ),
+        "total_deleted": sum(deleted_counts.values()),
+        "skipped_silver": skipped,
     }
 
 @app.post(

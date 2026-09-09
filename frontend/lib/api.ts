@@ -208,13 +208,15 @@ class ApiClient {
   }
 
   /**
-   * Wipe the entire bronze layer: all raw staging tables (indeed, linkedin,
-   * wellfound). Unified jobs are left untouched.
+   * Clear the bronze layer: delete raw staging rows (indeed, linkedin,
+   * wellfound) that have not been parsed into unified jobs yet. Raw rows
+   * referenced by silver (unified_jobs) are preserved.
    */
   async clearBronze(): Promise<{
     status: string;
     deleted: { raw_indeed_jobs: number; raw_linkedin_jobs: number; raw_wellfound_jobs: number };
     total_deleted: number;
+    skipped_silver: number;
   }> {
     return this.request('/api/db/clear-bronze', { method: 'POST' });
   }
