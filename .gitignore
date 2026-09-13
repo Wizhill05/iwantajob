@@ -17,3 +17,6 @@ frontend/node_modules
 
 # Claude Code harness worktrees
 .claude/
+
+# tunnel credentials — never commit
+cloudflared/credentials.json

@@ -1,0 +1,62 @@
+# iwantajob "production" stack — fully isolated from local dev instances.
+# Local dev (bun, ports 3020/8020, legacy DB) is untouched; this stack owns
+# ports 8999/3999 (loopback-only), its own Postgres volume, and the tunnel.
+#
+# Update flow:  docker compose build && docker compose up -d
+# The pgdata_prod volume persists across updates (fresh only on first ever run).
+
+name: iwantajob-prod
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: iwantajob_prod
+    volumes:
+      - pgdata_prod:/var/lib/postgresql/data
+    # Deliberately no ports published: unreachable from the host, so it can
+    # never collide with (or be touched by) the legacy Postgres on localhost.
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d iwantajob_prod"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build: ./backend
+    env_file: .env
+    environment:
+      # Overrides the DATABASE_URL in .env (localhost/legacy) with the
+      # containerized fresh database. init_db() creates all tables on boot.
+      DATABASE_URL: postgresql+asyncpg://postgres:${POSTGRES_PASSWORD}@db:5432/iwantajob_prod
+    ports:
+      - "127.0.0.1:8999:8999"
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  frontend:
+    build: ./frontend
+    environment:
+      BACKEND_HOST: backend
+      BACKEND_PORT: "8999"
+    ports:
+      - "127.0.0.1:3999:3999"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    command: tunnel --config /etc/cloudflared/config.yml run a8b6e68a-0307-457d-a518-70ef4391b5ab
+    volumes:
+      - ./cloudflared:/etc/cloudflared:ro
+    depends_on:
+      - frontend
+    restart: unless-stopped
+
+volumes:
+  pgdata_prod:
