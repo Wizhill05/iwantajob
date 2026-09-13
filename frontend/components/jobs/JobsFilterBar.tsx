@@ -17,7 +17,7 @@ import {
 import { cn } from '@/lib/utils';
 
 export interface JobsFilterValues {
-  source: 'all' | 'indeed' | 'linkedin' | 'wellfound';
+  source: 'all' | 'indeed' | 'linkedin' | 'wellfound' | 'glassdoor';
   city: string;
   is_fresher_friendly: 'all' | 'true' | 'false';
   experience_level: 'all' | 'fresher' | 'experienced';
@@ -75,6 +75,7 @@ const SOURCE_OPTIONS: Array<{
   { id: 'indeed', label: 'Indeed' },
   { id: 'linkedin', label: 'LinkedIn' },
   { id: 'wellfound', label: 'Wellfound' },
+  { id: 'glassdoor', label: 'Glassdoor' },
 ];
 
 export function JobsFilterBar({

@@ -5,7 +5,7 @@ import Link from 'next/link';
 import type { ProviderParsingStats } from '@/lib/types';
 import { cn } from '@/lib/utils';
 
-export type ProviderKey = 'indeed' | 'linkedin' | 'wellfound';
+export type ProviderKey = 'indeed' | 'linkedin' | 'wellfound' | 'glassdoor';
 
 interface ProviderCardProps {
   provider: ProviderKey;
@@ -17,6 +17,7 @@ const PROVIDER_NAMES: Record<ProviderKey, string> = {
   indeed: 'Indeed',
   linkedin: 'LinkedIn',
   wellfound: 'Wellfound',
+  glassdoor: 'Glassdoor',
 };
 
 export function ProviderCard({

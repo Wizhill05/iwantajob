@@ -8,7 +8,7 @@ interface ActivityContextType {
   logs: LogEntry[];
   startProcess: (
     type: 'scrape' | 'parse',
-    provider: 'indeed' | 'linkedin' | 'wellfound',
+    provider: 'indeed' | 'linkedin' | 'wellfound' | 'glassdoor',
     params?: Record<string, any>
   ) => string;
   updateProcess: (id: string, updates: Partial<ActiveProcess>) => void;
@@ -63,7 +63,7 @@ export function ActivityProvider({ children }: { children: ReactNode }) {
   const startProcess = useCallback(
     (
       type: 'scrape' | 'parse',
-      provider: 'indeed' | 'linkedin' | 'wellfound',
+      provider: 'indeed' | 'linkedin' | 'wellfound' | 'glassdoor',
       params?: Record<string, any>
     ): string => {
       const id = `proc-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;

@@ -3,7 +3,7 @@
 import React from 'react';
 import { cn } from '@/lib/utils';
 
-export type ScraperTabKey = 'linkedin' | 'indeed' | 'wellfound';
+export type ScraperTabKey = 'linkedin' | 'indeed' | 'wellfound' | 'glassdoor';
 
 interface ScraperTabsProps {
   activeTab: ScraperTabKey;
@@ -19,6 +19,7 @@ const TABS: TabDefinition[] = [
   { key: 'linkedin', label: 'LinkedIn' },
   { key: 'indeed', label: 'Indeed' },
   { key: 'wellfound', label: 'Wellfound' },
+  { key: 'glassdoor', label: 'Glassdoor' },
 ];
 
 export function ScraperTabs({ activeTab, onTabChange }: ScraperTabsProps) {

@@ -138,6 +138,39 @@ class ApiClient {
   }
 
   /**
+   * Scrape Glassdoor job cards and descriptions.
+   */
+  async scrapeGlassdoor(params: {
+    keywords?: string;
+    location?: string;
+    start?: number;
+    limit?: number;
+    time_range?: string;
+    work_type?: string;
+    seniority?: string;
+    fetch_descriptions?: boolean;
+    persist?: boolean;
+  }): Promise<JobItem[]> {
+    const searchParams = new URLSearchParams();
+    if (params.keywords) searchParams.set('keywords', params.keywords);
+    if (params.location) searchParams.set('location', params.location);
+    if (params.start !== undefined) searchParams.set('start', String(params.start));
+    if (params.limit !== undefined) searchParams.set('limit', String(params.limit));
+    if (params.time_range) searchParams.set('time_range', params.time_range);
+    if (params.work_type) searchParams.set('work_type', params.work_type);
+    if (params.seniority) searchParams.set('seniority', params.seniority);
+    if (params.fetch_descriptions !== undefined) {
+      searchParams.set('fetch_descriptions', String(params.fetch_descriptions));
+    }
+    if (params.persist !== undefined) {
+      searchParams.set('persist', String(params.persist));
+    }
+
+    const qs = searchParams.toString();
+    return this.request<JobItem[]>(`/api/scrape/glassdoor${qs ? `?${qs}` : ''}`);
+  }
+
+  /**
    * Scrape Wellfound roles via SSR Apollo state.
    */
   async scrapeWellfound(params: {
@@ -186,7 +219,7 @@ class ApiClient {
    * live progress via `active_job` / `last_job`. Throws on 409 if already busy.
    */
   async triggerParse(
-    source: 'indeed' | 'linkedin' | 'wellfound',
+    source: 'indeed' | 'linkedin' | 'wellfound' | 'glassdoor',
     options: {
       batchSize?: number;
     } = {}
@@ -209,7 +242,7 @@ class ApiClient {
    */
   async clearBronze(): Promise<{
     status: string;
-    deleted: { raw_indeed_jobs: number; raw_linkedin_jobs: number; raw_wellfound_jobs: number };
+    deleted: { raw_indeed_jobs: number; raw_linkedin_jobs: number; raw_wellfound_jobs: number; raw_glassdoor_jobs: number };
     total_deleted: number;
     skipped_silver: number;
   }> {
@@ -306,6 +339,7 @@ class ApiClient {
       raw_indeed_jobs: number;
       raw_linkedin_jobs: number;
       raw_wellfound_jobs: number;
+      raw_glassdoor_jobs: number;
       unified_jobs: number;
     };
     total_deleted: number;
@@ -316,6 +350,7 @@ class ApiClient {
         raw_indeed_jobs: number;
         raw_linkedin_jobs: number;
         raw_wellfound_jobs: number;
+        raw_glassdoor_jobs: number;
         unified_jobs: number;
       };
       total_deleted: number;

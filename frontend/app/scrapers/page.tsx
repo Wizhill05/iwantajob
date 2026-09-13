@@ -15,6 +15,7 @@ import { ScraperTabs, type ScraperTabKey } from '@/components/scrapers/ScraperTa
 import { LinkedInTester } from '@/components/scrapers/LinkedInTester';
 import { IndeedTester } from '@/components/scrapers/IndeedTester';
 import { WellfoundTester } from '@/components/scrapers/WellfoundTester';
+import { GlassdoorTester } from '@/components/scrapers/GlassdoorTester';
 import { ScrapedJobCard } from '@/components/scrapers/ScrapedJobCard';
 import { RawJsonViewer } from '@/components/scrapers/RawJsonViewer';
 import { PageHero } from '@/components/layout/PageHero';
@@ -36,7 +37,7 @@ function ScrapersContent() {
   // Active tab derived from ?tab= or default to linkedin
   const tabParam = searchParams.get('tab') as ScraperTabKey | null;
   const initialTab: ScraperTabKey =
-    tabParam === 'indeed' || tabParam === 'wellfound' || tabParam === 'linkedin'
+    tabParam === 'indeed' || tabParam === 'wellfound' || tabParam === 'linkedin' || tabParam === 'glassdoor'
       ? tabParam
       : 'linkedin';
 
@@ -44,7 +45,7 @@ function ScrapersContent() {
 
   // Sync tab with URL parameter changes
   useEffect(() => {
-    if (tabParam && (tabParam === 'indeed' || tabParam === 'wellfound' || tabParam === 'linkedin')) {
+    if (tabParam && (tabParam === 'indeed' || tabParam === 'wellfound' || tabParam === 'linkedin' || tabParam === 'glassdoor')) {
       setActiveTab(tabParam);
     }
   }, [tabParam]);
@@ -136,6 +137,19 @@ function ScrapersContent() {
           <WellfoundTester
             onResults={(items, rawPayload, latencyMs) =>
               handleResults('Wellfound Apollo SSR', items, rawPayload, latencyMs)
+            }
+            onError={handleError}
+            onLoadingChange={setIsLoading}
+            viewMode={viewMode}
+            onViewModeChange={setViewMode}
+            resultsCount={executionState.items.length}
+          />
+        )}
+
+        {activeTab === 'glassdoor' && (
+          <GlassdoorTester
+            onResults={(items, rawPayload, latencyMs) =>
+              handleResults('Glassdoor Guest Search', items, rawPayload, latencyMs)
             }
             onError={handleError}
             onLoadingChange={setIsLoading}

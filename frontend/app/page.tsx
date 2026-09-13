@@ -100,7 +100,7 @@ export default function OverviewPage() {
             />
           </section>
 
-          {/* Scraper Provider Engine Cards (3 Separate Rounded Pills) */}
+          {/* Scraper Provider Engine Cards (4 Separate Rounded Pills) */}
           <section aria-label="Providers">
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-2.5 sm:gap-3">
               <ProviderCard
@@ -116,6 +116,11 @@ export default function OverviewPage() {
               <ProviderCard
                 provider="wellfound"
                 stats={parsingStatus?.wellfound}
+                isLoading={isLoading}
+              />
+              <ProviderCard
+                provider="glassdoor"
+                stats={parsingStatus?.glassdoor}
                 isLoading={isLoading}
               />
             </div>

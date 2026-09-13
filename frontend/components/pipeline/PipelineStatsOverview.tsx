@@ -27,7 +27,8 @@ export function PipelineStatsOverview({
   const indeedRaw = status?.indeed?.total_raw || 0;
   const linkedinRaw = status?.linkedin?.total_raw || 0;
   const wellfoundRaw = status?.wellfound?.total_raw || 0;
-  const totalRaw = indeedRaw + linkedinRaw + wellfoundRaw;
+  const glassdoorRaw = status?.glassdoor?.total_raw || 0;
+  const totalRaw = indeedRaw + linkedinRaw + wellfoundRaw + glassdoorRaw;
   const totalClean = status?.unified_total || 0;
   const unparsedBacklog = Math.max(0, totalRaw - totalClean);
 
@@ -60,7 +61,7 @@ export function PipelineStatsOverview({
             {totalRaw.toLocaleString()}
           </span>
           <span className="text-[11px] font-mono text-[#6b7280]">
-            3 scrapers
+            4 scrapers
           </span>
         </div>
         <div className="mt-2 pt-2 border-t border-[#262626] flex items-center justify-between text-[10px] font-mono text-[#9ca3af]">
@@ -69,6 +70,8 @@ export function PipelineStatsOverview({
           <span>In: <strong className="text-white">{linkedinRaw}</strong></span>
           <span>•</span>
           <span>Wf: <strong className="text-white">{wellfoundRaw}</strong></span>
+          <span>•</span>
+          <span>Gd: <strong className="text-white">{glassdoorRaw}</strong></span>
         </div>
       </Card>
 

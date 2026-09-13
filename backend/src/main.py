@@ -15,6 +15,7 @@ from src.models.db_entities import (
     RawIndeedJob,
     RawLinkedInJob,
     RawWellfoundJob,
+    RawGlassdoorJob,
     UserPreference,
     DEFAULT_PREFS,
 )
@@ -24,6 +25,7 @@ from src.services.raw_ingestion import (
     save_raw_indeed_job,
     save_raw_linkedin_job,
     save_raw_wellfound_job,
+    save_raw_glassdoor_job,
 )
 from src.services.db_deduplication import check_jobs_exist_in_db
 
@@ -39,6 +41,11 @@ from src.clients.wellfound import (
     SUPPORTED_WELLFOUND_LOCATIONS,
 )
 from src.clients.linkedin import LinkedInClient
+from src.clients.glassdoor import (
+    GlassdoorClient,
+    UpstreamBlockedError as GlassdoorBlockedError,
+    UpstreamRateLimitError as GlassdoorRateLimitError,
+)
 from src.models.job import JobSearchResponse, JobItem, ErrorDetail
 
 logging.basicConfig(level=logging.INFO)
@@ -63,6 +70,13 @@ TAGS_METADATA = [
         ),
     },
     {
+        "name": "Glassdoor",
+        "description": (
+            "**Glassdoor Guest Scraper Engine.** Queries Glassdoor public search and job listings using TLS ClientHello "
+            "impersonation (`chrome120`), concurrency semaphores, in-memory LRU detail caching, and anti-bot challenge detection."
+        ),
+    },
+    {
         "name": "Indeed",
         "description": (
             "**Indeed Mobile GraphQL Gateway.** Queries Indeed's private iOS app GraphQL endpoint using mobile client signatures "
@@ -78,7 +92,7 @@ TAGS_METADATA = [
 APP_DESCRIPTION = """
 ## Autonomous Job Discovery & Aggregation API
 
-Production-grade ingestion backend that aggregates, parses, and normalizes job postings across **LinkedIn**, **Wellfound**, and **Indeed** without requiring user authentication.
+Production-grade ingestion backend that aggregates, parses, and normalizes job postings across **Indeed**, **LinkedIn**, **Wellfound**, and **Glassdoor** without requiring user authentication.
 
 ### Core Architectural Capabilities
 
@@ -87,6 +101,7 @@ Production-grade ingestion backend that aggregates, parses, and normalizes job p
 * **Strict Anti-Detection Guardrails:**
   * **LinkedIn:** Offsets clamped to 975 to prevent `/authwall` redirects; in-memory 24h LRU detail caching; concurrency semaphore (`max=5`).
   * **Wellfound:** Validated canonical slug mapping; page ceiling clamped to 20; Cloudflare challenge anomaly detection.
+  * **Glassdoor:** Concurrency semaphore (`max=5`); 24h LRU detail cache; anti-bot challenge detection; normalized canonical URLs.
   * **Indeed:** Concurrency lock (1 worker); jittered rate limiter (1.2s–1.6s); exponential backoff retries; mobile API key rotation via `INDEED_API_KEY`.
 
 ### Interactive Visual Portals
@@ -129,6 +144,7 @@ app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 indeed_client = IndeedClient()
 wellfound_client = WellfoundClient()
 linkedin_client = LinkedInClient()
+glassdoor_client = GlassdoorClient()
 
 @app.get("/", include_in_schema=False)
 async def serve_index():
@@ -723,6 +739,150 @@ async def scrape_linkedin(
             },
         )
 
+@app.get(
+    "/api/scrape/glassdoor",
+    summary="Scrape Glassdoor Guest Postings & Details",
+    response_model=list[JobItem],
+    responses={
+        200: {"description": "Successfully scraped job cards and enriched descriptions from Glassdoor."},
+        400: {"model": ErrorDetail, "description": "Invalid query parameters."},
+        429: {"model": ErrorDetail, "description": "Glassdoor returned rate limit."},
+        500: {"model": ErrorDetail, "description": "Internal server error occurred while scraping Glassdoor."},
+    },
+    tags=["Glassdoor"],
+)
+async def scrape_glassdoor(
+    keywords: Annotated[
+        str,
+        Query(
+            description="Job keywords, skill tags, or role title (e.g. 'software engineer', 'ai engineer').",
+            examples=["software engineer"],
+        ),
+    ] = "software engineer",
+    location: Annotated[
+        str,
+        Query(
+            description="Target location or country (e.g. 'India', 'Bengaluru', 'Pune', 'Delhi').",
+            examples=["India"],
+        ),
+    ] = "India",
+    start: Annotated[
+        int,
+        Query(
+            ge=0,
+            le=975,
+            description="Pagination start offset.",
+            examples=[0],
+        ),
+    ] = 0,
+    limit: Annotated[
+        int,
+        Query(
+            ge=1,
+            le=100,
+            description="Maximum job items to return in this request.",
+            examples=[20],
+        ),
+    ] = 20,
+    time_range: Annotated[
+        str | None,
+        Query(
+            description="Time freshness filter: listing age in days (e.g. '1', '7', '14', '30').",
+            examples=["7"],
+        ),
+    ] = None,
+    work_type: Annotated[
+        str | None,
+        Query(
+            description="Workplace setting filter: '1' (On-site), '2' (Remote), '3' (Hybrid).",
+            examples=["2"],
+        ),
+    ] = None,
+    seniority: Annotated[
+        str | None,
+        Query(
+            description="Seniority level filter.",
+            examples=["entrylevel"],
+        ),
+    ] = None,
+    fetch_descriptions: Annotated[
+        bool,
+        Query(
+            description="Whether to fetch full job descriptions. Detail calls are cached in-memory for 24 hours.",
+            examples=[True],
+        ),
+    ] = True,
+    persist: Annotated[
+        bool,
+        Query(
+            description="When true, saves raw unmodified records into the raw_glassdoor_jobs table.",
+            examples=[True],
+        ),
+    ] = False,
+):
+    """
+    Queries Glassdoor's search listings and detail pages using browser TLS impersonation (`chrome120`).
+    """
+    try:
+        jobs = await glassdoor_client.search_jobs(
+            keywords=keywords,
+            location=location,
+            start=start,
+            limit=limit,
+            time_range=time_range,
+            work_type=work_type,
+            seniority=seniority,
+            fetch_descriptions=fetch_descriptions,
+        )
+        if persist:
+            for j in jobs:
+                await save_raw_glassdoor_job({
+                    "external_id": j.external_id,
+                    "title": j.title,
+                    "company_name": j.company_name,
+                    "company_logo_url": j.company_logo_url,
+                    "company_website": j.company_website,
+                    "location_raw": j.location_raw,
+                    "city": j.city,
+                    "is_remote": j.is_remote,
+                    "is_international": j.is_international,
+                    "url": j.url,
+                    "salary_raw": j.salary_raw,
+                    "description_html": j.description_html,
+                    "description_text": j.description_text,
+                    "posted_at": j.posted_at,
+                    "raw_payload": {"external_id": j.external_id, "title": j.title, "url": j.url},
+                })
+
+        descriptors = [
+            {"source": "glassdoor", "external_id": j.external_id, "url": j.url}
+            for j in jobs
+        ]
+        found_in_db = await check_jobs_exist_in_db(descriptors)
+        for j in jobs:
+            j.is_in_db = ("glassdoor", j.external_id) in found_in_db
+        return jobs
+    except GlassdoorRateLimitError as rle:
+        return JSONResponse(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            content={"error": "UPSTREAM_RATE_LIMITED", "detail": str(rle), "retry_after": rle.retry_after},
+        )
+    except GlassdoorBlockedError as be:
+        return JSONResponse(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            content={"error": "GLASSDOOR_BLOCKED", "detail": str(be), "retry_after": None},
+        )
+    except Exception as exc:
+        logger.error(f"Error executing Glassdoor scrape: {exc}", exc_info=True)
+        return JSONResponse(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            content={
+                "error": "GLASSDOOR_SCRAPE_ERROR",
+                "detail": str(exc),
+                "retry_after": None,
+            },
+        )
+
 # ==========================================
 # Parsing & Unified Database Endpoints
 # ==========================================
@@ -777,6 +937,21 @@ async def parse_wellfound(
 ):
     """Starts a background parse of unparsed raw Wellfound records into unified_jobs. Queues behind any running pipeline operation; returns 409 if one is already running or queued."""
     started = ParserService.start_parse("wellfound", batch_size=batch_size, use_llm=use_llm)
+    if started is None:
+        raise HTTPException(status_code=409, detail="PIPELINE_BUSY: only one scraping operation can run at a time and another operation is already running or queued — see /api/status/parsing")
+    return started
+
+@app.post(
+    "/api/parse/glassdoor",
+    summary="Trigger Gemini LLM Parsing for Glassdoor Raw Jobs",
+    tags=["Glassdoor"],
+)
+async def parse_glassdoor(
+    batch_size: Annotated[int, Query(ge=1, le=500, description="Max raw jobs to parse in this run")] = 50,
+    use_llm: Annotated[bool, Query(description="Whether to use Gemini LLM batch parsing")] = True,
+):
+    """Starts a background parse of unparsed raw Glassdoor records into unified_jobs. Queues behind any running pipeline operation; returns 409 if one is already running or queued."""
+    started = ParserService.start_parse("glassdoor", batch_size=batch_size, use_llm=use_llm)
     if started is None:
         raise HTTPException(status_code=409, detail="PIPELINE_BUSY: only one scraping operation can run at a time and another operation is already running or queued — see /api/status/parsing")
     return started
@@ -922,7 +1097,7 @@ async def auto_triage_jobs(
     tags=["System"],
 )
 async def get_unified_jobs(
-    source: Annotated[str | None, Query(description="Filter by source: 'indeed', 'linkedin', 'wellfound'")] = None,
+    source: Annotated[str | None, Query(description="Filter by source: 'indeed', 'linkedin', 'wellfound', 'glassdoor'")] = None,
     city: Annotated[str | None, Query(description="Filter by lowercase city slug")] = None,
     is_fresher_friendly: Annotated[bool | None, Query(description="Filter strictly for freshers (min_years <= 1)")] = None,
     experience_level: Annotated[str | None, Query(description="Filter by experience level: 'all', 'fresher' (min_years <= 1), 'experienced' (min_years > 1; unspecified included in both)")] = None,
@@ -1153,6 +1328,7 @@ async def delete_unified_jobs(
             "indeed": RawIndeedJob,
             "linkedin": RawLinkedInJob,
             "wellfound": RawWellfoundJob,
+            "glassdoor": RawGlassdoorJob,
         }
         bronze_deleted = 0
 
@@ -1202,6 +1378,7 @@ async def clear_bronze():
         "indeed": RawIndeedJob,
         "linkedin": RawLinkedInJob,
         "wellfound": RawWellfoundJob,
+        "glassdoor": RawGlassdoorJob,
     }
 
     async with async_session_maker() as session:
@@ -1260,6 +1437,7 @@ async def clear_bronze():
             "raw_indeed_jobs": deleted_counts["indeed"],
             "raw_linkedin_jobs": deleted_counts["linkedin"],
             "raw_wellfound_jobs": deleted_counts["wellfound"],
+            "raw_glassdoor_jobs": deleted_counts["glassdoor"],
         },
         "total_deleted": sum(deleted_counts.values()),
         "skipped_silver": skipped,
@@ -1279,6 +1457,7 @@ async def reset_database():
         await session.execute(delete(RawIndeedJob))
         await session.execute(delete(RawLinkedInJob))
         await session.execute(delete(RawWellfoundJob))
+        await session.execute(delete(RawGlassdoorJob))
         await session.commit()
         return {"status": "success", "message": "All raw and unified job tables have been reset to 0."}
 
@@ -1295,7 +1474,7 @@ async def clear_test_data():
     produce bare numeric/hex IDs, so prefixed IDs only ever come from
     tester UIs and pytest seeds. Safe to run at any time.
     """
-    test_id_pattern = "^(test_|wf_|li_)"
+    test_id_pattern = "^(test_|wf_|li_|gd_)"
     async with async_session_maker() as session:
         res_indeed = await session.execute(
             text("DELETE FROM raw_indeed_jobs WHERE external_id ~ :pat").bindparams(pat=test_id_pattern)
@@ -1305,6 +1484,9 @@ async def clear_test_data():
         )
         res_wellfound = await session.execute(
             text("DELETE FROM raw_wellfound_jobs WHERE external_id ~ :pat").bindparams(pat=test_id_pattern)
+        )
+        res_glassdoor = await session.execute(
+            text("DELETE FROM raw_glassdoor_jobs WHERE external_id ~ :pat").bindparams(pat=test_id_pattern)
         )
         res_unified = await session.execute(
             text("DELETE FROM unified_jobs WHERE external_id ~ :pat").bindparams(pat=test_id_pattern)
@@ -1317,12 +1499,14 @@ async def clear_test_data():
             "raw_indeed_jobs": res_indeed.rowcount,
             "raw_linkedin_jobs": res_linkedin.rowcount,
             "raw_wellfound_jobs": res_wellfound.rowcount,
+            "raw_glassdoor_jobs": res_glassdoor.rowcount,
             "unified_jobs": res_unified.rowcount,
         },
         "total_deleted": (
             res_indeed.rowcount
             + res_linkedin.rowcount
             + res_wellfound.rowcount
+            + res_glassdoor.rowcount
             + res_unified.rowcount
         ),
     }

@@ -28,8 +28,10 @@ export function PipelineFlowDiagram({ status, isLoading = false }: PipelineFlowD
   const linkedinUnparsed = status?.linkedin?.unparsed || 0;
   const wellfoundRaw = status?.wellfound?.total_raw || 0;
   const wellfoundUnparsed = status?.wellfound?.unparsed || 0;
+  const glassdoorRaw = status?.glassdoor?.total_raw || 0;
+  const glassdoorUnparsed = status?.glassdoor?.unparsed || 0;
 
-  const totalRaw = indeedRaw + linkedinRaw + wellfoundRaw;
+  const totalRaw = indeedRaw + linkedinRaw + wellfoundRaw + glassdoorRaw;
   const totalClean = status?.unified_total || 0;
 
   return (
@@ -128,6 +130,25 @@ export function PipelineFlowDiagram({ status, isLoading = false }: PipelineFlowD
               <span className="text-[#9ca3af]">Total: <strong className="text-white font-mono">{wellfoundRaw}</strong></span>
               <span className={cn('px-1.5 py-0.2 rounded border text-[10px] font-sans', wellfoundUnparsed > 0 ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' : 'bg-[#3ecf8e]/10 text-[#3ecf8e] border-[#3ecf8e]/20')}>
                 <span className="font-mono">{wellfoundUnparsed}</span> unparsed
+              </span>
+            </div>
+          </div>
+
+          {/* Table 4: raw_glassdoor_jobs */}
+          <div className="p-3.5 rounded-lg bg-[#141414] border border-[#262626] hover:border-[#383838] transition-all">
+            <div className="flex items-start justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <Database className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                <span className="text-xs font-mono font-medium text-white">raw_glassdoor_jobs</span>
+              </div>
+              <span className="text-[10px] font-sans px-1.5 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
+                Guest Search
+              </span>
+            </div>
+            <div className="mt-2.5 flex items-center justify-between text-[11px] font-sans">
+              <span className="text-[#9ca3af]">Total: <strong className="text-white font-mono">{glassdoorRaw}</strong></span>
+              <span className={cn('px-1.5 py-0.2 rounded border text-[10px] font-sans', glassdoorUnparsed > 0 ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' : 'bg-[#3ecf8e]/10 text-[#3ecf8e] border-[#3ecf8e]/20')}>
+                <span className="font-mono">{glassdoorUnparsed}</span> unparsed
               </span>
             </div>
           </div>

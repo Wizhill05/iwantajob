@@ -139,6 +139,21 @@ export function DbStatsTable({ onRefresh, autoRefreshInterval }: DbStatsTablePro
       description: 'Lossless raw staging store for Wellfound Next.js SSR Apollo nodes',
     },
     {
+      tableName: 'raw_glassdoor_jobs',
+      tier: 'BRONZE',
+      tierLabel: 'Raw Ingestion',
+      sourceLabel: 'Glassdoor Guest Search',
+      totalRecords: parsingStatus?.glassdoor?.total_raw ?? 0,
+      parsedRecords: parsingStatus?.glassdoor?.parsed ?? 0,
+      pendingRecords: parsingStatus?.glassdoor?.unparsed ?? 0,
+      status: (parsingStatus?.glassdoor?.unparsed ?? 0) === 0 ? 'synced' : 'pending',
+      statusLabel:
+        (parsingStatus?.glassdoor?.unparsed ?? 0) === 0
+          ? 'Synchronized'
+          : `${parsingStatus?.glassdoor?.unparsed} Pending`,
+      description: 'Lossless raw staging store for Glassdoor job search & detail payloads',
+    },
+    {
       tableName: 'unified_jobs',
       tier: 'SILVER',
       tierLabel: 'Clean Standardized',
@@ -155,12 +170,14 @@ export function DbStatsTable({ onRefresh, autoRefreshInterval }: DbStatsTablePro
   const totalRawCount =
     (parsingStatus?.indeed?.total_raw ?? 0) +
     (parsingStatus?.linkedin?.total_raw ?? 0) +
-    (parsingStatus?.wellfound?.total_raw ?? 0);
+    (parsingStatus?.wellfound?.total_raw ?? 0) +
+    (parsingStatus?.glassdoor?.total_raw ?? 0);
 
   const totalPendingCount =
     (parsingStatus?.indeed?.unparsed ?? 0) +
     (parsingStatus?.linkedin?.unparsed ?? 0) +
-    (parsingStatus?.wellfound?.unparsed ?? 0);
+    (parsingStatus?.wellfound?.unparsed ?? 0) +
+    (parsingStatus?.glassdoor?.unparsed ?? 0);
 
   const totalUnifiedCount = parsingStatus?.unified_total ?? 0;
 

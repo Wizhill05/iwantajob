@@ -40,6 +40,10 @@ const SOURCE_CONFIG = {
     label: 'Wellfound',
     badgeClass: 'text-rose-400 bg-rose-500/10 border-rose-500/30',
   },
+  glassdoor: {
+    label: 'Glassdoor',
+    badgeClass: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30',
+  },
 };
 
 export function JobDescriptionModal({

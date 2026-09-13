@@ -5,6 +5,7 @@ import {
   Linkedin,
   Database,
   Building,
+  Shop,
   RefreshDouble,
   WarningTriangle,
   Trash,
@@ -17,14 +18,14 @@ import { useActivity } from '@/context/ActivityContext';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
 
-export type PipelineProvider = 'linkedin' | 'indeed' | 'wellfound';
+export type PipelineProvider = 'linkedin' | 'indeed' | 'wellfound' | 'glassdoor';
 
 interface SquareParserActionsProps {
   status: ParsingStatus | null;
   onParseComplete?: () => void;
 }
 
-const ALL_PROVIDERS: PipelineProvider[] = ['linkedin', 'indeed', 'wellfound'];
+const ALL_PROVIDERS: PipelineProvider[] = ['linkedin', 'indeed', 'wellfound', 'glassdoor'];
 
 // Backend rejects with 409 + a PIPELINE_BUSY detail while another scraping
 // operation is running/queued.
@@ -58,6 +59,13 @@ const PROVIDER_META: Record<
     text: 'text-rose-400',
     tint: 'bg-rose-500/10 text-rose-400',
     hoverRing: 'hover:border-rose-500/80',
+  },
+  glassdoor: {
+    label: 'Glassdoor',
+    ring: 'border-emerald-500',
+    text: 'text-emerald-400',
+    tint: 'bg-emerald-500/10 text-emerald-400',
+    hoverRing: 'hover:border-emerald-500/80',
   },
 };
 
@@ -240,7 +248,8 @@ export function SquareParserActions({
   const totalUnparsed =
     (status?.indeed?.unparsed || 0) +
     (status?.linkedin?.unparsed || 0) +
-    (status?.wellfound?.unparsed || 0);
+    (status?.wellfound?.unparsed || 0) +
+    (status?.glassdoor?.unparsed || 0);
 
   const runningProvider = (activeJob?.provider ?? pendingProvider) as
     | PipelineProvider
@@ -269,8 +278,8 @@ export function SquareParserActions({
 
   return (
     <div className="space-y-6">
-      {/* 4 Circular Action Buttons in a single row */}
-      <div className="grid grid-cols-4 gap-2 sm:gap-6 place-items-center py-1">
+      {/* 5 Circular Action Buttons in a single row */}
+      <div className="grid grid-cols-5 gap-2 sm:gap-4 place-items-center py-1">
         {/* 1. Parse All */}
         <div className="flex flex-col items-center gap-2">
           <button
@@ -296,7 +305,7 @@ export function SquareParserActions({
           </span>
         </div>
 
-        {/* 2-4. Per-provider circles */}
+        {/* 2-5. Per-provider circles */}
         {ALL_PROVIDERS.map((provider) => {
           const meta = PROVIDER_META[provider];
           const isRunning = runningProvider === provider;
@@ -312,6 +321,7 @@ export function SquareParserActions({
                 {provider === 'linkedin' && <Linkedin className={cn('w-6 h-6', meta.text, isRunning && 'animate-pulse')} />}
                 {provider === 'indeed' && <Database className={cn('w-6 h-6', meta.text, isRunning && 'animate-pulse')} />}
                 {provider === 'wellfound' && <Building className={cn('w-6 h-6', meta.text, isRunning && 'animate-pulse')} />}
+                {provider === 'glassdoor' && <Shop className={cn('w-6 h-6', meta.text, isRunning && 'animate-pulse')} />}
               </button>
               <span className="text-[11px] font-heading font-semibold text-white">{meta.label}</span>
               <span className="text-[10px] font-mono text-[#9ca3af] -mt-1">{statusLine(provider)}</span>
@@ -442,7 +452,7 @@ export function SquareParserActions({
                 </h3>
                 <p className="text-xs text-[#9ca3af] leading-relaxed font-sans">
                   This permanently deletes <strong className="text-rose-300">all unparsed raw jobs</strong>{' '}
-                  from the bronze staging tables (Indeed, LinkedIn and Wellfound). Raw jobs that were
+                  from the bronze staging tables (Indeed, LinkedIn, Wellfound and Glassdoor). Raw jobs that were
                   already parsed into unified jobs are kept, along with the unified jobs themselves.
                   This action cannot be undone.
                 </p>

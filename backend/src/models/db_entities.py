@@ -7,6 +7,7 @@ from sqlalchemy import (
     Boolean,
     BigInteger,
     Integer,
+    Numeric,
     DateTime,
     Text,
     func,
@@ -79,6 +80,29 @@ class RawWellfoundJob(Base):
     native_years_max = Column(Integer, nullable=True)
     live_start_at = Column(BigInteger, nullable=True)
     url = Column(String, nullable=False)
+    description_html = Column(Text, nullable=True)
+    description_text = Column(Text, nullable=False)
+    posted_at = Column(DateTime(timezone=True), nullable=True)
+    raw_payload = Column(JSONB, nullable=False)
+    scraped_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+class RawGlassdoorJob(Base):
+    __tablename__ = "raw_glassdoor_jobs"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    external_id = Column(String, unique=True, nullable=False, index=True)
+    title = Column(String, nullable=False)
+    company_name = Column(String, nullable=False)
+    company_logo_url = Column(String, nullable=True)
+    company_website = Column(String, nullable=True)
+    company_rating = Column(Numeric(2, 1), nullable=True)
+    location_raw = Column(String, nullable=False)
+    city = Column(String, nullable=True)
+    is_remote = Column(Boolean, default=False, nullable=False)
+    is_international = Column(Boolean, default=False, nullable=False)
+    url = Column(String, nullable=False)
+    salary_raw = Column(String, nullable=True)
+    easy_apply_available = Column(Boolean, default=False, nullable=False)
     description_html = Column(Text, nullable=True)
     description_text = Column(Text, nullable=False)
     posted_at = Column(DateTime(timezone=True), nullable=True)

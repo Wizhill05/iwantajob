@@ -62,6 +62,22 @@ def normalize_job_url(url: str | None) -> str:
             path_val = f"/jobs/{slug_match.group(1)}" if slug_match else f"/jobs/{job_id}"
             return f"https://wellfound.com{path_val}"
 
+    # Canonicalize Glassdoor URLs:
+    # https://www.glassdoor.com/job-listing/-jl.htm?jl=12345678 -> https://www.glassdoor.com/job-listing/-jl.htm?jl=12345678
+    if "glassdoor.com" in netloc:
+        query_dict = dict(parse_qsl(parsed.query, keep_blank_values=False))
+        jl = query_dict.get("jl") or query_dict.get("jobListingId")
+        if not jl:
+            jl_match = re.search(r"[-_]jl\.htm\?jl=(\d+)", clean)
+            if jl_match:
+                jl = jl_match.group(1)
+            else:
+                num_match = re.search(r"/partner/jobListing\.htm\?.*jobListingId=(\d+)", clean)
+                if num_match:
+                    jl = num_match.group(1)
+        if jl:
+            return f"https://www.glassdoor.com/job-listing/-jl.htm?jl={jl}"
+
     # General URL cleaning: strip tracking parameters
     filtered_queries = [
         (k, v) for k, v in parse_qsl(parsed.query, keep_blank_values=True)

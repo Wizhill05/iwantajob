@@ -3,7 +3,7 @@ from typing import Any
 from sqlalchemy import select, or_
 from sqlalchemy.dialects.postgresql import insert
 from src.core.database import async_session_maker
-from src.models.db_entities import RawIndeedJob, RawLinkedInJob, RawWellfoundJob, UnifiedJob
+from src.models.db_entities import RawIndeedJob, RawLinkedInJob, RawWellfoundJob, RawGlassdoorJob, UnifiedJob
 from src.utils.url_normalizer import normalize_job_url
 
 logger = logging.getLogger(__name__)
@@ -193,6 +193,71 @@ async def save_raw_wellfound_job(data: dict[str, Any]) -> bool:
             posted_at=data.get("posted_at"),
             raw_payload=data.get("raw_payload", {}),
         ).on_conflict_do_nothing(index_elements=[RawWellfoundJob.external_id])
+
+        await session.execute(stmt)
+        await session.commit()
+        return True
+
+
+async def save_raw_glassdoor_job(data: dict[str, Any]) -> bool:
+    """
+    Saves a raw Glassdoor job if it doesn't already exist in raw or unified tables.
+    Returns True if newly inserted, False if skipped as duplicate.
+    """
+    external_id = data["external_id"]
+    job_url = data["url"]
+    norm_url = normalize_job_url(job_url)
+
+    async with async_session_maker() as session:
+        # Check raw_glassdoor_jobs
+        exists_raw = await session.execute(
+            select(RawGlassdoorJob.id).where(
+                or_(
+                    RawGlassdoorJob.external_id == external_id,
+                    RawGlassdoorJob.url == job_url,
+                    RawGlassdoorJob.url == norm_url,
+                )
+            )
+        )
+        if exists_raw.scalar_one_or_none() is not None:
+            logger.info(f"Glassdoor job {external_id} already exists in raw_glassdoor_jobs, skipping duplicate.")
+            return False
+
+        # Check unified_jobs
+        exists_unified = await session.execute(
+            select(UnifiedJob.id).where(
+                or_(
+                    (UnifiedJob.source == "glassdoor") & (UnifiedJob.external_id == external_id),
+                    UnifiedJob.url == job_url,
+                    UnifiedJob.url == norm_url,
+                )
+            )
+        )
+        if exists_unified.scalar_one_or_none() is not None:
+            logger.info(f"Glassdoor job {external_id} already exists in unified_jobs, skipping duplicate.")
+            return False
+
+        company_name = data.get("company_name") or "Company"
+        title = data.get("title") or "Unknown"
+        stmt = insert(RawGlassdoorJob).values(
+            external_id=external_id,
+            title=title,
+            company_name=company_name,
+            company_logo_url=data.get("company_logo_url"),
+            company_website=data.get("company_website"),
+            company_rating=data.get("company_rating"),
+            location_raw=data["location_raw"],
+            city=data.get("city"),
+            is_remote=data.get("is_remote", False),
+            is_international=data.get("is_international", False),
+            url=norm_url or job_url,
+            salary_raw=data.get("salary_raw"),
+            easy_apply_available=data.get("easy_apply_available", False),
+            description_html=data.get("description_html"),
+            description_text=data["description_text"],
+            posted_at=data.get("posted_at"),
+            raw_payload=data.get("raw_payload", {}),
+        ).on_conflict_do_nothing(index_elements=[RawGlassdoorJob.external_id])
 
         await session.execute(stmt)
         await session.commit()

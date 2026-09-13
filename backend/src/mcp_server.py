@@ -31,9 +31,9 @@ mcp = MCPServer(
     instructions=(
         "Tools for the iwantajob job discovery platform. Every tool maps to a backend REST endpoint "
         f"at {BASE_URL}. Typical agent workflows:\n"
-        "- Scrape: scrape_indeed / scrape_linkedin / scrape_wellfound (or scrape_all_providers), "
+        "- Scrape: scrape_indeed / scrape_linkedin / scrape_wellfound / scrape_glassdoor (or scrape_all_providers), "
         "with persist=true to stage raw results in bronze.\n"
-        "- Parse: parse_indeed_jobs / parse_linkedin_jobs / parse_wellfound_jobs to promote bronze rows "
+        "- Parse: parse_indeed_jobs / parse_linkedin_jobs / parse_wellfound_jobs / parse_glassdoor_jobs to promote bronze rows "
         "into the clean unified_jobs table; get_parsing_status to watch progress.\n"
         "- Search & organize: search_unified_jobs, then save_jobs / archive_jobs (and unsave_jobs / "
         "unarchive_jobs to undo), run_auto_triage for preference-driven sorting.\n"
@@ -185,15 +185,47 @@ async def scrape_wellfound_company(company_slug: str, limit: int = 50) -> str:
 
 
 @mcp.tool()
+async def scrape_glassdoor(
+    keywords: str = "software engineer",
+    location: str = "India",
+    start: int = 0,
+    limit: int = 20,
+    time_range: str | None = None,
+    work_type: str | None = None,
+    seniority: str | None = None,
+    fetch_descriptions: bool = True,
+    persist: bool = False,
+) -> str:
+    """Scrape jobs live from Glassdoor using TLS browser impersonation.
+
+    Args:
+        keywords: Role title or keywords.
+        location: Target location (e.g. 'India', 'Bengaluru').
+        start: Pagination start offset (capped at 975).
+        limit: Max jobs to return (1-100).
+        time_range: Listing age in days ('1', '7', '14', '30').
+        work_type: Workplace setting ('1'=On-site, '2'=Remote, '3'=Hybrid).
+        seniority: Seniority filter (e.g. 'entrylevel', 'mid', 'senior').
+        fetch_descriptions: Fetch full descriptions with 24h LRU cache.
+        persist: When true, also save raw records into raw_glassdoor_jobs (bronze).
+    """
+    return await _request("GET", "/api/scrape/glassdoor", params={
+        "keywords": keywords, "location": location, "start": start, "limit": limit,
+        "time_range": time_range, "work_type": work_type, "seniority": seniority,
+        "fetch_descriptions": fetch_descriptions, "persist": persist,
+    })
+
+
+@mcp.tool()
 async def scrape_all_providers(
     keywords: str = "ai engineer",
     location: str = "India",
     limit: int = 20,
     persist: bool = True,
 ) -> str:
-    """Scrape Indeed, LinkedIn, and Wellfound together for the same keywords/location.
+    """Scrape Indeed, LinkedIn, Wellfound, and Glassdoor together for the same keywords/location.
 
-    Convenience wrapper running all three scrape endpoints sequentially and
+    Convenience wrapper running all four scrape endpoints sequentially and
     returning each provider's result. Set persist=true to stage everything in
     the bronze raw tables for later parsing.
     """
@@ -201,6 +233,7 @@ async def scrape_all_providers(
     results["indeed"] = json.loads(await scrape_indeed(what=keywords, where=location, limit=limit, persist=persist))
     results["linkedin"] = json.loads(await scrape_linkedin(keywords=keywords, location=location, limit=limit, persist=persist))
     results["wellfound"] = json.loads(await scrape_wellfound(role=keywords, location=location.lower(), persist=persist))
+    results["glassdoor"] = json.loads(await scrape_glassdoor(keywords=keywords, location=location, limit=limit, persist=persist))
     return json.dumps(results, indent=2, default=str)
 
 
@@ -264,6 +297,18 @@ async def parse_wellfound_jobs(batch_size: int = 50, use_llm: bool = True) -> st
 
 
 @mcp.tool()
+async def parse_glassdoor_jobs(batch_size: int = 50, use_llm: bool = True) -> str:
+    """Promote unparsed raw Glassdoor rows into unified_jobs (background task).
+
+    Args:
+        batch_size: Max raw jobs to parse this run (1-500).
+        use_llm: Use Gemini LLM fallback when regex can't extract salary/experience.
+    Returns 409 if another pipeline operation is running or queued.
+    """
+    return await _trigger_parse("glassdoor", batch_size, use_llm)
+
+
+@mcp.tool()
 async def reparse_unified_jobs(
     only_missing_experience: bool = True,
     use_llm: bool = True,
@@ -302,7 +347,7 @@ async def search_unified_jobs(
     """Query clean, parsed jobs from the unified database with structured filters.
 
     Args:
-        source: 'indeed', 'linkedin', or 'wellfound'.
+        source: 'indeed', 'linkedin', 'wellfound', or 'glassdoor'.
         city: Lowercase city slug (e.g. 'bengaluru', 'pune', 'delhi-ncr').
         is_fresher_friendly: Strict fresher flag filter (min_years <= 1).
         experience_level: 'fresher' (min_years <= 1 or unspecified) or 'experienced' (min_years > 1 or unspecified).

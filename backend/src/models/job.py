@@ -57,7 +57,7 @@ class JobItem(BaseModel):
     )
     source: str = Field(
         default="indeed",
-        description="Ingestion aggregator source platform. One of: 'indeed', 'wellfound', 'linkedin'.",
+        description="Ingestion aggregator source platform. One of: 'indeed', 'wellfound', 'linkedin', 'glassdoor'.",
         examples=["linkedin"],
     )
     location_raw: str = Field(

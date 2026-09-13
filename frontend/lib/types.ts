@@ -8,7 +8,7 @@ export interface JobItem {
   external_id: string;
   title: string;
   company_name: string;
-  source: 'indeed' | 'linkedin' | 'wellfound';
+  source: 'indeed' | 'linkedin' | 'wellfound' | 'glassdoor';
   location_raw: string;
   city?: string | null;
   is_remote: boolean;
@@ -25,6 +25,7 @@ export interface JobItem {
   experience_max_years?: number | null;
   company_logo_url?: string | null;
   company_website?: string | null;
+  company_rating?: number | null;
   easy_apply_available?: boolean;
   is_in_db?: boolean;
   attributes?: Array<{ key?: string; label?: string }> | Record<string, any>[];
@@ -43,7 +44,7 @@ export interface JobSearchResponse {
 
 export interface UnifiedJobItem {
   id: string;
-  source: 'indeed' | 'linkedin' | 'wellfound';
+  source: 'indeed' | 'linkedin' | 'wellfound' | 'glassdoor';
   external_id: string;
   raw_ref_id?: string;
   url: string;
@@ -76,7 +77,7 @@ export interface ProviderParsingStats {
 }
 
 export interface PipelineRunJob {
-  provider: 'indeed' | 'linkedin' | 'wellfound' | 'unified';
+  provider: 'indeed' | 'linkedin' | 'wellfound' | 'glassdoor' | 'unified';
   kind: 'parse' | 'reparse';
   /** 'queued' while waiting for the previous pipeline operation to finish. */
   state?: 'queued' | 'running' | 'finished';
@@ -97,6 +98,7 @@ export interface ParsingStatus {
   indeed: ProviderParsingStats;
   linkedin: ProviderParsingStats;
   wellfound: ProviderParsingStats;
+  glassdoor: ProviderParsingStats;
   unified_total: number;
   active_job: PipelineRunJob | null;
   last_job: LastPipelineJob | null;
@@ -114,7 +116,7 @@ export interface WellfoundRolesResponse {
 }
 
 export interface ParseResult {
-  source: 'indeed' | 'linkedin' | 'wellfound';
+  source: 'indeed' | 'linkedin' | 'wellfound' | 'glassdoor';
   processed: number;
   promoted_to_unified: number;
   errors: string[];
@@ -131,7 +133,7 @@ export interface ParseStartResult {
 export interface ActiveProcess {
   id: string;
   type: 'scrape' | 'parse';
-  provider: 'indeed' | 'linkedin' | 'wellfound';
+  provider: 'indeed' | 'linkedin' | 'wellfound' | 'glassdoor';
   startTime: number;
   status: 'running' | 'completed' | 'failed';
   message?: string;
@@ -151,12 +153,12 @@ export interface LogEntry {
 }
 
 export interface ScraperQueryPayload {
-  provider: 'indeed' | 'linkedin' | 'wellfound';
+  provider: 'indeed' | 'linkedin' | 'wellfound' | 'glassdoor';
   params: Record<string, any>;
 }
 
 export interface UnifiedJobsQueryParams {
-  source?: 'indeed' | 'linkedin' | 'wellfound';
+  source?: 'indeed' | 'linkedin' | 'wellfound' | 'glassdoor';
   city?: string;
   is_fresher_friendly?: boolean;
   experience_level?: 'all' | 'fresher' | 'experienced';
