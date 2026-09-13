@@ -2,10 +2,6 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import {
-  Linkedin,
-  Database,
-  Building,
-  Shop,
   RefreshDouble,
   WarningTriangle,
   Trash,
@@ -13,6 +9,8 @@ import {
   Minus,
   Plus,
 } from 'iconoir-react';
+import { FaLinkedin } from 'react-icons/fa6';
+import { SiIndeed, SiWellfound, SiGlassdoor } from 'react-icons/si';
 import type { LastPipelineJob, ParsingStatus } from '@/lib/types';
 import { useActivity } from '@/context/ActivityContext';
 import { api } from '@/lib/api';
@@ -318,10 +316,10 @@ export function SquareParserActions({
                 className={circleClass(meta, isRunning)}
                 title={`Parse ${meta.label} raw jobs`}
               >
-                {provider === 'linkedin' && <Linkedin className={cn('w-6 h-6', meta.text, isRunning && 'animate-pulse')} />}
-                {provider === 'indeed' && <Database className={cn('w-6 h-6', meta.text, isRunning && 'animate-pulse')} />}
-                {provider === 'wellfound' && <Building className={cn('w-6 h-6', meta.text, isRunning && 'animate-pulse')} />}
-                {provider === 'glassdoor' && <Shop className={cn('w-6 h-6', meta.text, isRunning && 'animate-pulse')} />}
+                {provider === 'linkedin' && <FaLinkedin className={cn('w-6 h-6', meta.text, isRunning && 'animate-pulse')} />}
+                {provider === 'indeed' && <SiIndeed className={cn('w-6 h-6', meta.text, isRunning && 'animate-pulse')} />}
+                {provider === 'wellfound' && <SiWellfound className={cn('w-6 h-6', meta.text, isRunning && 'animate-pulse')} />}
+                {provider === 'glassdoor' && <SiGlassdoor className={cn('w-6 h-6', meta.text, isRunning && 'animate-pulse')} />}
               </button>
               <span className="text-[11px] font-heading font-semibold text-white">{meta.label}</span>
               <span className="text-[10px] font-mono text-[#9ca3af] -mt-1">{statusLine(provider)}</span>

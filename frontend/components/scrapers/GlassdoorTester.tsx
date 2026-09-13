@@ -36,8 +36,8 @@ const ROLE_SUGGESTIONS = [
   'Machine Learning Engineer',
   'Data Scientist',
   'DevOps Engineer',
-  'Mobile Engineer',
-  'Product Manager',
+  'Python Developer',
+  'AI Engineer Intern',
 ];
 
 const LOCATION_SUGGESTIONS = [
@@ -63,14 +63,17 @@ export function GlassdoorTester({
 }: GlassdoorTesterProps) {
   const { startProcess, finishProcess } = useActivity();
 
+  // Primary parameter states (empty by default on load)
   const [keywords, setKeywords] = useState('');
   const [location, setLocation] = useState('');
 
+  // Dropdown suggestions states
   const [showRoleSuggestions, setShowRoleSuggestions] = useState(false);
   const [showLocSuggestions, setShowLocSuggestions] = useState(false);
   const roleRef = useRef<HTMLDivElement>(null);
   const locRef = useRef<HTMLDivElement>(null);
 
+  // Secondary parameter states (inside Filters drawer)
   const [start, setStart] = useState<number>(0);
   const [limit, setLimit] = useState<number>(10);
   const [timeRange, setTimeRange] = useState<string>('');
@@ -80,8 +83,10 @@ export function GlassdoorTester({
   const [persist, setPersist] = useState<boolean>(false);
   const [isFilterOpen, setIsFilterOpen] = useState<boolean>(false);
 
+  // Status states
   const [loading, setLoading] = useState(false);
 
+  // Close suggestions on outside click
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (roleRef.current && !roleRef.current.contains(event.target as Node)) {
@@ -103,12 +108,6 @@ export function GlassdoorTester({
     (seniority !== '' ? 1 : 0) +
     (!fetchDescriptions ? 1 : 0) +
     (persist ? 1 : 0);
-
-  const handleStartChange = (val: number) => {
-    setStart(Math.max(0, val));
-  };
-
-  const isStartExceeded = start > 975;
 
   const filteredRoles = ROLE_SUGGESTIONS.filter((r) =>
     r.toLowerCase().includes(keywords.toLowerCase().trim())
@@ -187,177 +186,232 @@ export function GlassdoorTester({
   };
 
   return (
-    <div className="rounded-xl border border-[#262626] bg-[#141414] p-5 shadow-2xl transition-all duration-200">
-      <form onSubmit={handleRun} className="space-y-4">
-        <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-center">
-          <div className="md:col-span-6 relative" ref={roleRef}>
-            <div className="relative flex items-center">
-              <span className="absolute left-3.5 text-[#6b7280] pointer-events-none">
-                <Search className="w-4 h-4" />
-              </span>
-              <input
-                type="text"
-                value={keywords}
-                onChange={(e) => {
-                  setKeywords(e.target.value);
-                  setShowRoleSuggestions(true);
-                }}
-                onFocus={() => setShowRoleSuggestions(true)}
-                placeholder="e.g. Software Engineer, AI Engineer..."
-                className="w-full pl-10 pr-9 py-2.5 bg-[#1a1a1a] border border-[#2a2a2a] rounded-lg text-sm text-white placeholder-[#525252] focus:outline-none focus:border-emerald-500/60 focus:ring-1 focus:ring-emerald-500/60 transition-all font-mono"
-              />
-              {keywords && (
-                <button
-                  type="button"
-                  onClick={() => setKeywords('')}
-                  className="absolute right-3 text-[#525252] hover:text-[#9ca3af] transition-colors"
-                >
-                  <Xmark className="w-4 h-4" />
-                </button>
-              )}
+    <div className="w-full min-w-0 space-y-3 font-sans">
+      <form onSubmit={handleRun} className="space-y-3 w-full min-w-0">
+        {/* Main Toolbar: Two side-by-side search bars + Filter Toggle + Run Button */}
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full min-w-0">
+          {/* Search Bar 1: Keywords / Role */}
+          <div ref={roleRef} className="relative flex-1 min-w-0">
+            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-[#6b7280]">
+              <Search className="w-4 h-4" />
             </div>
+            <input
+              type="text"
+              value={keywords}
+              onChange={(e) => {
+                setKeywords(e.target.value);
+                setShowRoleSuggestions(true);
+              }}
+              onFocus={() => setShowRoleSuggestions(true)}
+              placeholder="Role or skills (e.g. AI Engineer)..."
+              className="w-full pl-9 pr-8 py-2 text-xs font-sans rounded-lg bg-[#181818] border border-[#262626] text-white placeholder-[#6b7280] focus:outline-none focus:border-emerald-500 transition-colors"
+            />
+            {keywords && (
+              <button
+                type="button"
+                onClick={() => setKeywords('')}
+                className="absolute inset-y-0 right-0 pr-2.5 flex items-center text-[#6b7280] hover:text-white"
+              >
+                <Xmark className="w-3.5 h-3.5" />
+              </button>
+            )}
 
+            {/* Suggestions Dropdown */}
             {showRoleSuggestions && (
-              <div className="absolute left-0 right-0 top-full mt-1.5 z-30 max-h-56 overflow-y-auto rounded-lg border border-[#2a2a2a] bg-[#181818] shadow-2xl backdrop-blur-xl divide-y divide-[#222222]">
-                {filteredRoles.length > 0 ? (
-                  filteredRoles.map((role) => (
-                    <button
-                      key={role}
-                      type="button"
-                      onClick={() => {
-                        setKeywords(role);
-                        setShowRoleSuggestions(false);
-                      }}
-                      className="w-full text-left px-3.5 py-2 text-xs font-mono text-[#d1d5db] hover:bg-emerald-500/10 hover:text-emerald-400 transition-colors flex items-center justify-between"
-                    >
-                      <span>{role}</span>
-                      <span className="text-[10px] text-[#525252]">role</span>
-                    </button>
-                  ))
-                ) : (
-                  <div className="px-3.5 py-2.5 text-xs text-[#6b7280] font-mono">
-                    Press Enter to use custom query &quot;{keywords}&quot;
-                  </div>
-                )}
+              <div className="absolute top-full left-0 right-0 mt-1 z-30 bg-[#181818] border border-[#262626] rounded-lg shadow-2xl overflow-hidden divide-y divide-[#222222] max-h-52 overflow-y-auto">
+                <div className="px-3 py-1.5 text-[10px] font-sans text-[#6b7280] bg-[#141414]">
+                  Suggested Roles
+                </div>
+                {(filteredRoles.length > 0 ? filteredRoles : ROLE_SUGGESTIONS).map((r) => (
+                  <button
+                    key={r}
+                    type="button"
+                    onClick={() => {
+                      setKeywords(r);
+                      setShowRoleSuggestions(false);
+                    }}
+                    className="w-full text-left px-3 py-2 text-xs text-[#d1d5db] hover:text-white hover:bg-[#202020] transition-colors flex items-center justify-between"
+                  >
+                    <span>{r}</span>
+                    <span className="text-[10px] text-[#6b7280]">select</span>
+                  </button>
+                ))}
               </div>
             )}
           </div>
 
-          <div className="md:col-span-4 relative" ref={locRef}>
-            <div className="relative flex items-center">
-              <span className="absolute left-3.5 text-[#6b7280] pointer-events-none">
-                <MapPin className="w-4 h-4" />
-              </span>
-              <input
-                type="text"
-                value={location}
-                onChange={(e) => {
-                  setLocation(e.target.value);
-                  setShowLocSuggestions(true);
-                }}
-                onFocus={() => setShowLocSuggestions(true)}
-                placeholder="e.g. India, Bengaluru, Pune..."
-                className="w-full pl-10 pr-9 py-2.5 bg-[#1a1a1a] border border-[#2a2a2a] rounded-lg text-sm text-white placeholder-[#525252] focus:outline-none focus:border-emerald-500/60 focus:ring-1 focus:ring-emerald-500/60 transition-all font-mono"
-              />
-              {location && (
-                <button
-                  type="button"
-                  onClick={() => setLocation('')}
-                  className="absolute right-3 text-[#525252] hover:text-[#9ca3af] transition-colors"
-                >
-                  <Xmark className="w-4 h-4" />
-                </button>
-              )}
+          {/* Search Bar 2: Location */}
+          <div ref={locRef} className="relative flex-1 min-w-0">
+            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-[#6b7280]">
+              <MapPin className="w-4 h-4 text-emerald-400" />
             </div>
+            <input
+              type="text"
+              value={location}
+              onChange={(e) => {
+                setLocation(e.target.value);
+                setShowLocSuggestions(true);
+              }}
+              onFocus={() => setShowLocSuggestions(true)}
+              placeholder="Location (e.g. India, Bengaluru)..."
+              className="w-full pl-9 pr-8 py-2 text-xs font-sans rounded-lg bg-[#181818] border border-[#262626] text-white placeholder-[#6b7280] focus:outline-none focus:border-emerald-500 transition-colors"
+            />
+            {location && (
+              <button
+                type="button"
+                onClick={() => setLocation('')}
+                className="absolute inset-y-0 right-0 pr-2.5 flex items-center text-[#6b7280] hover:text-white"
+              >
+                <Xmark className="w-3.5 h-3.5" />
+              </button>
+            )}
 
+            {/* Suggestions Dropdown */}
             {showLocSuggestions && (
-              <div className="absolute left-0 right-0 top-full mt-1.5 z-30 max-h-56 overflow-y-auto rounded-lg border border-[#2a2a2a] bg-[#181818] shadow-2xl backdrop-blur-xl divide-y divide-[#222222]">
-                {filteredLocations.length > 0 ? (
-                  filteredLocations.map((loc) => (
-                    <button
-                      key={loc}
-                      type="button"
-                      onClick={() => {
-                        setLocation(loc);
-                        setShowLocSuggestions(false);
-                      }}
-                      className="w-full text-left px-3.5 py-2 text-xs font-mono text-[#d1d5db] hover:bg-emerald-500/10 hover:text-emerald-400 transition-colors flex items-center justify-between"
-                    >
-                      <span>{loc}</span>
-                      <span className="text-[10px] text-[#525252]">location</span>
-                    </button>
-                  ))
-                ) : (
-                  <div className="px-3.5 py-2.5 text-xs text-[#6b7280] font-mono">
-                    Press Enter to use custom location &quot;{location}&quot;
-                  </div>
-                )}
+              <div className="absolute top-full left-0 right-0 mt-1 z-30 bg-[#181818] border border-[#262626] rounded-lg shadow-2xl overflow-hidden divide-y divide-[#222222] max-h-52 overflow-y-auto">
+                <div className="px-3 py-1.5 text-[10px] font-sans text-[#6b7280] bg-[#141414]">
+                  Popular Locations
+                </div>
+                {(filteredLocations.length > 0 ? filteredLocations : LOCATION_SUGGESTIONS).map((l) => (
+                  <button
+                    key={l}
+                    type="button"
+                    onClick={() => {
+                      setLocation(l);
+                      setShowLocSuggestions(false);
+                    }}
+                    className="w-full text-left px-3 py-2 text-xs text-[#d1d5db] hover:text-white hover:bg-[#202020] transition-colors flex items-center justify-between"
+                  >
+                    <span>{l}</span>
+                    <span className="text-[10px] text-[#6b7280]">select</span>
+                  </button>
+                ))}
               </div>
             )}
           </div>
 
-          <div className="md:col-span-2 flex items-center gap-2">
+          {/* Action Row on Mobile, Inline on Desktop */}
+          <div className="flex items-center gap-2 flex-1 sm:flex-initial shrink-0">
+            {/* Filters Toggle Button */}
             <button
               type="button"
-              onClick={() => setIsFilterOpen(!isFilterOpen)}
+              onClick={() => setIsFilterOpen((prev) => !prev)}
               className={cn(
-                'flex-1 flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-lg border text-xs font-heading font-medium transition-all select-none',
-                isFilterOpen || activeAdvancedFilterCount > 0
-                  ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-400'
-                  : 'border-[#2a2a2a] bg-[#1a1a1a] text-[#9ca3af] hover:text-white hover:border-[#3a3a3a]'
+                'flex items-center gap-1.5 px-3 py-2 rounded-lg border text-xs font-sans font-medium transition-all shrink-0',
+                isFilterOpen
+                  ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-400'
+                  : activeAdvancedFilterCount > 0
+                  ? 'bg-[#202020] border-emerald-500/40 text-white'
+                  : 'bg-[#181818] hover:bg-[#202020] border-[#262626] text-[#9ca3af] hover:text-white'
               )}
-              title="Toggle filter drawer"
             >
-              <Filter className="w-3.5 h-3.5" />
+              <Filter className={cn('w-3.5 h-3.5', activeAdvancedFilterCount > 0 ? 'text-emerald-400' : '')} />
               <span>Filters</span>
               {activeAdvancedFilterCount > 0 && (
-                <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-emerald-500 text-black text-[10px] font-bold">
+                <span className="min-w-[18px] h-[18px] px-1 rounded-full bg-emerald-500 text-[#131313] font-mono text-[10px] font-bold flex items-center justify-center">
                   {activeAdvancedFilterCount}
                 </span>
               )}
               {isFilterOpen ? (
-                <NavArrowUp className="w-3 h-3" />
+                <NavArrowUp className="w-3.5 h-3.5 text-emerald-400" />
               ) : (
-                <NavArrowDown className="w-3 h-3" />
+                <NavArrowDown className="w-3.5 h-3.5 text-[#6b7280]" />
               )}
             </button>
 
+            {/* Run Button - Matches Indeed with Emerald accent */}
             <button
               type="submit"
-              disabled={loading}
-              className="flex-1 flex items-center justify-center gap-1.5 py-2.5 px-4 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white rounded-lg text-xs font-heading font-semibold shadow-lg shadow-emerald-950/40 transition-all select-none"
+              disabled={loading || !keywords.trim() || !location.trim()}
+              className={cn(
+                'flex items-center justify-center gap-1.5 px-5 py-2 rounded-lg text-xs font-sans font-semibold transition-all flex-1 sm:flex-initial min-w-[80px] select-none shadow-sm',
+                loading || !keywords.trim() || !location.trim()
+                  ? 'bg-[#202020] border border-[#262626] text-[#6b7280] opacity-40 cursor-not-allowed'
+                  : 'bg-emerald-600 hover:bg-emerald-500 text-white active:scale-[0.98]'
+              )}
             >
               {loading ? (
-                <Refresh className="w-3.5 h-3.5 animate-spin" />
+                <>
+                  <Refresh className="w-3.5 h-3.5 animate-spin text-white" />
+                  <span>Running...</span>
+                </>
               ) : (
-                <Play className="w-3.5 h-3.5 fill-current" />
+                <>
+                  <Play className="w-3.5 h-3.5 fill-current" />
+                  <span>Run</span>
+                </>
               )}
-              <span>{loading ? 'Fetching...' : 'Scrape'}</span>
             </button>
+
+            {/* Boxy Cards / JSON Toggle */}
+            {onViewModeChange && (
+              <div className="flex items-center p-0.5 rounded-lg bg-[#181818] border border-[#262626] shrink-0">
+                <button
+                  type="button"
+                  onClick={() => onViewModeChange('cards')}
+                  title={`Cards View${resultsCount > 0 ? ` (${resultsCount})` : ''}`}
+                  className={cn(
+                    'p-1.5 rounded-md transition-all',
+                    viewMode === 'cards'
+                      ? 'bg-[#262626] text-emerald-400 shadow-sm'
+                      : 'text-[#6b7280] hover:text-white'
+                  )}
+                >
+                  <Page className="w-4 h-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onViewModeChange('json')}
+                  title="Raw JSON View"
+                  className={cn(
+                    'p-1.5 rounded-md transition-all',
+                    viewMode === 'json'
+                      ? 'bg-[#262626] text-emerald-400 shadow-sm'
+                      : 'text-[#6b7280] hover:text-white'
+                  )}
+                >
+                  <Code className="w-4 h-4" />
+                </button>
+              </div>
+            )}
           </div>
         </div>
 
+        {/* Expandable Advanced Filters Drawer (Matching IndeedTester) */}
         {isFilterOpen && (
-          <div className="mt-4 pt-4 border-t border-[#222222] rounded-lg bg-[#181818]/60 p-4 space-y-4">
+          <div className="bg-[#181818] border border-[#262626] rounded-lg p-3.5 sm:p-4 space-y-3.5 animate-in fade-in-50 slide-in-from-top-1 duration-150 text-xs font-sans">
             <div className="flex items-center justify-between pb-2 border-b border-[#262626]">
-              <span className="text-xs font-heading font-semibold text-[#e5e5e5] flex items-center gap-1.5">
-                <Filter className="w-3.5 h-3.5 text-emerald-400" />
-                Advanced Glassdoor Parameters
-              </span>
+              <span className="font-semibold text-white">Filter Parameters</span>
               <button
                 type="button"
                 onClick={resetAll}
-                className="text-[11px] font-mono text-[#6b7280] hover:text-red-400 flex items-center gap-1 transition-colors"
+                className="text-[11px] text-[#6b7280] hover:text-red-400 flex items-center gap-1 transition-colors"
               >
                 <Refresh className="w-3 h-3" />
-                Reset Defaults
+                <span>Reset to Defaults</span>
               </button>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+              {/* Batch Limit */}
               <div>
-                <label className="block text-[11px] font-mono text-[#9ca3af] mb-1.5">
-                  Start Offset (Page: {Math.floor(start / 30) + 1})
+                <label className="block text-[11px] text-[#9ca3af] mb-1">
+                  Batch Limit
+                </label>
+                <input
+                  type="number"
+                  min={1}
+                  max={100}
+                  value={limit}
+                  onChange={(e) => setLimit(Math.max(1, Math.min(100, parseInt(e.target.value) || 10)))}
+                  className="w-full px-2.5 py-1.5 text-xs font-mono rounded bg-[#141414] border border-[#262626] text-white focus:outline-none focus:border-emerald-500"
+                />
+              </div>
+
+              {/* Offset / Page */}
+              <div>
+                <label className="block text-[11px] text-[#9ca3af] mb-1">
+                  Start Offset (Page {Math.floor(start / 30) + 1})
                 </label>
                 <input
                   type="number"
@@ -365,55 +419,38 @@ export function GlassdoorTester({
                   max={975}
                   step={30}
                   value={start}
-                  onChange={(e) => handleStartChange(parseInt(e.target.value, 10) || 0)}
-                  className={cn(
-                    'w-full px-3 py-2 bg-[#141414] border rounded-lg text-xs font-mono text-white focus:outline-none focus:ring-1 transition-all',
-                    isStartExceeded
-                      ? 'border-red-500 focus:border-red-500 focus:ring-red-500/50'
-                      : 'border-[#2e2e2e] focus:border-emerald-500/60 focus:ring-emerald-500/60'
-                  )}
+                  onChange={(e) => setStart(Math.max(0, Math.min(975, parseInt(e.target.value) || 0)))}
+                  className="w-full px-2.5 py-1.5 text-xs font-mono rounded bg-[#141414] border border-[#262626] text-white focus:outline-none focus:border-emerald-500"
                 />
               </div>
 
+              {/* Freshness Age */}
               <div>
-                <label className="block text-[11px] font-mono text-[#9ca3af] mb-1.5">
-                  Batch Limit (1 – 100)
-                </label>
-                <input
-                  type="number"
-                  min={1}
-                  max={100}
-                  value={limit}
-                  onChange={(e) => setLimit(parseInt(e.target.value, 10) || 10)}
-                  className="w-full px-3 py-2 bg-[#141414] border border-[#2e2e2e] rounded-lg text-xs font-mono text-white focus:outline-none focus:border-emerald-500/60 focus:ring-1 focus:ring-emerald-500/60 transition-all"
-                />
-              </div>
-
-              <div>
-                <label className="block text-[11px] font-mono text-[#9ca3af] mb-1.5">
-                  Freshness / Max Age
+                <label className="block text-[11px] text-[#9ca3af] mb-1">
+                  Listing Age
                 </label>
                 <select
                   value={timeRange}
                   onChange={(e) => setTimeRange(e.target.value)}
-                  className="w-full px-3 py-2 bg-[#141414] border border-[#2e2e2e] rounded-lg text-xs font-mono text-white focus:outline-none focus:border-emerald-500/60 focus:ring-1 focus:ring-emerald-500/60 transition-all"
+                  className="w-full px-2.5 py-1.5 text-xs rounded bg-[#141414] border border-[#262626] text-white focus:outline-none focus:border-emerald-500"
                 >
                   <option value="">Any Time</option>
                   <option value="1">Past 24 Hours</option>
-                  <option value="7">Past Week</option>
+                  <option value="7">Past 7 Days</option>
                   <option value="14">Past 14 Days</option>
                   <option value="30">Past Month</option>
                 </select>
               </div>
 
+              {/* Workplace Setting */}
               <div>
-                <label className="block text-[11px] font-mono text-[#9ca3af] mb-1.5">
+                <label className="block text-[11px] text-[#9ca3af] mb-1">
                   Workplace Setting
                 </label>
                 <select
                   value={workType}
                   onChange={(e) => setWorkType(e.target.value)}
-                  className="w-full px-3 py-2 bg-[#141414] border border-[#2e2e2e] rounded-lg text-xs font-mono text-white focus:outline-none focus:border-emerald-500/60 focus:ring-1 focus:ring-emerald-500/60 transition-all"
+                  className="w-full px-2.5 py-1.5 text-xs rounded bg-[#141414] border border-[#262626] text-white focus:outline-none focus:border-emerald-500"
                 >
                   <option value="">All Settings</option>
                   <option value="1">On-site</option>
@@ -423,68 +460,31 @@ export function GlassdoorTester({
               </div>
             </div>
 
-            <div className="flex flex-wrap items-center justify-between gap-4 pt-2 border-t border-[#222222]">
-              <div className="flex flex-wrap items-center gap-6">
-                <label className="flex items-center gap-2 cursor-pointer select-none">
-                  <input
-                    type="checkbox"
-                    checked={fetchDescriptions}
-                    onChange={(e) => setFetchDescriptions(e.target.checked)}
-                    className="rounded border-[#333] bg-[#141414] text-emerald-500 focus:ring-emerald-500/30"
-                  />
-                  <span className="text-xs font-mono text-[#d1d5db]">
-                    Fetch Full Descriptions (LRU Cached)
-                  </span>
-                </label>
+            {/* Persistence & Details Toggle */}
+            <div className="pt-2 border-t border-[#262626] flex items-center justify-between flex-wrap gap-4">
+              <label className="flex items-center gap-2 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={fetchDescriptions}
+                  onChange={(e) => setFetchDescriptions(e.target.checked)}
+                  className="rounded border-[#262626] bg-[#141414] text-emerald-500 focus:ring-0 focus:ring-offset-0"
+                />
+                <span className="text-xs text-[#d1d5db]">
+                  Fetch Full Descriptions (LRU cached)
+                </span>
+              </label>
 
-                <label className="flex items-center gap-2 cursor-pointer select-none">
-                  <input
-                    type="checkbox"
-                    checked={persist}
-                    onChange={(e) => setPersist(e.target.checked)}
-                    className="rounded border-[#333] bg-[#141414] text-emerald-500 focus:ring-emerald-500/30"
-                  />
-                  <span className="text-xs font-mono text-emerald-400 font-semibold">
-                    Persist to Bronze DB (raw_glassdoor_jobs)
-                  </span>
-                </label>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {resultsCount > 0 && onViewModeChange && (
-          <div className="flex items-center justify-between pt-2 border-t border-[#222222]">
-            <span className="text-xs font-mono text-[#6b7280]">
-              Showing {resultsCount} listings
-            </span>
-            <div className="flex items-center gap-1 bg-[#1a1a1a] p-1 rounded-lg border border-[#2a2a2a]">
-              <button
-                type="button"
-                onClick={() => onViewModeChange('cards')}
-                className={cn(
-                  'flex items-center gap-1.5 px-3 py-1 rounded text-xs font-mono transition-all',
-                  viewMode === 'cards'
-                    ? 'bg-emerald-500/20 text-emerald-400 font-semibold'
-                    : 'text-[#6b7280] hover:text-white'
-                )}
-              >
-                <Page className="w-3.5 h-3.5" />
-                Cards
-              </button>
-              <button
-                type="button"
-                onClick={() => onViewModeChange('json')}
-                className={cn(
-                  'flex items-center gap-1.5 px-3 py-1 rounded text-xs font-mono transition-all',
-                  viewMode === 'json'
-                    ? 'bg-emerald-500/20 text-emerald-400 font-semibold'
-                    : 'text-[#6b7280] hover:text-white'
-                )}
-              >
-                <Code className="w-3.5 h-3.5" />
-                JSON
-              </button>
+              <label className="flex items-center gap-2 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={persist}
+                  onChange={(e) => setPersist(e.target.checked)}
+                  className="rounded border-[#262626] bg-[#141414] text-emerald-500 focus:ring-0 focus:ring-offset-0"
+                />
+                <span className="text-xs text-emerald-400 font-medium">
+                  Persist to Bronze DB (raw_glassdoor_jobs)
+                </span>
+              </label>
             </div>
           </div>
         )}
@@ -492,3 +492,5 @@ export function GlassdoorTester({
     </div>
   );
 }
+
+export default GlassdoorTester;
