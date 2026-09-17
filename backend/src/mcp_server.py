@@ -328,6 +328,45 @@ async def reparse_unified_jobs(
 
 
 # ==========================================
+# Blocked companies (bronze -> silver gate)
+# ==========================================
+
+@mcp.tool()
+async def list_blocked_companies() -> str:
+    """List companies excluded from bronze -> silver promotion. Blocked companies stay in bronze but never reach unified_jobs."""
+    return await _request("GET", "/api/companies/blocked")
+
+
+@mcp.tool()
+async def block_company(company_name: str) -> str:
+    """Block a company so future parses skip it (normalized-exact match). Existing silver rows stay visible.
+
+    Args:
+        company_name: Employer name as seen in bronze, e.g. 'Acme Corp'.
+    """
+    return await _request("POST", "/api/companies/block", json={"company_name": company_name})
+
+
+@mcp.tool()
+async def unblock_company(company_name: str) -> str:
+    """Remove a company from the blocklist so future parses promote it again.
+
+    Args:
+        company_name: Employer name previously blocked.
+    """
+    # httpx DELETE with JSON body
+    client = _get_client()
+    try:
+        resp = await client.request("DELETE", "/api/companies/block", json={"company_name": company_name})
+        body = resp.json()
+    except httpx.HTTPError as exc:
+        return json.dumps({"mcp_error": f"backend unreachable at {BASE_URL}: {exc}"})
+    except ValueError:
+        return json.dumps({"mcp_error": f"non-JSON response (HTTP {resp.status_code})", "text": resp.text[:2000]})
+    return json.dumps({"status_code": resp.status_code, "body": body}, indent=2, default=str)
+
+
+# ==========================================
 # Unified jobs (silver layer) query & triage
 # ==========================================
 

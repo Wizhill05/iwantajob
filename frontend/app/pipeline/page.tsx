@@ -5,6 +5,7 @@ import { Refresh, RefreshDouble } from 'iconoir-react';
 import { api } from '@/lib/api';
 import type { ParsingStatus } from '@/lib/types';
 import { SquareParserActions } from '@/components/pipeline/SquareParserActions';
+import { BlockedCompaniesManager } from '@/components/pipeline/BlockedCompaniesManager';
 import { PageHero } from '@/components/layout/PageHero';
 import { cn } from '@/lib/utils';
 
@@ -84,6 +85,9 @@ function PipelineContent() {
           status={parsingStatus}
           onParseComplete={loadPipelineData}
         />
+
+        {/* Blocked companies gate for bronze -> silver promotion */}
+        <BlockedCompaniesManager />
       </div>
     </div>
   );

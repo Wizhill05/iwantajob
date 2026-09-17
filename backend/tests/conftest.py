@@ -43,4 +43,9 @@ async def cleanup_test_data():
             text("DELETE FROM unified_jobs WHERE external_id LIKE 'test_%'")
         )
 
+        # Blocked companies seeded by tests (normalized names start with 'test ')
+        await session.execute(
+            text("DELETE FROM blocked_companies WHERE company_name_normalized LIKE 'test%'")
+        )
+
         await session.commit()

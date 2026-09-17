@@ -8,6 +8,7 @@
   UnifiedJobsQueryParams,
   HealthCheckResponse,
   AutoTriageResult,
+  BlockedCompanyItem,
 } from './types';
 
 const API_BASE_URL =
@@ -378,6 +379,32 @@ class ApiClient {
       `/api/jobs/auto-triage${qs ? `?${qs}` : ''}`,
       { method: 'POST' }
     );
+  }
+  /**
+   * List companies excluded from bronze -> silver promotion.
+   */
+  async getBlockedCompanies(): Promise<BlockedCompanyItem[]> {
+    return this.request<BlockedCompanyItem[]>('/api/companies/blocked');
+  }
+
+  /**
+   * Block a company so future parses skip it. Existing silver rows stay visible.
+   */
+  async blockCompany(company_name: string): Promise<{ blocked: boolean; company_name_normalized: string }> {
+    return this.request('/api/companies/block', {
+      method: 'POST',
+      body: JSON.stringify({ company_name }),
+    });
+  }
+
+  /**
+   * Unblock a company so future parses promote it again.
+   */
+  async unblockCompany(company_name: string): Promise<{ unblocked: boolean; company_name_normalized: string }> {
+    return this.request('/api/companies/block', {
+      method: 'DELETE',
+      body: JSON.stringify({ company_name }),
+    });
   }
 }
 

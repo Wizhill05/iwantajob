@@ -38,6 +38,9 @@ class RawIndeedJob(Base):
     date_published = Column(DateTime(timezone=True), nullable=True)
     raw_payload = Column(JSONB, nullable=False)
     scraped_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    # True once a parse run has counted this row against a blocked company.
+    # Flagged rows stay in bronze but are hidden from pending counts.
+    skipped_as_blocked = Column(Boolean, default=False, nullable=False)
 
 class RawLinkedInJob(Base):
     __tablename__ = "raw_linkedin_jobs"
@@ -59,6 +62,9 @@ class RawLinkedInJob(Base):
     posted_at = Column(DateTime(timezone=True), nullable=True)
     raw_payload = Column(JSONB, nullable=False)
     scraped_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    # True once a parse run has counted this row against a blocked company.
+    # Flagged rows stay in bronze but are hidden from pending counts.
+    skipped_as_blocked = Column(Boolean, default=False, nullable=False)
 
 class RawWellfoundJob(Base):
     __tablename__ = "raw_wellfound_jobs"
@@ -85,6 +91,9 @@ class RawWellfoundJob(Base):
     posted_at = Column(DateTime(timezone=True), nullable=True)
     raw_payload = Column(JSONB, nullable=False)
     scraped_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    # True once a parse run has counted this row against a blocked company.
+    # Flagged rows stay in bronze but are hidden from pending counts.
+    skipped_as_blocked = Column(Boolean, default=False, nullable=False)
 
 class RawGlassdoorJob(Base):
     __tablename__ = "raw_glassdoor_jobs"
@@ -108,6 +117,9 @@ class RawGlassdoorJob(Base):
     posted_at = Column(DateTime(timezone=True), nullable=True)
     raw_payload = Column(JSONB, nullable=False)
     scraped_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    # True once a parse run has counted this row against a blocked company.
+    # Flagged rows stay in bronze but are hidden from pending counts.
+    skipped_as_blocked = Column(Boolean, default=False, nullable=False)
 
 class UnifiedJob(Base):
     __tablename__ = "unified_jobs"
@@ -149,6 +161,17 @@ class UnifiedJob(Base):
         UniqueConstraint("source", "external_id", name="uq_source_external_id"),
     )
 
+
+
+class BlockedCompany(Base):
+    __tablename__ = "blocked_companies"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    company_name_raw = Column(String, nullable=False)
+    company_name_normalized = Column(String, unique=True, nullable=False, index=True)
+    # Cumulative count of bronze rows skipped because of this block.
+    blocked_attempts = Column(Integer, default=0, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
 
 class UserPreference(Base):

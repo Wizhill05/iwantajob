@@ -175,8 +175,14 @@ export interface HealthCheckResponse {
   version: string;
 }
 
-export interface AutoTriageResult {
-  dry_run: boolean;
+export interface BlockedCompanyItem {
+  company_name_raw: string;
+  company_name_normalized: string;
+  blocked_attempts: number;
+  created_at?: string | null;
+}
+
+export interface AutoTriageResult {  dry_run: boolean;
   evaluated: number;
   saved: number;
   archived: number;

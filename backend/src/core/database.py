@@ -27,5 +27,27 @@ class Base(DeclarativeBase):
 async def init_db() -> None:
     # Import entities so they register with Base.metadata
     import src.models.db_entities  # noqa: F401
+    from sqlalchemy import text
+
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        # Additive-only migration for tables created before the blocked-companies
+        # feature: create_all never alters existing tables.
+        for table in (
+            "raw_indeed_jobs",
+            "raw_linkedin_jobs",
+            "raw_wellfound_jobs",
+            "raw_glassdoor_jobs",
+        ):
+            await conn.execute(
+                text(
+                    f"ALTER TABLE {table} ADD COLUMN IF NOT EXISTS "
+                    "skipped_as_blocked BOOLEAN NOT NULL DEFAULT FALSE"
+                )
+            )
+        await conn.execute(
+            text(
+                "ALTER TABLE blocked_companies ADD COLUMN IF NOT EXISTS "
+                "blocked_attempts INTEGER NOT NULL DEFAULT 0"
+            )
+        )

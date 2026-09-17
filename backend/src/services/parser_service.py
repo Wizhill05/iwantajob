@@ -11,11 +11,13 @@ from src.models.db_entities import (
     RawWellfoundJob,
     RawGlassdoorJob,
     UnifiedJob,
+    BlockedCompany,
 )
 from src.services.llm_parser import LLMJobParser
 from src.services.experience_extractor import ExperienceExtractor
 from src.services.pay_normalizer import PayNormalizer
 from src.services.pipeline_lock import PIPELINE_LOCK
+from src.services.blocked_companies import get_blocked_normalized_set, normalize_company_name
 from src.utils.url_normalizer import normalize_job_url
 
 logger = logging.getLogger(__name__)
@@ -78,6 +80,7 @@ class ParserService:
             finished["processed"] = result.get("processed", run.get("processed", 0))
             finished["promoted"] = result.get("promoted_to_unified", run.get("promoted", 0))
             finished["updated"] = result.get("updated", 0)
+            finished["skipped_blocked"] = result.get("skipped_blocked", 0)
         if error is not None:
             finished["error"] = str(error)
         cls._last_run = finished
@@ -281,13 +284,45 @@ class ParserService:
             run["promoted"] = promoted
 
     @classmethod
-    async def get_parsing_status(cls) -> dict[str, Any]:
-        """Returns the total raw counts and unparsed counts for all 4 sources."""
+    async def _record_blocked_skips(
+        cls,
+        model: Any,
+        blocked_ids: list,
+        blocked_counts: dict[str, int],
+    ) -> None:
+        """Flag bronze rows as handled and tick each company's red counter.
+
+        Flagged rows stay in bronze but are excluded from future parse
+        selection and pending counts, so each blocked hit counts exactly once.
+        """
+        if not blocked_ids:
+            return
         async with async_session_maker() as session:
-            raw_indeed_count = (await session.execute(select(RawIndeedJob.id))).scalars().all()
-            raw_linkedin_count = (await session.execute(select(RawLinkedInJob.id))).scalars().all()
-            raw_wellfound_count = (await session.execute(select(RawWellfoundJob.id))).scalars().all()
-            raw_glassdoor_count = (await session.execute(select(RawGlassdoorJob.id))).scalars().all()
+            await session.execute(
+                update(model).where(model.id.in_(blocked_ids)).values(skipped_as_blocked=True)
+            )
+            await session.commit()
+        async with async_session_maker() as session:
+            for normalized, count in blocked_counts.items():
+                await session.execute(
+                    update(BlockedCompany)
+                    .where(BlockedCompany.company_name_normalized == normalized)
+                    .values(blocked_attempts=BlockedCompany.blocked_attempts + count)
+                )
+            await session.commit()
+
+    @classmethod
+    async def get_parsing_status(cls) -> dict[str, Any]:
+        """Returns the total raw counts and unparsed counts for all 4 sources.
+
+        Rows already counted against a blocked company stay in bronze but are
+        hidden from the pending (unparsed) counts.
+        """
+        async with async_session_maker() as session:
+            raw_indeed_rows = (await session.execute(select(RawIndeedJob.id, RawIndeedJob.skipped_as_blocked))).all()
+            raw_linkedin_rows = (await session.execute(select(RawLinkedInJob.id, RawLinkedInJob.skipped_as_blocked))).all()
+            raw_wellfound_rows = (await session.execute(select(RawWellfoundJob.id, RawWellfoundJob.skipped_as_blocked))).all()
+            raw_glassdoor_rows = (await session.execute(select(RawGlassdoorJob.id, RawGlassdoorJob.skipped_as_blocked))).all()
 
             unified_rows = (await session.execute(select(UnifiedJob.source, UnifiedJob.raw_ref_id))).all()
 
@@ -296,26 +331,30 @@ class ParserService:
             wellfound_parsed_ids = {row[1] for row in unified_rows if row[0] == "wellfound"}
             glassdoor_parsed_ids = {row[1] for row in unified_rows if row[0] == "glassdoor"}
 
+            def _unparsed(raw_rows: list, parsed_ids: set) -> int:
+                handled = {row[0] for row in raw_rows if row[1]} - parsed_ids
+                return max(0, len(raw_rows) - len(parsed_ids) - len(handled))
+
             return {
                 "indeed": {
-                    "total_raw": len(raw_indeed_count),
+                    "total_raw": len(raw_indeed_rows),
                     "parsed": len(indeed_parsed_ids),
-                    "unparsed": max(0, len(raw_indeed_count) - len(indeed_parsed_ids)),
+                    "unparsed": _unparsed(raw_indeed_rows, indeed_parsed_ids),
                 },
                 "linkedin": {
-                    "total_raw": len(raw_linkedin_count),
+                    "total_raw": len(raw_linkedin_rows),
                     "parsed": len(linkedin_parsed_ids),
-                    "unparsed": max(0, len(raw_linkedin_count) - len(linkedin_parsed_ids)),
+                    "unparsed": _unparsed(raw_linkedin_rows, linkedin_parsed_ids),
                 },
                 "wellfound": {
-                    "total_raw": len(raw_wellfound_count),
+                    "total_raw": len(raw_wellfound_rows),
                     "parsed": len(wellfound_parsed_ids),
-                    "unparsed": max(0, len(raw_wellfound_count) - len(wellfound_parsed_ids)),
+                    "unparsed": _unparsed(raw_wellfound_rows, wellfound_parsed_ids),
                 },
                 "glassdoor": {
-                    "total_raw": len(raw_glassdoor_count),
+                    "total_raw": len(raw_glassdoor_rows),
                     "parsed": len(glassdoor_parsed_ids),
-                    "unparsed": max(0, len(raw_glassdoor_count) - len(glassdoor_parsed_ids)),
+                    "unparsed": _unparsed(raw_glassdoor_rows, glassdoor_parsed_ids),
                 },
                 "unified_total": len(unified_rows),
                 **cls.get_run_state(),
@@ -329,15 +368,20 @@ class ParserService:
             stmt = (
                 select(RawIndeedJob)
                 .where(RawIndeedJob.id.not_in(existing_ref_subquery))
+                .where(RawIndeedJob.skipped_as_blocked == False)  # noqa: E712
                 .limit(batch_size)
             )
             raw_jobs = (await session.execute(stmt)).scalars().all()
 
         if not raw_jobs:
-            return {"source": "indeed", "processed": 0, "promoted_to_unified": 0, "errors": []}
+            return {"source": "indeed", "processed": 0, "promoted_to_unified": 0, "skipped_blocked": 0, "errors": []}
 
         promoted = 0
+        skipped_blocked = 0
         errors = []
+        blocked = await get_blocked_normalized_set()
+        blocked_ids: list = []
+        blocked_counts: dict[str, int] = {}
 
         for i in range(0, len(raw_jobs), LLM_BATCH_CHUNK_SIZE):
             chunk = raw_jobs[i : i + LLM_BATCH_CHUNK_SIZE]
@@ -367,6 +411,12 @@ class ParserService:
 
             for r_job in chunk:
                 try:
+                    norm_company = normalize_company_name(r_job.company_name)
+                    if blocked and norm_company in blocked:
+                        skipped_blocked += 1
+                        blocked_ids.append(r_job.id)
+                        blocked_counts[norm_company] = blocked_counts.get(norm_company, 0) + 1
+                        continue
                     url = f"https://www.indeed.com/viewjob?jk={r_job.external_id}"
                     raw_apply_url = r_job.apply_url
                     norm_apply_url = normalize_job_url(raw_apply_url) if raw_apply_url else None
@@ -441,10 +491,13 @@ class ParserService:
 
             cls._report_progress(processed=i + len(chunk), promoted=promoted)
 
+        await cls._record_blocked_skips(RawIndeedJob, blocked_ids, blocked_counts)
+
         return {
             "source": "indeed",
             "processed": len(raw_jobs),
             "promoted_to_unified": promoted,
+            "skipped_blocked": skipped_blocked,
             "errors": errors,
         }
 
@@ -456,15 +509,20 @@ class ParserService:
             stmt = (
                 select(RawLinkedInJob)
                 .where(RawLinkedInJob.id.not_in(existing_ref_subquery))
+                .where(RawLinkedInJob.skipped_as_blocked == False)  # noqa: E712
                 .limit(batch_size)
             )
             raw_jobs = (await session.execute(stmt)).scalars().all()
 
         if not raw_jobs:
-            return {"source": "linkedin", "processed": 0, "promoted_to_unified": 0, "errors": []}
+            return {"source": "linkedin", "processed": 0, "promoted_to_unified": 0, "skipped_blocked": 0, "errors": []}
 
         promoted = 0
+        skipped_blocked = 0
         errors = []
+        blocked = await get_blocked_normalized_set()
+        blocked_ids: list = []
+        blocked_counts: dict[str, int] = {}
 
         for i in range(0, len(raw_jobs), LLM_BATCH_CHUNK_SIZE):
             chunk = raw_jobs[i : i + LLM_BATCH_CHUNK_SIZE]
@@ -492,6 +550,12 @@ class ParserService:
 
             for r_job in chunk:
                 try:
+                    norm_company = normalize_company_name(r_job.company_name)
+                    if blocked and norm_company in blocked:
+                        skipped_blocked += 1
+                        blocked_ids.append(r_job.id)
+                        blocked_counts[norm_company] = blocked_counts.get(norm_company, 0) + 1
+                        continue
                     norm_url = normalize_job_url(r_job.url) or r_job.url
                     # Check if URL already exists in unified_jobs under another entry
                     async with async_session_maker() as s_check:
@@ -562,10 +626,13 @@ class ParserService:
 
             cls._report_progress(processed=i + len(chunk), promoted=promoted)
 
+        await cls._record_blocked_skips(RawLinkedInJob, blocked_ids, blocked_counts)
+
         return {
             "source": "linkedin",
             "processed": len(raw_jobs),
             "promoted_to_unified": promoted,
+            "skipped_blocked": skipped_blocked,
             "errors": errors,
         }
 
@@ -577,15 +644,20 @@ class ParserService:
             stmt = (
                 select(RawWellfoundJob)
                 .where(RawWellfoundJob.id.not_in(existing_ref_subquery))
+                .where(RawWellfoundJob.skipped_as_blocked == False)  # noqa: E712
                 .limit(batch_size)
             )
             raw_jobs = (await session.execute(stmt)).scalars().all()
 
         if not raw_jobs:
-            return {"source": "wellfound", "processed": 0, "promoted_to_unified": 0, "errors": []}
+            return {"source": "wellfound", "processed": 0, "promoted_to_unified": 0, "skipped_blocked": 0, "errors": []}
 
         promoted = 0
+        skipped_blocked = 0
         errors = []
+        blocked = await get_blocked_normalized_set()
+        blocked_ids: list = []
+        blocked_counts: dict[str, int] = {}
 
         for i in range(0, len(raw_jobs), LLM_BATCH_CHUNK_SIZE):
             chunk = raw_jobs[i : i + LLM_BATCH_CHUNK_SIZE]
@@ -617,6 +689,12 @@ class ParserService:
 
             for r_job in chunk:
                 try:
+                    norm_company = normalize_company_name(r_job.company_name)
+                    if blocked and norm_company in blocked:
+                        skipped_blocked += 1
+                        blocked_ids.append(r_job.id)
+                        blocked_counts[norm_company] = blocked_counts.get(norm_company, 0) + 1
+                        continue
                     norm_url = normalize_job_url(r_job.url) or r_job.url
                     # Check if URL already exists in unified_jobs under another entry
                     async with async_session_maker() as s_check:
@@ -689,10 +767,13 @@ class ParserService:
 
             cls._report_progress(processed=i + len(chunk), promoted=promoted)
 
+        await cls._record_blocked_skips(RawWellfoundJob, blocked_ids, blocked_counts)
+
         return {
             "source": "wellfound",
             "processed": len(raw_jobs),
             "promoted_to_unified": promoted,
+            "skipped_blocked": skipped_blocked,
             "errors": errors,
         }
 
@@ -704,15 +785,20 @@ class ParserService:
             stmt = (
                 select(RawGlassdoorJob)
                 .where(RawGlassdoorJob.id.not_in(existing_ref_subquery))
+                .where(RawGlassdoorJob.skipped_as_blocked == False)  # noqa: E712
                 .limit(batch_size)
             )
             raw_jobs = (await session.execute(stmt)).scalars().all()
 
         if not raw_jobs:
-            return {"source": "glassdoor", "processed": 0, "promoted_to_unified": 0, "errors": []}
+            return {"source": "glassdoor", "processed": 0, "promoted_to_unified": 0, "skipped_blocked": 0, "errors": []}
 
         promoted = 0
+        skipped_blocked = 0
         errors = []
+        blocked = await get_blocked_normalized_set()
+        blocked_ids: list = []
+        blocked_counts: dict[str, int] = {}
 
         for i in range(0, len(raw_jobs), LLM_BATCH_CHUNK_SIZE):
             chunk = raw_jobs[i : i + LLM_BATCH_CHUNK_SIZE]
@@ -740,6 +826,12 @@ class ParserService:
 
             for r_job in chunk:
                 try:
+                    norm_company = normalize_company_name(r_job.company_name)
+                    if blocked and norm_company in blocked:
+                        skipped_blocked += 1
+                        blocked_ids.append(r_job.id)
+                        blocked_counts[norm_company] = blocked_counts.get(norm_company, 0) + 1
+                        continue
                     norm_url = normalize_job_url(r_job.url) or r_job.url
                     # Check if URL already exists in unified_jobs under another entry
                     async with async_session_maker() as s_check:
@@ -810,10 +902,13 @@ class ParserService:
 
             cls._report_progress(processed=i + len(chunk), promoted=promoted)
 
+        await cls._record_blocked_skips(RawGlassdoorJob, blocked_ids, blocked_counts)
+
         return {
             "source": "glassdoor",
             "processed": len(raw_jobs),
             "promoted_to_unified": promoted,
+            "skipped_blocked": skipped_blocked,
             "errors": errors,
         }
 

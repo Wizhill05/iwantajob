@@ -16,6 +16,7 @@ from src.models.db_entities import (
     RawLinkedInJob,
     RawWellfoundJob,
     RawGlassdoorJob,
+    BlockedCompany,
     UserPreference,
     DEFAULT_PREFS,
 )
@@ -979,6 +980,100 @@ async def reparse_unified_jobs_endpoint(
     return result
 
 
+# ==========================================
+# Blocked companies (bronze -> silver gate)
+# ==========================================
+
+class BlockCompanyRequest(BaseModel):
+    company_name: str
+
+
+@app.get(
+    "/api/companies/blocked",
+    summary="List Blocked Companies",
+    tags=["Companies"],
+)
+async def list_blocked_companies():
+    """List companies excluded from bronze -> silver promotion."""
+    async with async_session_maker() as session:
+        rows = (await session.execute(select(BlockedCompany).order_by(BlockedCompany.created_at.desc()))).scalars().all()
+        return [
+            {
+                "company_name_raw": r.company_name_raw,
+                "company_name_normalized": r.company_name_normalized,
+                "blocked_attempts": r.blocked_attempts or 0,
+                "created_at": r.created_at.isoformat() if r.created_at else None,
+            }
+            for r in rows
+        ]
+
+
+@app.post(
+    "/api/companies/block",
+    summary="Block a Company From Silver Promotion",
+    tags=["Companies"],
+)
+async def block_company(payload: BlockCompanyRequest):
+    """Block future bronze -> silver promotions for this company (normalized-exact match). Existing silver rows stay visible."""
+    from src.services.blocked_companies import normalize_company_name
+
+    normalized = normalize_company_name(payload.company_name)
+    if not normalized:
+        raise HTTPException(status_code=400, detail="company_name must not be empty")
+    async with async_session_maker() as session:
+        existing = await session.execute(
+            select(BlockedCompany).where(BlockedCompany.company_name_normalized == normalized)
+        )
+        row = existing.scalar_one_or_none()
+        if row is None:
+            row = BlockedCompany(
+                company_name_raw=payload.company_name.strip(),
+                company_name_normalized=normalized,
+            )
+            session.add(row)
+            await session.commit()
+    return {"blocked": True, "company_name_normalized": normalized}
+
+
+@app.delete(
+    "/api/companies/block",
+    summary="Unblock a Company",
+    tags=["Companies"],
+)
+async def unblock_company(payload: BlockCompanyRequest):
+    """Remove a company from the blocklist so future parses promote it again."""
+    from src.services.blocked_companies import normalize_company_name
+
+    normalized = normalize_company_name(payload.company_name)
+    if not normalized:
+        raise HTTPException(status_code=400, detail="company_name must not be empty")
+    async with async_session_maker() as session:
+        result = await session.execute(
+            delete(BlockedCompany).where(BlockedCompany.company_name_normalized == normalized)
+        )
+        await session.commit()
+        removed = (result.rowcount or 0) > 0
+        requeued = 0
+        if removed:
+            # Requeue this company's bronze rows so the next parse picks them up.
+            for model in (RawIndeedJob, RawLinkedInJob, RawWellfoundJob, RawGlassdoorJob):
+                flagged = (
+                    await session.execute(
+                        select(model.id, model.company_name).where(
+                            model.skipped_as_blocked == True  # noqa: E712
+                        )
+                    )
+                ).all()
+                matching = [row[0] for row in flagged if normalize_company_name(row[1]) == normalized]
+                if matching:
+                    await session.execute(
+                        update(model).where(model.id.in_(matching)).values(skipped_as_blocked=False)
+                    )
+                    requeued += len(matching)
+            await session.commit()
+    return {"unblocked": removed, "company_name_normalized": normalized, "requeued": requeued}
+
+
 class JobTriageUpdateRequest(BaseModel):
     is_saved: bool | None = None
     is_archived: bool | None = None
@@ -1373,6 +1468,9 @@ async def clear_bronze():
     Such rows are preserved so silver jobs always keep a valid bronze
     lineage; unified_jobs (silver layer) rows themselves are never
     touched by this endpoint.
+
+    Rows already counted against a blocked company (skipped_as_blocked)
+    are also preserved — they are intentionally kept in bronze.
     """
     raw_models = {
         "indeed": RawIndeedJob,
@@ -1404,7 +1502,7 @@ async def clear_bronze():
             ref_ids = silver_ref_ids[source]
             ext_ids = silver_external_ids[source]
 
-            conditions = []
+            conditions = [model.skipped_as_blocked == False]  # noqa: E712
             if ref_ids:
                 conditions.append(model.id.not_in(ref_ids))
             if ext_ids:
@@ -1420,10 +1518,21 @@ async def clear_bronze():
                     .select_from(model)
                     .where(or_(*keep_conditions))
                 ) or 0
+                skipped += await session.scalar(
+                    select(func.count())
+                    .select_from(model)
+                    .where(model.skipped_as_blocked == True)  # noqa: E712
+                ) or 0
                 stmt = delete(model).where(*conditions)
             else:
-                # Nothing in silver for this source: wipe the whole table.
-                stmt = delete(model)
+                # Nothing in silver for this source: wipe everything except
+                # rows intentionally kept for blocked companies.
+                skipped += await session.scalar(
+                    select(func.count())
+                    .select_from(model)
+                    .where(model.skipped_as_blocked == True)  # noqa: E712
+                ) or 0
+                stmt = delete(model).where(model.skipped_as_blocked == False)  # noqa: E712
 
             deleted_counts[source] = (
                 await session.execute(stmt)
